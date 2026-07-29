@@ -1,39 +1,68 @@
-<!doctype html>
-<html lang="en">
-  <head>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
-    <script type="module" src="/main.js" defer></script>
-  </head>
+    <title>SoundMap</title>
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+    <div class="app-container">
 
-  <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+        <!-- Colonne gauche : largeur variable -->
+        <div class="column column-left">
+            <div class="content-area" id="image-viewer-container">
+                <div id="image-viewer">
+                  <img id="preview" src="" alt="Aperçu de l'image" style="max-width: 600px; border: 1px solid #ccc;" />
+                </div>
 
-      <div class="row">
-        <a href="https://tauri.app" target="_blank">
-          <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a
-          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-          target="_blank"
-        >
-          <img
-            src="/assets/javascript.svg"
-            class="logo vanilla"
-            alt="JavaScript logo"
-          />
-        </a>
-      </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
+                <div id="controls">
+                  <button id="load-btn">Charger une image</button>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
-  </body>
+                  <label>
+                    Contraste (<span id="contrast-value">0</span>)
+                    <input type="range" id="contrast" min="-100" max="100" value="0" step="1" />
+                  </label>
+
+                  <label>
+                    Largeur max (px)
+                    <input type="number" id="max-width" value="800" min="1" />
+                  </label>
+
+                  <label>
+                    Hauteur max (px)
+                    <input type="number" id="max-height" value="600" min="1" />
+                  </label>
+
+                  <p id="dimensions-info"></p>
+                </div>
+            </div>
+            <div class="footer-area" id="metronome">
+                <h3>Métronome</h3>
+                <p>Contrôles du métronome (tempo, play/stop...).</p>
+            </div>
+        </div>
+
+        <!-- Colonne droite : largeur fixe -->
+        <div class="column column-right">
+            <div class="content-area" id="synth-list">
+                <div class="synth-list-header">
+                    <h2>Synthétiseurs</h2>
+                    <button id="add-synth-btn" title="Ajouter un synthétiseur">+</button>
+                </div>
+                <div class="synth-list-body">
+                    <!-- Les synthétiseurs seront ajoutés dynamiquement ici -->
+                    <p class="placeholder-text">Aucun synthétiseur pour l'instant.</p>
+                </div>
+            </div>
+            <div class="footer-area" id="common-controls">
+                <h3>Commandes communes</h3>
+                <p>Paramètres globaux appliqués à tous les synthétiseurs.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
 </html>
