@@ -49,6 +49,20 @@ html, body {
   display: flex;
   flex-direction: column;
 }
+#image-viewer-container #image-viewer {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#image-viewer-container #image-viewer img {
+  min-width: 100%;
+  min-height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
 #image-viewer-container h2 {
   margin-bottom: 12px;
   font-size: 1.1rem;

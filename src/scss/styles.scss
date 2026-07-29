@@ -81,6 +81,22 @@ html, body {
     display: flex;
     flex-direction: column;
 
+    #image-viewer {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+
+        img {
+            min-width: 100%;
+            min-height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+    }
+
     h2 {
         margin-bottom: 12px;
         font-size: 1.1rem;
