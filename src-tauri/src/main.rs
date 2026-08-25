@@ -11,6 +11,7 @@ fn main() {
             image_processing::load_image,
             image_processing::apply_image_adjustments,
             image_processing::get_pixel_data,
+            image_processing::get_grid_info,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors du lancement de l'application Tauri");

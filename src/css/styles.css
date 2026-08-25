@@ -48,28 +48,112 @@ html, body {
   background-color: #141414;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
 }
 #image-viewer-container #image-viewer {
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  border: 1px solid #333;
+  border-radius: 4px;
 }
 #image-viewer-container #image-viewer img {
-  min-width: 100%;
-  min-height: 100%;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
-#image-viewer-container h2 {
+#image-viewer-container #image-viewer img.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+#image-viewer-container #image-viewer img.hidden {
+  display: none;
+}
+#image-viewer-container #image-viewer .viewer-empty {
+  color: #888;
+  font-style: italic;
+}
+#image-viewer-container #image-viewer .viewer-empty.hidden {
+  display: none;
+}
+
+#controls {
+  flex: 0 0 auto;
+}
+#controls .controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
-  font-size: 1.1rem;
+}
+#controls .controls-row.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+#controls .controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 18px;
+}
+#controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
   color: #ccc;
 }
-#image-viewer-container p {
+#controls label span {
+  display: flex;
+  justify-content: space-between;
+}
+#controls label span em {
+  font-style: normal;
   color: #888;
+  font-variant-numeric: tabular-nums;
+}
+#controls label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+#controls .span-2 {
+  grid-column: span 2;
+}
+#controls input[type=range] {
+  width: 100%;
+}
+#controls button {
+  background-color: #3a7bd5;
+  border: none;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
+}
+#controls button:hover {
+  background-color: #2d5fa8;
+}
+#controls button.secondary {
+  background-color: transparent;
+  border: 1px solid #333;
+  color: #ccc;
+}
+#controls button.secondary:hover {
+  background-color: #262626;
+}
+#controls .info {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: #888;
+  font-variant-numeric: tabular-nums;
 }
 
 #synth-list {

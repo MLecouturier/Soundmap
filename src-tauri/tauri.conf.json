@@ -10,9 +10,13 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "soundmap",
-        "width": 800,
-        "height": 600
+        "title": "SoundMap",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 650,
+        "center": true,
+        "resizable": true
       }
     ],
     "security": {

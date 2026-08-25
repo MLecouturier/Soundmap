@@ -13,28 +13,48 @@
         <div class="column column-left">
             <div class="content-area" id="image-viewer-container">
                 <div id="image-viewer">
-                  <img id="preview" src="" alt="Aperçu de l'image" style="max-width: 600px; border: 1px solid #ccc;" />
+                    <img id="preview" alt="Aperçu de l'image" class="hidden" />
+                    <p class="viewer-empty" id="viewer-empty">Aucune image chargée</p>
                 </div>
 
                 <div id="controls">
-                  <button id="load-btn">Charger une image</button>
+                    <div class="controls-row">
+                        <button id="load-btn">Charger une image</button>
+                        <button id="reset-btn" class="secondary">Réinitialiser</button>
+                        <label class="checkbox">
+                            <input type="checkbox" id="show-original" />
+                            Voir l'original
+                        </label>
+                    </div>
 
-                  <label>
-                    Contraste (<span id="contrast-value">0</span>)
-                    <input type="range" id="contrast" min="-100" max="100" value="0" step="1" />
-                  </label>
+                    <div class="controls-grid">
+                        <label>
+                            <span>Colonnes <em id="grid-width-value">-</em></span>
+                            <input type="range" id="grid-width" min="0" max="1000" value="1000" />
+                        </label>
 
-                  <label>
-                    Largeur max (px)
-                    <input type="number" id="max-width" value="800" min="1" />
-                  </label>
+                        <label>
+                            <span>Contraste <em id="contrast-value">0</em></span>
+                            <input type="range" id="contrast" min="-100" max="100" value="0" step="1" />
+                        </label>
 
-                  <label>
-                    Hauteur max (px)
-                    <input type="number" id="max-height" value="600" min="1" />
-                  </label>
+                        <label>
+                            <span>Luminosité <em id="brightness-value">0</em></span>
+                            <input type="range" id="brightness" min="-100" max="100" value="0" step="1" />
+                        </label>
 
-                  <p id="dimensions-info"></p>
+                        <label class="checkbox">
+                            <input type="checkbox" id="grayscale" />
+                            Niveaux de gris
+                        </label>
+
+                        <label>
+                            <span>Postérisation <em id="posterize-value">off</em></span>
+                            <input type="range" id="posterize" min="1" max="32" value="1" step="1" />
+                        </label>
+                    </div>
+
+                    <p id="dimensions-info" class="info"></p>
                 </div>
             </div>
             <div class="footer-area" id="metronome">
