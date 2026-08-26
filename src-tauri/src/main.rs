@@ -1,18 +1,5 @@
-mod image_processing;
-mod state;
-
-use state::ImageState;
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .manage(ImageState::default())
-        .invoke_handler(tauri::generate_handler![
-            image_processing::load_image,
-            image_processing::apply_image_adjustments,
-            image_processing::get_pixel_data,
-            image_processing::get_grid_info,
-        ])
-        .run(tauri::generate_context!())
-        .expect("Erreur lors du lancement de l'application Tauri");
+    soundmap_lib::run();
 }
