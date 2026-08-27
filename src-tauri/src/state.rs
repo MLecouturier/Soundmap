@@ -1,5 +1,6 @@
 use image::DynamicImage;
 use std::sync::Mutex;
+use crate::midi::MidiSender;
 
 pub struct ImageState {
     pub original: Mutex<Option<DynamicImage>>,
@@ -12,5 +13,15 @@ impl Default for ImageState {
             original: Mutex::new(None),
             processed: Mutex::new(None),
         }
+    }
+}
+
+pub struct MidiState {
+    pub sender: MidiSender,
+}
+
+impl Default for MidiState {
+    fn default() -> Self {
+        Self { sender: MidiSender::new() }
     }
 }
