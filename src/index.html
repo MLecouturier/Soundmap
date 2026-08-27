@@ -59,7 +59,22 @@
             </div>
             <div class="footer-area" id="metronome">
                 <h3>Métronome</h3>
-                <p>Contrôles du métronome (tempo, play/stop...).</p>
+                <div class="metronome-controls">
+                    <button id="metronome-toggle">▶ Démarrer</button>
+
+                    <div class="metronome-bpm">
+                        <label for="bpm-input">Tempo (BPM)</label>
+                        <div class="bpm-input-group">
+                            <button id="bpm-minus10" class="bpm-step" title="-10 BPM">-10</button>
+                            <button id="bpm-minus1"  class="bpm-step" title="-1 BPM">-1</button>
+                            <input type="number" id="bpm-input" min="20" max="300" value="120" />
+                            <button id="bpm-plus1"   class="bpm-step" title="+1 BPM">+1</button>
+                            <button id="bpm-plus10"  class="bpm-step" title="+10 BPM">+10</button>
+                        </div>
+                    </div>
+
+                    <div id="metronome-led" class="led"></div>
+                </div>
             </div>
         </div>
 

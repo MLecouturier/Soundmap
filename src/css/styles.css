@@ -156,6 +156,46 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+.metronome-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.metronome-controls .metronome-bpm {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85em;
+  gap: 4px;
+}
+.metronome-controls .metronome-bpm .bpm-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.metronome-controls .metronome-bpm .bpm-input-group #bpm-input {
+  width: 3.5em;
+  text-align: center;
+  font-size: 1em;
+}
+.metronome-controls .metronome-bpm .bpm-input-group .bpm-step {
+  padding: 2px 6px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+.metronome-controls .led {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #444;
+  transition: background-color 0.05s ease;
+  flex-shrink: 0;
+}
+.metronome-controls .led.active {
+  background-color: #2ecc71;
+  box-shadow: 0 0 8px #2ecc71;
+}
+
 #synth-list {
   background-color: #232323;
   display: flex;

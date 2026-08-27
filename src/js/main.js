@@ -161,3 +161,69 @@ showOriginal.addEventListener('change', updatePreviewSrc);
 
 // ---------- Init ----------
 syncLabels();
+
+// ---------- Métronome ----------
+const metronomeToggle = document.querySelector('#metronome-toggle');
+const bpmInput = document.querySelector('#bpm-input');
+const bpmMinus10 = document.querySelector('#bpm-minus10');
+const bpmMinus1  = document.querySelector('#bpm-minus1');
+const bpmPlus1   = document.querySelector('#bpm-plus1');
+const bpmPlus10  = document.querySelector('#bpm-plus10');
+const metronomeLed = document.querySelector('#metronome-led');
+
+const BPM_MIN = 20;
+const BPM_MAX = 300;
+
+let metronomeRunning = false;
+
+function clampBpm(value) {
+    return Math.min(BPM_MAX, Math.max(BPM_MIN, value));
+}
+
+async function applyBpm(newBpm) {
+    const clamped = clampBpm(newBpm);
+    bpmInput.value = clamped;
+    if (metronomeRunning) {
+        await invoke('set_metronome_bpm', { bpm: clamped });
+    }
+}
+
+async function toggleMetronome() {
+    if (metronomeRunning) {
+        await invoke('stop_metronome');
+        metronomeRunning = false;
+        metronomeToggle.textContent = '▶ Démarrer';
+    } else {
+        await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
+        await invoke('start_metronome');
+        metronomeRunning = true;
+        metronomeToggle.textContent = '⏸ Arrêter';
+    }
+}
+
+metronomeToggle.addEventListener('click', toggleMetronome);
+
+bpmMinus10.addEventListener('click', () => applyBpm(Number(bpmInput.value) - 10));
+bpmMinus1.addEventListener('click',  () => applyBpm(Number(bpmInput.value) - 1));
+bpmPlus1.addEventListener('click',   () => applyBpm(Number(bpmInput.value) + 1));
+bpmPlus10.addEventListener('click',  () => applyBpm(Number(bpmInput.value) + 10));
+
+// Saisie directe au clavier : on valide au blur ou sur "Enter"
+bpmInput.addEventListener('change', () => applyBpm(Number(bpmInput.value)));
+
+// Support clavier : flèches ↑/↓ pour incrémenter/décrémenter de 1
+bpmInput.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowUp') {
+        event.preventDefault(); // évite le comportement natif du <input type="number">
+        applyBpm(Number(bpmInput.value) + 1);
+    } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        applyBpm(Number(bpmInput.value) - 1);
+    }
+});
+
+// Écoute des ticks émis par le backend Rust
+window.__TAURI__.event.listen('metronome-tick', (event) => {
+    metronomeLed.classList.add('active');
+    setTimeout(() => metronomeLed.classList.remove('active'), 100);
+});
