@@ -12,11 +12,29 @@ pub struct ImageInfo {
     pub height: u32,
 }
 
+#[derive(Serialize)]
+pub struct LoadedImageInfo {
+    pub base64_png: String,
+    pub orig_width: u32,
+    pub orig_height: u32,
+}
+
+#[derive(Serialize)]
+pub struct AdjustedImageInfo {
+    pub base64_png: String,
+    pub width: u32,
+    pub height: u32,
+    pub cell_count: u32,
+}
+
 #[derive(Deserialize)]
 pub struct AdjustmentParams {
+    pub grid_width: u32,
+    pub grid_height: Option<u32>, // toujours None pour l'instant : ratio déduit
     pub contrast: f32,
-    pub max_width: u32,
-    pub max_height: u32,
+    pub brightness: i32,
+    pub grayscale: bool,
+    pub posterize_levels: Option<u8>,
 }
 
 #[derive(Serialize)]
@@ -37,7 +55,7 @@ fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 pub async fn load_image(
     app_handle: tauri::AppHandle,
     state: State<'_, ImageState>,
-) -> Result<ImageInfo, String> {
+) -> Result<LoadedImageInfo, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let file_path = app_handle
@@ -61,10 +79,10 @@ pub async fn load_image(
     *state.original.lock().unwrap() = Some(img.clone());
     *state.processed.lock().unwrap() = Some(img);
 
-    Ok(ImageInfo {
+    Ok(LoadedImageInfo {
         base64_png,
-        width,
-        height,
+        orig_width: width,
+        orig_height: height,
     })
 }
 
@@ -72,33 +90,77 @@ pub async fn load_image(
 pub fn apply_image_adjustments(
     state: State<'_, ImageState>,
     params: AdjustmentParams,
-) -> Result<ImageInfo, String> {
+) -> Result<AdjustedImageInfo, String> {
     let original_guard = state.original.lock().unwrap();
     let original = original_guard
         .as_ref()
         .ok_or_else(|| "Aucune image chargée".to_string())?;
 
-    // resize() conserve le ratio, en s'assurant que l'image tient
-    // dans max_width x max_height (nearest neighbor pour garder des valeurs pures)
-    let resized = original.resize(
-        params.max_width.max(1),
-        params.max_height.max(1),
+    let (orig_w, orig_h) = original.dimensions();
+
+    // --- Downsampling réel : grid_width devient le nombre de colonnes/notes ---
+    // Le ratio est toujours déduit de l'image originale (pas de grid_height indépendant).
+    let target_w = params.grid_width.max(1);
+    let target_h = ((orig_h as f64) * (target_w as f64) / (orig_w as f64))
+        .round()
+        .max(1.0) as u32;
+
+    let mut img = original.resize_exact(
+        target_w,
+        target_h,
         image::imageops::FilterType::Nearest,
     );
 
-    let adjusted = resized.adjust_contrast(params.contrast);
+    // --- Ajustements ---
+    if params.grayscale {
+        img = DynamicImage::ImageLuma8(img.to_luma8()).into();
+        // reconversion en RGBA pour rester cohérent avec la suite du pipeline
+        img = DynamicImage::ImageRgba8(img.to_rgba8());
+    }
 
-    let (width, height) = adjusted.dimensions();
-    let base64_png = encode_to_base64_png(&adjusted)?;
+    if params.contrast != 0.0 {
+        img = img.adjust_contrast(params.contrast);
+    }
+
+    if params.brightness != 0 {
+        img = img.brighten(params.brightness);
+    }
+
+    if let Some(levels) = params.posterize_levels {
+        if levels >= 2 {
+            img = posterize(&img, levels);
+        }
+    }
+
+    let (width, height) = img.dimensions();
+    let base64_png = encode_to_base64_png(&img)?;
+    let cell_count = width * height;
 
     drop(original_guard);
-    *state.processed.lock().unwrap() = Some(adjusted);
+    *state.processed.lock().unwrap() = Some(img);
 
-    Ok(ImageInfo {
+    Ok(AdjustedImageInfo {
         base64_png,
         width,
         height,
+        cell_count,
     })
+}
+
+/// Réduit chaque canal RGB à `levels` paliers distincts (posterize classique).
+fn posterize(img: &DynamicImage, levels: u8) -> DynamicImage {
+    let levels = levels.max(2) as f32;
+    let step = 255.0 / (levels - 1.0);
+
+    let mut rgba = img.to_rgba8();
+    for pixel in rgba.pixels_mut() {
+        for channel in 0..3 {
+            let v = pixel[channel] as f32;
+            let posterized = ((v / step).round() * step).clamp(0.0, 255.0);
+            pixel[channel] = posterized as u8;
+        }
+    }
+    DynamicImage::ImageRgba8(rgba)
 }
 
 #[tauri::command]
