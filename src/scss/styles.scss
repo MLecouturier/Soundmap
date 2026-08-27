@@ -308,6 +308,49 @@ $metronome-led-transition: 0.05s ease;
     font-style: italic;
 }
 
+.synth-block {
+    background-color: $color-bg-light;
+    border: 1px solid $color-border;
+    border-radius: $border-radius-base;
+    padding: 10px;
+
+    .synth-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+        color: $color-text-secondary;
+
+        .synth-remove {
+            background: none;
+            border: none;
+            color: $color-text-muted;
+            cursor: pointer;
+            font-size: 1rem;
+
+            &:hover { color: $color-text-primary; }
+        }
+    }
+
+    .synth-body {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        .synth-play.active {
+            background-color: #c0392b;
+            &:hover { background-color: #a5281b; }
+        }
+
+        .synth-pixel-info {
+            font-size: 0.78rem;
+            color: $color-text-muted;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+}
+
 // ==========================================================================
 // Zones fixes (footers)
 // ==========================================================================

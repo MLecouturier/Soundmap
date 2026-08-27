@@ -227,3 +227,83 @@ window.__TAURI__.event.listen('metronome-tick', (event) => {
     metronomeLed.classList.add('active');
     setTimeout(() => metronomeLed.classList.remove('active'), 100);
 });
+
+// ==========================================
+// Synthétiseurs
+// ==========================================
+const addSynthBtn   = document.querySelector('#add-synth-btn');
+const synthListBody = document.querySelector('.synth-list-body');
+const placeholder   = synthListBody.querySelector('.placeholder-text');
+
+function createSynthElement(id) {
+    const el = document.createElement('div');
+    el.className = 'synth-block';
+    el.dataset.synthId = id;
+
+    el.innerHTML = `
+        <div class="synth-header">
+            <span>Synthé #${id}</span>
+            <button class="synth-remove" title="Supprimer">✕</button>
+        </div>
+        <div class="synth-body">
+            <button class="synth-play">▶ Play</button>
+            <p class="synth-pixel-info">Pixel : -</p>
+        </div>
+    `;
+
+    el.querySelector('.synth-play').addEventListener('click', () => onSynthPlayClick(id, el));
+    el.querySelector('.synth-remove').addEventListener('click', () => onSynthRemoveClick(id, el));
+
+    return el;
+}
+
+async function onSynthPlayClick(id, el) {
+    const playBtn = el.querySelector('.synth-play');
+    const willPlay = !playBtn.classList.contains('active');
+    const anyPlaying = await invoke('is_any_synth_playing');
+    
+    if (!anyPlaying && metronomeRunning) {
+        await toggleMetronome();
+    }
+
+    if (willPlay) {
+        await invoke('start_synth', { id });
+        playBtn.classList.add('active');
+        playBtn.textContent = '⏸ Stop';
+
+        // Démarre le métronome s'il n'est pas déjà lancé
+        if (!metronomeRunning) {
+            await toggleMetronome();
+        }
+    } else {
+        await invoke('stop_synth', { id });
+        playBtn.classList.remove('active');
+        playBtn.textContent = '▶ Play';
+    }
+}
+
+async function onSynthRemoveClick(id, el) {
+    await invoke('stop_synth', { id }).catch(() => {});
+    await invoke('remove_synth', { id });
+    el.remove();
+
+    if (!synthListBody.querySelector('.synth-block')) {
+        placeholder.classList.remove('hidden');
+    }
+}
+
+addSynthBtn.addEventListener('click', async () => {
+    const info = await invoke('add_synth');
+    placeholder.classList.add('hidden');
+    const el = createSynthElement(info.id);
+    synthListBody.appendChild(el);
+});
+
+// Réception des ticks de pixels, un par synthé
+window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
+    const { synthId, cursor, r, g, b, a } = event.payload;
+    const el = synthListBody.querySelector(`[data-synth-id="${synthId}"]`);
+    if (!el) return;
+    el.querySelector('.synth-pixel-info').textContent =
+        `Pixel ${cursor} — rgba(${r}, ${g}, ${b}, ${a})`;
+});

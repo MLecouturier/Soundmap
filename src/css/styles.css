@@ -242,6 +242,47 @@ html, body {
   font-style: italic;
 }
 
+.synth-block {
+  background-color: #262626;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 10px;
+}
+.synth-block .synth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+.synth-block .synth-header .synth-remove {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.synth-block .synth-header .synth-remove:hover {
+  color: #e0e0e0;
+}
+.synth-block .synth-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.synth-block .synth-body .synth-play.active {
+  background-color: #c0392b;
+}
+.synth-block .synth-body .synth-play.active:hover {
+  background-color: #a5281b;
+}
+.synth-block .synth-body .synth-pixel-info {
+  font-size: 0.78rem;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+
 .footer-area {
   flex: 0 0 auto;
   height: 140px;

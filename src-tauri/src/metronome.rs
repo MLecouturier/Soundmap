@@ -2,7 +2,9 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
+
+use crate::state::{ImageState, SynthState};
 
 pub struct MetronomeState {
     pub running: Arc<AtomicBool>,
@@ -41,8 +43,29 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
             let interval_ms = 60_000u64 / current_bpm as u64;
 
             let _ = app.emit("metronome-tick", beat_index);
-            beat_index += 1;
 
+            // --- Avancement des synthés actifs sur l'image ---
+            let image_state = app.state::<ImageState>();
+            let synth_state = app.state::<SynthState>();
+
+            if let Some(image) = image_state.processed.lock().unwrap().as_ref() {
+                let (width, height) = (image.width() as usize, image.height() as usize);
+                let total_pixels = width * height;
+
+                let mut synths = synth_state.synths.lock().unwrap();
+                for synth in synths.values_mut() {
+                    if synth.playing && total_pixels > 0 {
+                        synth.cursor = (synth.cursor + 1) % total_pixels;
+
+                        let _ = app.emit("synth-pixel-tick", serde_json::json!({
+                            "id": synth.id,
+                            "cursor": synth.cursor,
+                        }));
+                    }
+                }
+            }
+
+            beat_index += 1;
             thread::sleep(Duration::from_millis(interval_ms));
         }
     });
