@@ -185,6 +185,15 @@ input[type=range].synth-range-input::-moz-range-track {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px 18px;
 }
+#controls button:disabled,
+#controls input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+#controls.locked label:has(input:disabled) {
+  opacity: 0.5;
+}
 #controls label {
   display: flex;
   flex-direction: column;
@@ -293,8 +302,14 @@ input[type=range].synth-range-input::-moz-range-track {
   font-size: 1.1rem;
   color: #ccc;
 }
+.synth-list-header .synth-list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-#add-synth-btn {
+#add-synth-btn,
+#play-all-btn {
   background-color: #3a7bd5;
   border: none;
   color: white;
@@ -307,8 +322,13 @@ input[type=range].synth-range-input::-moz-range-track {
   line-height: 1;
   transition: background-color 0.2s ease;
 }
-#add-synth-btn:hover {
+#add-synth-btn:hover,
+#play-all-btn:hover {
   background-color: #2d5fa8;
+}
+
+#play-all-btn {
+  font-size: 0.9rem;
 }
 
 .synth-list-body {
@@ -399,6 +419,10 @@ input[type=range].synth-range-input::-moz-range-track {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.synth-block .synth-body select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .synth-block .synth-body .synth-controls-row {
   display: flex;

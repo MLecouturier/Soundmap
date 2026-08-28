@@ -21,6 +21,17 @@ const posterizeValue  = document.querySelector('#posterize-value');
 
 const dimensionsInfo  = document.querySelector('#dimensions-info');
 
+// Contrôles d'image à verrouiller pendant la lecture d'un synthétiseur
+// (le bouton "Voir l'original" reste volontairement exclu)
+const imageLockControls = [loadBtn, resetBtn, gridSlider, contrast, brightness, grayscale, posterize];
+
+// Verrouille/déverrouille les contrôles d'image selon qu'un synthé joue ou non
+function updateImageControlsLockState() {
+    const anyPlaying = synthListBody.querySelectorAll('.synth-play.active').length > 0;
+    imageLockControls.forEach(el => { el.disabled = anyPlaying; });
+    document.querySelector('#controls').classList.toggle('locked', anyPlaying);
+}
+
 // ---------- Canvas overlay ----------
 let gridW = 1; // largeur courante de la grille en pixels
 let gridH = 1; // hauteur courante de la grille en pixels
@@ -327,7 +338,6 @@ showOriginal.addEventListener('change', updatePreviewSrc);
 syncLabels();
 
 // ---------- Métronome ----------
-const metronomeToggle = document.querySelector('#metronome-toggle');
 const bpmInput = document.querySelector('#bpm-input');
 const bpmMinus10 = document.querySelector('#bpm-minus10');
 const bpmMinus1  = document.querySelector('#bpm-minus1');
@@ -352,42 +362,32 @@ async function applyBpm(newBpm) {
     }
 }
 
-async function toggleMetronome() {
-    if (metronomeRunning) {
-        await invoke('stop_metronome');
-        metronomeRunning = false;
-        metronomeToggle.textContent = '▶ Démarrer';
-
-        // Remettre tous les boutons de synthés à l'état arrêté et restaurer les highlights
-        synthListBody.querySelectorAll('.synth-block').forEach(el => {
-            const btn = el.querySelector('.synth-play');
-            btn.textContent = '▶ Play';
-            btn.classList.remove('active');
-            const sid = Number(el.dataset.synthId);
-            synthCursors.delete(sid);
-            const hi = synthHighlights.get(sid);
-            if (hi && hi._wasVisible) { hi.visible = true; hi._wasVisible = false; }
-        });
-        redrawAllHighlights();
-    } else {
-        await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
-        await invoke('start_metronome');
-        metronomeRunning = true;
-        metronomeToggle.textContent = '⏸ Arrêter';
-
-        // Resynchroniser l'état visuel de chaque synthé avec l'état Rust
-        for (const el of synthListBody.querySelectorAll('.synth-block')) {
-            const sid = Number(el.dataset.synthId);
-            const isPlaying = await invoke('is_synth_playing', { id: sid });
-            const btn = el.querySelector('.synth-play');
-            btn.textContent = isPlaying ? '⏸ Stop' : '▶ Play';
-            btn.classList.toggle('active', isPlaying);
-            if (isPlaying) hideHighlightForPlay(sid);
-        }
-    }
+// Démarre le métronome Rust s'il n'est pas déjà en cours
+async function ensureMetronomeStarted() {
+    if (metronomeRunning) return;
+    await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
+    await invoke('start_metronome');
+    metronomeRunning = true;
 }
 
-metronomeToggle.addEventListener('click', toggleMetronome);
+// Arrête le métronome Rust s'il n'y a plus aucun synthé en lecture
+async function stopMetronomeIfIdle() {
+    if (!metronomeRunning) return;
+    const anyPlaying = synthListBody.querySelectorAll('.synth-play.active').length > 0;
+    if (anyPlaying) return;
+
+    await invoke('stop_metronome');
+    metronomeRunning = false;
+
+    // Restaurer les highlights masqués pendant la lecture
+    synthListBody.querySelectorAll('.synth-block').forEach(el => {
+        const sid = Number(el.dataset.synthId);
+        synthCursors.delete(sid);
+        const hi = synthHighlights.get(sid);
+        if (hi && hi._wasVisible) { hi.visible = true; hi._wasVisible = false; }
+    });
+    redrawAllHighlights();
+}
 
 bpmMinus10.addEventListener('click', () => applyBpm(Number(bpmInput.value) - 10));
 bpmMinus1.addEventListener('click',  () => applyBpm(Number(bpmInput.value) - 1));
@@ -418,6 +418,7 @@ window.__TAURI__.event.listen('metronome-tick', (event) => {
 // Synthétiseurs
 // ==========================================
 const addSynthBtn   = document.querySelector('#add-synth-btn');
+const playAllBtn    = document.querySelector('#play-all-btn');
 const synthListBody = document.querySelector('.synth-list-body');
 const placeholder   = synthListBody.querySelector('.placeholder-text');
 
@@ -700,28 +701,49 @@ function initFillUpdate(el) {
 }
 
 async function onSynthPlayClick(id, el) {
-    const btn = el.querySelector('.synth-play');
     const isPlaying = await invoke('is_synth_playing', { id });
-
     if (!isPlaying) {
-        if (!metronomeRunning) {
-            await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
-            await invoke('start_metronome');
-            metronomeRunning = true;
-            metronomeToggle.textContent = '⏸ Arrêter';
-        }
-        await invoke('start_synth', { id });
-        btn.textContent = '⏸ Stop';
-        btn.classList.add('active');
-        // Masquer le surlignage pendant la lecture
-        hideHighlightForPlay(id);
+        await startSynthPlayback(id, el);
     } else {
-        await invoke('stop_synth', { id });
-        btn.textContent = '▶ Play';
-        btn.classList.remove('active');
-        // Réafficher le surlignage si le bouton œil est actif
-        restoreHighlightAfterStop(id, el);
+        await stopSynthPlayback(id, el);
     }
+    syncPlayAllButton();
+}
+
+// Met à jour le libellé du bouton "play all" selon l'état courant des synthés
+function syncPlayAllButton() {
+    const blocks = Array.from(synthListBody.querySelectorAll('.synth-block'));
+    const anyPlaying = blocks.some(el => el.querySelector('.synth-play').classList.contains('active'));
+    playAllBtn.textContent = anyPlaying ? '⏸' : '▶';
+    playAllBtn.title = anyPlaying
+        ? 'Arrêter tous les synthétiseurs'
+        : 'Démarrer tous les synthétiseurs';
+}
+
+async function startSynthPlayback(id, el) {
+    const btn = el.querySelector('.synth-play');
+    await ensureMetronomeStarted();
+    await invoke('start_synth', { id });
+    btn.textContent = '⏸ Stop';
+    btn.classList.add('active');
+    // Masquer le surlignage pendant la lecture
+    hideHighlightForPlay(id);
+    // Verrouiller le canal MIDI de ce synthé pendant la lecture
+    el.querySelector('.synth-channel').disabled = true;
+    updateImageControlsLockState();
+}
+
+async function stopSynthPlayback(id, el) {
+    const btn = el.querySelector('.synth-play');
+    await invoke('stop_synth', { id });
+    btn.textContent = '▶ Play';
+    btn.classList.remove('active');
+    // Réafficher le surlignage si le bouton œil est actif
+    restoreHighlightAfterStop(id, el);
+    await stopMetronomeIfIdle();
+    // Déverrouiller le canal MIDI de ce synthé
+    el.querySelector('.synth-channel').disabled = false;
+    updateImageControlsLockState();
 }
 
 function hideHighlightForPlay(id) {
@@ -760,6 +782,9 @@ async function onSynthRemoveClick(id, el) {
     if (synthListBody.querySelectorAll('.synth-block').length === 0) {
         placeholder.classList.remove('hidden');
     }
+    syncPlayAllButton();
+    await stopMetronomeIfIdle();
+    updateImageControlsLockState();
 }
 
 addSynthBtn.addEventListener('click', async () => {
@@ -773,8 +798,34 @@ addSynthBtn.addEventListener('click', async () => {
     }
 });
 
+// ---------- Démarrer/arrêter tous les synthétiseurs ----------
+playAllBtn.addEventListener('click', async () => {
+    const blocks = Array.from(synthListBody.querySelectorAll('.synth-block'));
+    if (blocks.length === 0) return;
+
+    // On considère l'ensemble "en lecture" si au moins un synthé joue déjà.
+    const anyPlaying = blocks.some(el => el.querySelector('.synth-play').classList.contains('active'));
+
+    if (anyPlaying) {
+        // Tout arrêter
+        for (const el of blocks) {
+            const id = Number(el.dataset.synthId);
+            if (el.querySelector('.synth-play').classList.contains('active')) {
+                await stopSynthPlayback(id, el);
+            }
+        }
+    } else {
+        // Tout démarrer
+        for (const el of blocks) {
+            const id = Number(el.dataset.synthId);
+            await startSynthPlayback(id, el);
+        }
+    }
+    syncPlayAllButton();
+});
+
 // Arrêt automatique en fin de séquence (mode sans boucle)
-window.__TAURI__.event.listen('synth-stopped', (event) => {
+window.__TAURI__.event.listen('synth-stopped', async (event) => {
     const { id } = event.payload;
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
@@ -783,6 +834,11 @@ window.__TAURI__.event.listen('synth-stopped', (event) => {
     btn.classList.remove('active');
     synthCursors.delete(id);
     restoreHighlightAfterStop(id, el);
+    syncPlayAllButton();
+    await stopMetronomeIfIdle();
+    // Déverrouiller le canal MIDI de ce synthé
+    el.querySelector('.synth-channel').disabled = false;
+    updateImageControlsLockState();
 });
 
 // Réception des ticks de pixels, un par synthé

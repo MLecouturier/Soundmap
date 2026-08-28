@@ -212,6 +212,20 @@ input[type="range"].synth-range-input {
         gap: 10px 18px;
     }
 
+    // Contrôles verrouillés pendant la lecture d'un synthétiseur
+    // (le bouton "Voir l'original" reste actif, donc on cible chaque élément
+    // désactivé plutôt que la .controls-row entière)
+    button:disabled,
+    input:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    &.locked label:has(input:disabled) {
+        opacity: 0.5;
+    }
+
     label {
         display: flex;
         flex-direction: column;
@@ -339,9 +353,16 @@ $metronome-led-transition: 0.05s ease;
         font-size: 1.1rem;
         color: $color-text-secondary;
     }
+
+    .synth-list-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 }
 
-#add-synth-btn {
+#add-synth-btn,
+#play-all-btn {
     background-color: $color-accent;
     border: none;
     color: white;
@@ -357,6 +378,10 @@ $metronome-led-transition: 0.05s ease;
     &:hover {
         background-color: $color-accent-hover;
     }
+}
+
+#play-all-btn {
+    font-size: 0.9rem;
 }
 
 .synth-list-body {
@@ -453,6 +478,11 @@ $metronome-led-transition: 0.05s ease;
         display: flex;
         flex-direction: column;
         gap: 6px;
+
+        select:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
 
         .synth-controls-row {
             display: flex;

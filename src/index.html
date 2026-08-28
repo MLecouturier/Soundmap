@@ -61,8 +61,6 @@
             <div class="footer-area" id="metronome">
                 <h3>Métronome</h3>
                 <div class="metronome-controls">
-                    <button id="metronome-toggle">▶ Démarrer</button>
-
                     <div class="metronome-bpm">
                         <label for="bpm-input">Tempo (BPM)</label>
                         <div class="bpm-input-group">
@@ -84,7 +82,10 @@
             <div class="content-area" id="synth-list">
                 <div class="synth-list-header">
                     <h2>Synthétiseurs</h2>
-                    <button id="add-synth-btn" title="Ajouter un synthétiseur">+</button>
+                    <div class="synth-list-header-actions">
+                        <button id="play-all-btn" title="Démarrer/arrêter tous les synthétiseurs">▶</button>
+                        <button id="add-synth-btn" title="Ajouter un synthétiseur">+</button>
+                    </div>
                 </div>
                 <div class="synth-list-body">
                     <!-- Les synthétiseurs seront ajoutés dynamiquement ici -->

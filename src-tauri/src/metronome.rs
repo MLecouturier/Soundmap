@@ -13,8 +13,37 @@ fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
     0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32
 }
 
-/// Mappe une luminosité (0–255) vers une note MIDI 0–127.
-fn luma_to_midi_note(luma: f32) -> u8 {
+/// Calcule la teinte (Hue) d'un pixel RGB selon le modèle TSL/HSL, en degrés (0.0–360.0).
+/// Pour un pixel achromatique (gris pur, r=g=b), la teinte n'est pas définie ; on retourne 0.0.
+fn pixel_hue(r: u8, g: u8, b: u8) -> f32 {
+    let (r, g, b) = (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0);
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+
+    if delta.abs() < f32::EPSILON {
+        return 0.0; // gris : teinte indéfinie
+    }
+
+    let hue = if max == r {
+        60.0 * (((g - b) / delta) % 6.0)
+    } else if max == g {
+        60.0 * (((b - r) / delta) + 2.0)
+    } else {
+        60.0 * (((r - g) / delta) + 4.0)
+    };
+
+    if hue < 0.0 { hue + 360.0 } else { hue }
+}
+
+/// Mappe une teinte (0–360°) vers une note MIDI 0–127.
+fn hue_to_midi_note(hue: f32) -> u8 {
+    ((hue / 360.0) * 127.0).round().clamp(0.0, 127.0) as u8
+}
+
+/// Mappe une luminosité (0–255) vers un niveau MIDI 0–127 (utilisé pour le
+/// filtrage par seuil de luminosité, indépendamment de la note jouée).
+fn luma_to_level(luma: f32) -> u8 {
     ((luma / 255.0) * 127.0).round() as u8
 }
 
@@ -123,7 +152,9 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         let pixel = image.get_pixel(x, y);
                         let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
                         let luma = pixel_luma(r, g, b);
-                        let raw_note = luma_to_midi_note(luma);
+                        let hue = pixel_hue(r, g, b);
+                        let raw_note = hue_to_midi_note(hue);
+                        let brightness_level = luma_to_level(luma);
                         let velocity = luma_to_velocity(luma);
 
                         // Appliquer le seuil de variation de note : si l'écart avec la
@@ -141,8 +172,8 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                             }
                         };
 
-                        let in_range = effective_note >= synth.brightness_min
-                            && effective_note <= synth.brightness_max;
+                        let in_range = brightness_level >= synth.brightness_min
+                            && brightness_level <= synth.brightness_max;
 
                         // On ne (re)déclenche le MIDI que si la note change réellement
                         // ou si son statut audible (muet / non muet) change. Sinon on
@@ -178,6 +209,8 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                             "r": r, "g": g, "b": b, "a": a,
                             "note": effective_note,
                             "raw_note": raw_note,
+                            "hue": hue,
+                            "brightness_level": brightness_level,
                             "velocity": velocity,
                             "muted": !in_range,
                         }));
