@@ -338,6 +338,34 @@ $metronome-led-transition: 0.05s ease;
         flex-direction: column;
         gap: 6px;
 
+        .synth-controls-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .synth-loop-btn {
+            font-size: 0.82rem;
+            padding: 4px 10px;
+            border-radius: $border-radius-base;
+            border: none;
+            cursor: pointer;
+            transition: background-color $transition-fast, color $transition-fast;
+            background-color: #444;
+            color: $color-text-muted;
+
+            &.active {
+                background-color: #27ae60;
+                color: #fff;
+                &:hover { background-color: #219a52; }
+            }
+
+            &:not(.active):hover {
+                background-color: #555;
+                color: $color-text-secondary;
+            }
+        }
+
         .synth-play.active {
             background-color: #c0392b;
             &:hover { background-color: #a5281b; }
@@ -347,6 +375,84 @@ $metronome-led-transition: 0.05s ease;
             font-size: 0.78rem;
             color: $color-text-muted;
             font-variant-numeric: tabular-nums;
+        }
+    }
+
+    // Double slider de range pixel
+    .synth-range-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .synth-range-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: $color-text-secondary;
+
+            .synth-range-values {
+                color: $color-text-muted;
+                font-variant-numeric: tabular-nums;
+
+                em {
+                    font-style: normal;
+                }
+            }
+        }
+
+        .synth-range-track {
+            position: relative;
+            height: 20px;
+            display: flex;
+            align-items: center;
+
+            // Rail de fond
+            &::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background-color: $color-border;
+                border-radius: 2px;
+                pointer-events: none;
+            }
+
+            // Segment coloré entre les deux poignées
+            .synth-range-fill {
+                position: absolute;
+                height: 4px;
+                background-color: $color-accent;
+                border-radius: 2px;
+                pointer-events: none;
+            }
+
+            // Les deux inputs superposés
+            .synth-range-input {
+                position: absolute;
+                width: 100%;
+                height: 4px;
+                appearance: none;
+                background: transparent;
+                pointer-events: none;
+                margin: 0;
+
+                &::-webkit-slider-thumb {
+                    appearance: none;
+                    width: 14px;
+                    height: 14px;
+                    border-radius: 50%;
+                    background-color: $color-accent;
+                    border: 2px solid $color-bg-light;
+                    cursor: pointer;
+                    pointer-events: all;
+                    transition: background-color $transition-fast;
+
+                    &:hover {
+                        background-color: $color-accent-hover;
+                    }
+                }
+            }
         }
     }
 }

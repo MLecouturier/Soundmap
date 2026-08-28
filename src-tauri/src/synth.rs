@@ -1,5 +1,6 @@
 use tauri::State;
-use crate::state::{ImageState, Synth, SynthState};
+use crate::midi::send_note_off;
+use crate::state::{ImageState, Synth, SynthState, MidiState};
 
 // --- SynthConfig / SynthEngine existants (logique pure de traitement pixel) ---
 // (inchangés, on suppose qu'ils restent au-dessus ou en dessous dans ce fichier)
@@ -42,11 +43,19 @@ pub fn start_synth(id: u32, state: State<SynthState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn stop_synth(id: u32, state: State<SynthState>) -> Result<(), String> {
+pub fn stop_synth(
+    id: u32,
+    state: State<SynthState>,
+    midi_state: State<MidiState>,
+) -> Result<(), String> {
     let mut synths = state.synths.lock().unwrap();
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.playing = false;
+            // Éteindre immédiatement la note en cours
+            if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
+                send_note_off(conn, synth.channel, synth.note);
+            }
             Ok(())
         }
         None => Err(format!("Synthé {id} introuvable")),
@@ -62,4 +71,53 @@ pub fn is_synth_playing(id: u32, state: State<SynthState>) -> bool {
         .get(&id)
         .map(|s| s.playing)
         .unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn set_synth_channel(id: u32, channel: u8, state: State<SynthState>) -> Result<(), String> {
+    let clamped = channel.min(15);
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.channel = clamped;
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_loop(id: u32, loop_enabled: bool, state: State<SynthState>) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.loop_enabled = loop_enabled;
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_range(
+    id: u32,
+    pixel_start: usize,
+    pixel_end: usize,
+    state: State<SynthState>,
+) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.pixel_start = pixel_start;
+            synth.pixel_end = pixel_end;
+            // Replacer le curseur dans le range si nécessaire
+            if synth.cursor < pixel_start {
+                synth.cursor = pixel_start;
+            } else if pixel_end > 0 && synth.cursor > pixel_end {
+                synth.cursor = pixel_start;
+            }
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
 }

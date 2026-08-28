@@ -22,9 +22,12 @@ impl Default for ImageState {
 pub struct Synth {
     pub id: u32,
     pub playing: bool,
-    pub cursor: usize, // index du pixel courant (0..width*height)
-    pub note: u8,       // note MIDI fixe pour l'instant : LA4 = 69
-    pub channel: u8,    // canal MIDI 0-15
+    pub cursor: usize,      // index du pixel courant (0..width*height)
+    pub note: u8,           // note MIDI fixe pour l'instant : LA4 = 69
+    pub channel: u8,        // canal MIDI 0-15
+    pub pixel_start: usize,  // pixel d'entrée (inclusif)
+    pub pixel_end: usize,    // pixel de sortie (inclusif, 0 = jusqu'à la fin)
+    pub loop_enabled: bool,  // lecture en boucle ou arrêt en fin de range
 }
 
 impl Synth {
@@ -35,6 +38,9 @@ impl Synth {
             cursor: 0,
             note: 69, // LA4
             channel: 0,
+            pixel_start: 0,
+            pixel_end: 0,       // 0 signifie "fin de l'image"
+            loop_enabled: true, // boucle activée par défaut
         }
     }
 }

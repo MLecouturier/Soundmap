@@ -3,9 +3,17 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
+use image::GenericImageView;
 
 use crate::midi::{send_note_off, send_note_on};
 use crate::state::{ImageState, SynthState, MidiState};
+
+/// Calcule la luminosité perçue d'un pixel RGBA (formule Rec.601)
+/// et la mappe vers une note MIDI 0–127.
+fn brightness_to_midi_note(r: u8, g: u8, b: u8) -> u8 {
+    let luma = 0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32;
+    ((luma / 255.0) * 127.0).round() as u8
+}
 
 pub struct MetronomeState {
     pub running: Arc<AtomicBool>,
@@ -56,11 +64,55 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                 let mut synths = synth_state.synths.lock().unwrap();
                 for synth in synths.values_mut() {
                     if synth.playing && total_pixels > 0 {
-                        synth.cursor = (synth.cursor + 1) % total_pixels;
+                        // Déterminer les bornes effectives du range
+                        let range_start = synth.pixel_start.min(total_pixels - 1);
+                        let range_end = if synth.pixel_end == 0 || synth.pixel_end >= total_pixels {
+                            total_pixels - 1
+                        } else {
+                            synth.pixel_end
+                        };
+                        let range_len = if range_end >= range_start {
+                            range_end - range_start + 1
+                        } else {
+                            1
+                        };
+
+                        // Avancer le curseur dans le range
+                        let pos_in_range = if synth.cursor >= range_start && synth.cursor <= range_end {
+                            synth.cursor - range_start
+                        } else {
+                            0
+                        };
+                        let next_pos = pos_in_range + 1;
+
+                        if next_pos >= range_len && !synth.loop_enabled {
+                            // Fin de séquence sans boucle : on arrête le synthé
+                            synth.playing = false;
+                            synth.cursor = range_start;
+                            // Éteindre la dernière note immédiatement
+                            let midi_state = app.state::<MidiState>();
+                            if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
+                                send_note_off(conn, synth.channel, synth.note);
+                            }
+                            let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
+                            continue;
+                        }
+
+                        synth.cursor = range_start + next_pos % range_len;
+
+                        // Lire le pixel courant et déduire la note MIDI depuis la luminosité
+                        let px = synth.cursor as u32;
+                        let x = px % width as u32;
+                        let y = px / width as u32;
+                        let pixel = image.get_pixel(x, y);
+                        let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
+                        synth.note = brightness_to_midi_note(r, g, b);
 
                         let _ = app.emit("synth-pixel-tick", serde_json::json!({
                             "id": synth.id,
                             "cursor": synth.cursor,
+                            "r": r, "g": g, "b": b, "a": a,
+                            "note": synth.note,
                         }));
                     }
                 }
