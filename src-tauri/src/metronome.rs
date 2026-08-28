@@ -4,7 +4,8 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::state::{ImageState, SynthState};
+use crate::midi::{send_note_off, send_note_on};
+use crate::state::{ImageState, SynthState, MidiState};
 
 pub struct MetronomeState {
     pub running: Arc<AtomicBool>,
@@ -64,6 +65,38 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                     }
                 }
             }
+
+            // --- Note On pour chaque synthé actif ---
+            {
+                let synth_state = app.state::<SynthState>();
+                let midi_state = app.state::<MidiState>();
+                let synths = synth_state.synths.lock().unwrap();
+                let mut conn_guard = midi_state.connection.lock().unwrap();
+
+                if let Some(conn) = conn_guard.as_mut() {
+                    for synth in synths.values().filter(|s| s.playing) {
+                        send_note_on(conn, synth.channel, synth.note, 100);
+                    }
+                }
+            }
+
+            // --- Note Off après 80% de l'intervalle, pour détacher les notes ---
+            let note_duration_ms = (interval_ms * 8) / 10;
+            let app_off = app.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(note_duration_ms));
+
+                let synth_state = app_off.state::<SynthState>();
+                let midi_state = app_off.state::<MidiState>();
+                let synths = synth_state.synths.lock().unwrap();
+                let mut conn_guard = midi_state.connection.lock().unwrap();
+
+                if let Some(conn) = conn_guard.as_mut() {
+                    for synth in synths.values().filter(|s| s.playing) {
+                        send_note_off(conn, synth.channel, synth.note);
+                    }
+                }
+            });
 
             beat_index += 1;
             thread::sleep(Duration::from_millis(interval_ms));

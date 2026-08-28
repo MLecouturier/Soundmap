@@ -1,11 +1,19 @@
 use tauri::State;
-use crate::state::{Synth, SynthState};
+use crate::state::{ImageState, Synth, SynthState};
 
 // --- SynthConfig / SynthEngine existants (logique pure de traitement pixel) ---
 // (inchangés, on suppose qu'ils restent au-dessus ou en dessous dans ce fichier)
 
 #[tauri::command]
-pub fn add_synth(state: State<SynthState>) -> u32 {
+pub fn add_synth(
+    image_state: State<ImageState>,
+    state: State<SynthState>,
+) -> Result<u32, String> {
+    let has_image = image_state.original.lock().unwrap().is_some();
+    if !has_image {
+        return Err("Veuillez charger une image avant d'ajouter un synthétiseur.".to_string());
+    }
+
     let mut next_id = state.next_id.lock().unwrap();
     let id = *next_id;
     *next_id += 1;
@@ -13,7 +21,7 @@ pub fn add_synth(state: State<SynthState>) -> u32 {
     let synth = Synth::new(id);
     state.synths.lock().unwrap().insert(id, synth);
 
-    id
+    Ok(id)
 }
 
 #[tauri::command]

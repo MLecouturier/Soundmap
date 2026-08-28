@@ -1,10 +1,12 @@
 pub mod image_processing;
 pub mod metronome;
+pub mod midi;
 pub mod state;
 pub mod synth;
 
+use tauri::Manager;
 use metronome::MetronomeState;
-use state::{ImageState, SynthState};
+use state::{ImageState, SynthState, MidiState};
 
 pub fn run() {
     tauri::Builder::default()
@@ -12,6 +14,12 @@ pub fn run() {
         .manage(ImageState::default())
         .manage(MetronomeState::default())
         .manage(SynthState::default())
+        .manage(MidiState::default())
+        .setup(|app| {
+            let midi_state = app.state::<MidiState>();
+            midi::auto_connect(&midi_state);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             image_processing::load_image,
             image_processing::apply_image_adjustments,

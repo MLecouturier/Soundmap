@@ -258,45 +258,46 @@ function createSynthElement(id) {
 }
 
 async function onSynthPlayClick(id, el) {
-    const playBtn = el.querySelector('.synth-play');
-    const willPlay = !playBtn.classList.contains('active');
-    const anyPlaying = await invoke('is_any_synth_playing');
-    
-    if (!anyPlaying && metronomeRunning) {
-        await toggleMetronome();
-    }
+    const btn = el.querySelector('.synth-play');
+    const isPlaying = await invoke('is_synth_playing', { id });
 
-    if (willPlay) {
-        await invoke('start_synth', { id });
-        playBtn.classList.add('active');
-        playBtn.textContent = '⏸ Stop';
-
-        // Démarre le métronome s'il n'est pas déjà lancé
+    if (!isPlaying) {
         if (!metronomeRunning) {
-            await toggleMetronome();
+            await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
+            await invoke('start_metronome');
+            metronomeRunning = true;
+            metronomeToggle.textContent = '⏸ Arrêter';
         }
+        await invoke('start_synth', { id });
+        btn.textContent = '⏸ Stop';
+        btn.classList.add('active');
     } else {
         await invoke('stop_synth', { id });
-        playBtn.classList.remove('active');
-        playBtn.textContent = '▶ Play';
+        btn.textContent = '▶ Play';
+        btn.classList.remove('active');
     }
 }
 
 async function onSynthRemoveClick(id, el) {
     await invoke('stop_synth', { id }).catch(() => {});
     await invoke('remove_synth', { id });
+
     el.remove();
 
-    if (!synthListBody.querySelector('.synth-block')) {
+    if (synthListBody.querySelectorAll('.synth-block').length === 0) {
         placeholder.classList.remove('hidden');
     }
 }
 
 addSynthBtn.addEventListener('click', async () => {
-    const info = await invoke('add_synth');
-    placeholder.classList.add('hidden');
-    const el = createSynthElement(info.id);
-    synthListBody.appendChild(el);
+    try {
+        const id = await invoke('add_synth');
+        placeholder.classList.add('hidden');
+        synthListBody.appendChild(createSynthElement(id));
+    } catch (err) {
+        console.error('Erreur lors de l\'ajout du synthétiseur :', err);
+        alert(err); // ou un affichage plus discret type toast/message d'erreur dans l'UI
+    }
 });
 
 // Réception des ticks de pixels, un par synthé
