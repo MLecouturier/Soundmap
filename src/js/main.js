@@ -330,6 +330,12 @@ function initSynthRange(id, el) {
         const e = Number(endInput.value)   / max * 100;
         fill.style.left  = `${s}%`;
         fill.style.width = `${e - s}%`;
+
+        // Le thumb gauche doit toujours être cliquable : on le passe devant
+        // quand il est proche ou égal au thumb droit
+        const atEnd = Number(startInput.value) >= Number(endInput.value);
+        startInput.style.zIndex = atEnd ? '3' : '2';
+        endInput.style.zIndex   = atEnd ? '1' : '2';
     }
 
     function sendRange() {

@@ -126,6 +126,61 @@ html, body {
     }    
 }
 
+// ==========================================================================
+// Slider — style réutilisable (simple et double)
+// ==========================================================================
+//
+// Usage simple :   <input type="range" class="slider" />
+// Usage double :   voir .synth-range-track (deux .slider superposés + .slider-fill)
+//
+@mixin slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background-color: $color-accent;
+    border: 2px solid $color-bg-dark;
+    cursor: pointer;
+    transition: background-color $transition-fast, transform $transition-fast;
+
+    &:hover {
+        background-color: $color-accent-hover;
+        transform: scale(1.15);
+    }
+}
+
+@mixin slider-track {
+    height: 4px;
+    background-color: $color-border;
+    border-radius: 2px;
+    border: none;
+}
+
+input[type="range"],
+input[type="range"].slider,
+input[type="range"].synth-range-input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: $color-border;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+
+    &::-webkit-slider-thumb     { @include slider-thumb; }
+    &::-moz-range-thumb         { @include slider-thumb; border: 2px solid $color-bg-dark; }
+    &::-webkit-slider-runnable-track { @include slider-track; }
+    &::-moz-range-track         { @include slider-track; }
+}
+
+// ==========================================================================
+// Controls (colonne gauche)
+// ==========================================================================
 #controls {
     flex: 0 0 auto;
 
@@ -173,8 +228,6 @@ html, body {
     }
 
     .span-2 { grid-column: span 2; }
-
-    input[type="range"] { width: 100%; }
 
     button {
         background-color: $color-accent;
@@ -427,31 +480,26 @@ $metronome-led-transition: 0.05s ease;
                 pointer-events: none;
             }
 
-            // Les deux inputs superposés
+            // Les deux inputs superposés — le style du thumb vient du mixin global
             .synth-range-input {
                 position: absolute;
+                left: 0;
+                top: 0;
                 width: 100%;
-                height: 4px;
-                appearance: none;
-                background: transparent;
+                height: 100%; // occupe toute la hauteur pour centrer le thumb
+                background: transparent; // le rail est géré par ::before et .slider-fill
+
+                // Le track est transparent : le rail visuel est le ::before du conteneur
+                &::-webkit-slider-runnable-track { background: transparent; border: none; }
+                &::-moz-range-track              { background: transparent; border: none; }
+
                 pointer-events: none;
-                margin: 0;
+                &::-webkit-slider-thumb { 
+                    pointer-events: all; }
+                &::-moz-range-thumb     { pointer-events: all; }
 
-                &::-webkit-slider-thumb {
-                    appearance: none;
-                    width: 14px;
-                    height: 14px;
-                    border-radius: 50%;
-                    background-color: $color-accent;
-                    border: 2px solid $color-bg-light;
-                    cursor: pointer;
-                    pointer-events: all;
-                    transition: background-color $transition-fast;
-
-                    &:hover {
-                        background-color: $color-accent-hover;
-                    }
-                }
+                &.range-start { z-index: 2; }
+                &.range-end   { z-index: 1; }
             }
         }
     }
