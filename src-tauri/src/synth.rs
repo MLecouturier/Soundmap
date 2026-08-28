@@ -52,9 +52,13 @@ pub fn stop_synth(
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.playing = false;
-            // Éteindre immédiatement la note en cours
-            if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
-                send_note_off(conn, synth.channel, synth.note);
+            synth.last_played_note = None;
+            // Éteindre immédiatement la note en cours, si elle sonne encore
+            if synth.note_is_on {
+                if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
+                    send_note_off(conn, synth.channel, synth.note);
+                }
+                synth.note_is_on = false;
             }
             Ok(())
         }
@@ -80,6 +84,24 @@ pub fn set_synth_channel(id: u32, channel: u8, state: State<SynthState>) -> Resu
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.channel = clamped;
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_threshold(
+    id: u32,
+    threshold: u8,
+    state: State<SynthState>,
+) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.note_threshold = threshold.min(12);
+            // On ne coupe pas la note en cours : le prochain tick réévaluera
+            // normalement si un changement de note est nécessaire.
             Ok(())
         }
         None => Err(format!("Synthé {id} introuvable")),

@@ -34,6 +34,7 @@ pub fn run() {
             synth::stop_synth,
             synth::is_synth_playing,
             synth::set_synth_channel,
+            synth::set_synth_threshold,
             synth::set_synth_brightness_range,
             synth::set_synth_loop,
             synth::set_synth_range,

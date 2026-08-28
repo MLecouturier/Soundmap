@@ -485,6 +485,10 @@ function createSynthElement(id) {
                     <input type="range" class="synth-range-input brightness-end"   min="0" max="127" value="127" step="1" />
                 </div>
             </div>
+            <label class="synth-slider-label">
+                <span>Seuil de variation <em class="threshold-val">0</em></span>
+                <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
+            </label>
             <p class="synth-pixel-info">Pixel : -</p>
         </div>
     `;
@@ -544,6 +548,17 @@ function createSynthElement(id) {
         if (hi.visible) drawRangeHighlight(id);
         else            clearRangeHighlight(id);
     });
+
+    // Slider seuil de variation
+    const thresholdInput = el.querySelector('.synth-threshold');
+    const thresholdVal   = el.querySelector('.threshold-val');
+    thresholdInput.addEventListener('input', () => {
+        const threshold = Number(thresholdInput.value);
+        thresholdVal.textContent = threshold === 0 ? 'off' : threshold;
+        invoke('set_synth_threshold', { id, threshold })
+            .catch(err => console.error('Erreur set_synth_threshold :', err));
+    });
+    thresholdVal.textContent = 'off';
 
     initSynthRange(id, el);
     initBrightnessRange(id, el);
@@ -772,13 +787,13 @@ window.__TAURI__.event.listen('synth-stopped', (event) => {
 
 // Réception des ticks de pixels, un par synthé
 window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
-    const { id, cursor, r, g, b, a, note, muted } = event.payload;
+    const { id, cursor, r, g, b, a, note, velocity, muted } = event.payload;
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
     const noteName = midiNoteToName(note);
     const muteLabel = muted ? ' — muet' : '';
     el.querySelector('.synth-pixel-info').textContent =
-        `Pixel ${cursor} — rgba(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'}, ${a ?? '-'}) — Note ${noteName}${muteLabel}`;
+        `Pixel ${cursor} — rgba(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'}, ${a ?? '-'}) — Note ${noteName} — Vel ${velocity ?? '-'}${muteLabel}`;
     drawSynthPixel(id, cursor, muted);
 });
 

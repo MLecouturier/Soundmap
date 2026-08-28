@@ -8,11 +8,21 @@ use image::GenericImageView;
 use crate::midi::{send_note_off, send_note_on};
 use crate::state::{ImageState, SynthState, MidiState};
 
-/// Calcule la luminosité perçue d'un pixel RGBA (formule Rec.601)
-/// et la mappe vers une note MIDI 0–127.
-fn brightness_to_midi_note(r: u8, g: u8, b: u8) -> u8 {
-    let luma = 0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32;
+/// Calcule la luminosité perçue d'un pixel RGBA (formule Rec.601), 0.0–255.0.
+fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
+    0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32
+}
+
+/// Mappe une luminosité (0–255) vers une note MIDI 0–127.
+fn luma_to_midi_note(luma: f32) -> u8 {
     ((luma / 255.0) * 127.0).round() as u8
+}
+
+/// Mappe une luminosité (0–255) vers une vélocité MIDI 1–127
+/// (plus le pixel est lumineux, plus la vélocité est forte).
+fn luma_to_velocity(luma: f32) -> u8 {
+    let v = ((luma / 255.0) * 126.0).round() as u8;
+    v.max(1) // 0 équivaudrait à un Note Off en MIDI
 }
 
 pub struct MetronomeState {
@@ -56,12 +66,15 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
             // --- Avancement des synthés actifs sur l'image ---
             let image_state = app.state::<ImageState>();
             let synth_state = app.state::<SynthState>();
+            let midi_state = app.state::<MidiState>();
 
             if let Some(image) = image_state.processed.lock().unwrap().as_ref() {
                 let (width, height) = (image.width() as usize, image.height() as usize);
                 let total_pixels = width * height;
 
                 let mut synths = synth_state.synths.lock().unwrap();
+                let mut conn_guard = midi_state.connection.lock().unwrap();
+
                 for synth in synths.values_mut() {
                     if synth.playing && total_pixels > 0 {
                         // Déterminer les bornes effectives du range
@@ -89,10 +102,13 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                             // Fin de séquence sans boucle : on arrête le synthé
                             synth.playing = false;
                             synth.cursor = range_start;
-                            // Éteindre la dernière note immédiatement
-                            let midi_state = app.state::<MidiState>();
-                            if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
-                                send_note_off(conn, synth.channel, synth.note);
+                            synth.last_played_note = None;
+                            // Éteindre la note en cours si elle sonne encore
+                            if synth.note_is_on {
+                                if let Some(conn) = conn_guard.as_mut() {
+                                    send_note_off(conn, synth.channel, synth.note);
+                                }
+                                synth.note_is_on = false;
                             }
                             let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
                             continue;
@@ -106,53 +122,68 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         let y = px / width as u32;
                         let pixel = image.get_pixel(x, y);
                         let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
-                        let note = brightness_to_midi_note(r, g, b);
-                        let in_range = note >= synth.brightness_min && note <= synth.brightness_max;
-                        synth.note = note;
-                        synth.active_note = in_range; // mémorise si ce pixel doit sonner
+                        let luma = pixel_luma(r, g, b);
+                        let raw_note = luma_to_midi_note(luma);
+                        let velocity = luma_to_velocity(luma);
+
+                        // Appliquer le seuil de variation de note : si l'écart avec la
+                        // dernière note retenue est insuffisant, on garde cette dernière
+                        // (la note en cours sera donc prolongée, pas rejouée).
+                        let effective_note = if synth.note_threshold == 0 {
+                            raw_note
+                        } else {
+                            match synth.last_played_note {
+                                None => raw_note, // pas encore de référence : on démarre avec la note brute
+                                Some(last) => {
+                                    let diff = (raw_note as i16 - last as i16).unsigned_abs() as u8;
+                                    if diff >= synth.note_threshold { raw_note } else { last }
+                                }
+                            }
+                        };
+
+                        let in_range = effective_note >= synth.brightness_min
+                            && effective_note <= synth.brightness_max;
+
+                        // On ne (re)déclenche le MIDI que si la note change réellement
+                        // ou si son statut audible (muet / non muet) change. Sinon on
+                        // laisse la note en cours sonner sans interruption (legato).
+                        let note_changed = effective_note != synth.note;
+                        let needs_off = synth.note_is_on && (note_changed || !in_range);
+                        let needs_on  = in_range && (!synth.note_is_on || note_changed);
+
+                        if needs_off {
+                            if let Some(conn) = conn_guard.as_mut() {
+                                send_note_off(conn, synth.channel, synth.note);
+                            }
+                            synth.note_is_on = false;
+                        }
+
+                        synth.note = effective_note;
+                        synth.active_note = in_range;
+                        if in_range {
+                            synth.last_played_note = Some(effective_note);
+                        }
+
+                        if needs_on {
+                            synth.velocity = velocity;
+                            if let Some(conn) = conn_guard.as_mut() {
+                                send_note_on(conn, synth.channel, effective_note, synth.velocity);
+                            }
+                            synth.note_is_on = true;
+                        }
 
                         let _ = app.emit("synth-pixel-tick", serde_json::json!({
                             "id": synth.id,
                             "cursor": synth.cursor,
                             "r": r, "g": g, "b": b, "a": a,
-                            "note": note,
+                            "note": effective_note,
+                            "raw_note": raw_note,
+                            "velocity": velocity,
                             "muted": !in_range,
                         }));
                     }
                 }
             }
-
-            // --- Note On pour chaque synthé actif ---
-            {
-                let synth_state = app.state::<SynthState>();
-                let midi_state = app.state::<MidiState>();
-                let synths = synth_state.synths.lock().unwrap();
-                let mut conn_guard = midi_state.connection.lock().unwrap();
-
-                if let Some(conn) = conn_guard.as_mut() {
-                    for synth in synths.values().filter(|s| s.playing && s.active_note) {
-                        send_note_on(conn, synth.channel, synth.note, 100);
-                    }
-                }
-            }
-
-            // --- Note Off après 80% de l'intervalle, pour détacher les notes ---
-            let note_duration_ms = (interval_ms * 8) / 10;
-            let app_off = app.clone();
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(note_duration_ms));
-
-                let synth_state = app_off.state::<SynthState>();
-                let midi_state = app_off.state::<MidiState>();
-                let synths = synth_state.synths.lock().unwrap();
-                let mut conn_guard = midi_state.connection.lock().unwrap();
-
-                if let Some(conn) = conn_guard.as_mut() {
-                    for synth in synths.values().filter(|s| s.playing && s.active_note) {
-                        send_note_off(conn, synth.channel, synth.note);
-                    }
-                }
-            });
 
             beat_index += 1;
             thread::sleep(Duration::from_millis(interval_ms));

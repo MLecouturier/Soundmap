@@ -518,6 +518,25 @@ $metronome-led-transition: 0.05s ease;
             &:hover { background-color: #a5281b; }
         }
 
+        .synth-slider-label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.78rem;
+            color: $color-text-secondary;
+
+            span {
+                display: flex;
+                justify-content: space-between;
+
+                em {
+                    font-style: normal;
+                    color: $color-text-muted;
+                    font-variant-numeric: tabular-nums;
+                }
+            }
+        }
+
         .synth-pixel-info {
             font-size: 0.78rem;
             color: $color-text-muted;

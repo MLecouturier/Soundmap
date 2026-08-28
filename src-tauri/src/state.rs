@@ -30,7 +30,11 @@ pub struct Synth {
     pub loop_enabled: bool,   // lecture en boucle ou arrêt en fin de range
     pub brightness_min: u8,   // seuil de luminosité minimum (0–127)
     pub brightness_max: u8,   // seuil de luminosité maximum (0–127)
-    pub active_note: bool,    // false si le pixel courant est hors seuil (muet)
+    pub active_note: bool,     // false si le pixel courant est hors seuil (muet)
+    pub note_threshold: u8,    // écart minimum de note pour déclencher un changement (0 = toujours)
+    pub last_played_note: Option<u8>, // dernière note effectivement jouée
+    pub note_is_on: bool,      // true si une note MIDI est actuellement en train de sonner (sustain)
+    pub velocity: u8,          // vélocité MIDI courante, dérivée de la luminosité du pixel (1–127)
 }
 
 impl Synth {
@@ -47,6 +51,10 @@ impl Synth {
             brightness_min: 0,
             brightness_max: 127,
             active_note: true,
+            note_threshold: 0,
+            last_played_note: None,
+            note_is_on: false,
+            velocity: 100,
         }
     }
 }

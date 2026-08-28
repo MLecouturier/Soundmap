@@ -455,6 +455,22 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-play.active:hover {
   background-color: #a5281b;
 }
+.synth-block .synth-body .synth-slider-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: #ccc;
+}
+.synth-block .synth-body .synth-slider-label span {
+  display: flex;
+  justify-content: space-between;
+}
+.synth-block .synth-body .synth-slider-label span em {
+  font-style: normal;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
 .synth-block .synth-body .synth-pixel-info {
   font-size: 0.78rem;
   color: #888;
