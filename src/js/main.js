@@ -104,6 +104,61 @@ function clearOverlay() {
     synthCursors.clear();
 }
 
+// Calcule les dimensions de rendu de l'image dans le viewer (object-fit: contain)
+function getImageLayout() {
+    const vw = pixelOverlay.width;
+    const vh = pixelOverlay.height;
+    if (!gridW || !gridH || !vw || !vh) return null;
+    const imgRatio  = gridW / gridH;
+    const viewRatio = vw / vh;
+    let renderW, renderH;
+    if (imgRatio > viewRatio) { renderW = vw; renderH = vw / imgRatio; }
+    else                      { renderH = vh; renderW = vh * imgRatio; }
+    return {
+        renderW, renderH,
+        offsetX: (vw - renderW) / 2,
+        offsetY: (vh - renderH) / 2,
+        cellW: renderW / gridW,
+        cellH: renderH / gridH,
+    };
+}
+
+function drawRangeHighlight(synthId) {
+    const hi = synthHighlights.get(synthId);
+    if (!hi || !hi.visible) return;
+    const layout = getImageLayout();
+    if (!layout) return;
+    const { offsetX, offsetY, cellW, cellH } = layout;
+    const color = synthColors.get(synthId);
+    if (!color) return;
+
+    const ctx = pixelOverlay.getContext('2d');
+    const start = hi.start;
+    const end   = hi.end > 0 ? hi.end : totalPixels - 1;
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle   = color;
+    for (let i = start; i <= end; i++) {
+        const col = i % gridW;
+        const row = Math.floor(i / gridW);
+        ctx.fillRect(offsetX + col * cellW, offsetY + row * cellH, cellW, cellH);
+    }
+    ctx.restore();
+}
+
+function clearRangeHighlight(synthId) {
+    // On redessine tout le canvas à partir de zéro (plus sûr que de cibler zone par zone)
+    redrawAllHighlights();
+}
+
+function redrawAllHighlights() {
+    const ctx = pixelOverlay.getContext('2d');
+    ctx.clearRect(0, 0, pixelOverlay.width, pixelOverlay.height);
+    synthCursors.clear(); // les curseurs actifs seront redessinés au prochain tick
+    synthHighlights.forEach((_, sid) => drawRangeHighlight(sid));
+}
+
 new ResizeObserver(() => {
     resizeOverlay();
     clearOverlay();
@@ -126,6 +181,9 @@ const SYNTH_COLORS = [
 
 // Map id → couleur courante
 const synthColors = new Map();
+
+// Map id → { visible: bool, start: number, end: number }
+const synthHighlights = new Map();
 
 const SLIDER_STEPS = 1000;
 const MIN_CELLS    = 2;
@@ -300,12 +358,17 @@ async function toggleMetronome() {
         metronomeRunning = false;
         metronomeToggle.textContent = '▶ Démarrer';
 
-        // Remettre tous les boutons de synthés à l'état arrêté
+        // Remettre tous les boutons de synthés à l'état arrêté et restaurer les highlights
         synthListBody.querySelectorAll('.synth-block').forEach(el => {
             const btn = el.querySelector('.synth-play');
             btn.textContent = '▶ Play';
             btn.classList.remove('active');
+            const sid = Number(el.dataset.synthId);
+            synthCursors.delete(sid);
+            const hi = synthHighlights.get(sid);
+            if (hi && hi._wasVisible) { hi.visible = true; hi._wasVisible = false; }
         });
+        redrawAllHighlights();
     } else {
         await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
         await invoke('start_metronome');
@@ -314,11 +377,12 @@ async function toggleMetronome() {
 
         // Resynchroniser l'état visuel de chaque synthé avec l'état Rust
         for (const el of synthListBody.querySelectorAll('.synth-block')) {
-            const id = Number(el.dataset.synthId);
-            const isPlaying = await invoke('is_synth_playing', { id });
+            const sid = Number(el.dataset.synthId);
+            const isPlaying = await invoke('is_synth_playing', { id: sid });
             const btn = el.querySelector('.synth-play');
             btn.textContent = isPlaying ? '⏸ Stop' : '▶ Play';
             btn.classList.toggle('active', isPlaying);
+            if (isPlaying) hideHighlightForPlay(sid);
         }
     }
 }
@@ -389,6 +453,7 @@ function createSynthElement(id) {
             <div class="synth-controls-row">
                 <button class="synth-play">▶ Play</button>
                 <button class="synth-loop-btn active" title="Activer/désactiver la boucle">Boucle</button>
+                <button class="synth-eye-btn" title="Afficher/masquer le surlignage du range"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg></button>
             </div>
             <label class="synth-channel-label">
                 <span>Canal MIDI</span>
@@ -445,6 +510,8 @@ function createSynthElement(id) {
             synthColors.set(id, color);
             colorBand.style.background = color;
             colorPicker.classList.add('hidden');
+            // Redessiner le surlignage avec la nouvelle couleur
+            redrawAllHighlights();
         });
     });
 
@@ -463,6 +530,19 @@ function createSynthElement(id) {
         btn.classList.toggle('active', loopEnabled);
         invoke('set_synth_loop', { id, loopEnabled })
             .catch(err => console.error('Erreur set_synth_loop :', err));
+    });
+
+    // Initialiser l'état du highlight (masqué par défaut)
+    synthHighlights.set(id, { visible: false, start: 0, end: maxPx });
+
+    // Bouton œil
+    el.querySelector('.synth-eye-btn').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const hi = synthHighlights.get(id);
+        hi.visible = !hi.visible;
+        btn.classList.toggle('active', hi.visible);
+        if (hi.visible) drawRangeHighlight(id);
+        else            clearRangeHighlight(id);
     });
 
     initSynthRange(id, el);
@@ -497,6 +577,10 @@ function initSynthRange(id, el) {
         const pixelEnd   = Number(endInput.value);
         invoke('set_synth_range', { id, pixelStart, pixelEnd })
             .catch(err => console.error('Erreur set_synth_range :', err));
+        // Mettre à jour le highlight si visible
+        const hi = synthHighlights.get(id);
+        if (hi) { hi.start = pixelStart; hi.end = pixelEnd; }
+        redrawAllHighlights();
     }
 
     startInput.addEventListener('input', () => {
@@ -580,7 +664,13 @@ function updateAllSynthRangeMax(newTotal) {
 
         endVal.textContent = endInput.value;
         el.querySelector('.synth-range-fill') && initFillUpdate(el);
+
+        // Recaler les bornes du highlight
+        const synthId = Number(el.dataset.synthId);
+        const hi = synthHighlights.get(synthId);
+        if (hi) { hi.start = Number(el.querySelector('.range-start').value); hi.end = Number(endInput.value); }
     });
+    redrawAllHighlights();
 }
 
 function initFillUpdate(el) {
@@ -608,11 +698,38 @@ async function onSynthPlayClick(id, el) {
         await invoke('start_synth', { id });
         btn.textContent = '⏸ Stop';
         btn.classList.add('active');
+        // Masquer le surlignage pendant la lecture
+        hideHighlightForPlay(id);
     } else {
         await invoke('stop_synth', { id });
         btn.textContent = '▶ Play';
         btn.classList.remove('active');
+        // Réafficher le surlignage si le bouton œil est actif
+        restoreHighlightAfterStop(id, el);
     }
+}
+
+function hideHighlightForPlay(id) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return;
+    hi._wasVisible = hi.visible; // mémoriser l'état
+    if (hi.visible) {
+        hi.visible = false;
+        redrawAllHighlights();
+    }
+}
+
+function restoreHighlightAfterStop(id, el) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return;
+    if (hi._wasVisible) {
+        hi.visible = true;
+        hi._wasVisible = false;
+        redrawAllHighlights();
+    }
+    // Effacer le curseur de ce synthé du canvas
+    synthCursors.delete(id);
+    redrawAllHighlights();
 }
 
 async function onSynthRemoveClick(id, el) {
@@ -621,7 +738,9 @@ async function onSynthRemoveClick(id, el) {
 
     synthColors.delete(id);
     synthCursors.delete(id);
+    synthHighlights.delete(id);
     el.remove();
+    redrawAllHighlights();
 
     if (synthListBody.querySelectorAll('.synth-block').length === 0) {
         placeholder.classList.remove('hidden');
@@ -648,6 +767,7 @@ window.__TAURI__.event.listen('synth-stopped', (event) => {
     btn.textContent = '▶ Play';
     btn.classList.remove('active');
     synthCursors.delete(id);
+    restoreHighlightAfterStop(id, el);
 });
 
 // Réception des ticks de pixels, un par synthé

@@ -13,6 +13,7 @@ $color-text-secondary: #ccc;
 $color-text-muted: #888;
 
 $color-accent: #3a7bd5;
+$color-accent-alt: #219a52;
 $color-accent-hover: #2d5fa8;
 
 $sidebar-width: 320px;
@@ -457,6 +458,37 @@ $metronome-led-transition: 0.05s ease;
             display: flex;
             align-items: center;
             gap: 12px;
+        }
+
+        .synth-eye-btn {
+            font-size: 0.9rem;
+            padding: 4px 8px;
+            border-radius: $border-radius-base;
+            border: none;
+            background: none;
+            color: $color-text-muted;
+            cursor: pointer;
+            transition: color $transition-fast;
+            line-height: 1;
+
+            svg {
+                height: 24px;
+
+                path {
+                    fill: #555;
+                }
+            }
+
+            &:hover  { color: $color-text-primary; }
+            &.active { 
+
+                svg {
+
+                    path {
+                        fill: $color-accent-alt;
+                    }
+                }
+            }
         }
 
         .synth-loop-btn {

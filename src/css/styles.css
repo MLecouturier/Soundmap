@@ -405,6 +405,29 @@ input[type=range].synth-range-input::-moz-range-track {
   align-items: center;
   gap: 12px;
 }
+.synth-block .synth-body .synth-eye-btn {
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  line-height: 1;
+}
+.synth-block .synth-body .synth-eye-btn svg {
+  height: 24px;
+}
+.synth-block .synth-body .synth-eye-btn svg path {
+  fill: #555;
+}
+.synth-block .synth-body .synth-eye-btn:hover {
+  color: #e0e0e0;
+}
+.synth-block .synth-body .synth-eye-btn.active svg path {
+  fill: #219a52;
+}
 .synth-block .synth-body .synth-loop-btn {
   font-size: 0.82rem;
   padding: 4px 10px;
