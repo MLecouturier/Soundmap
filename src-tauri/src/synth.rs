@@ -87,6 +87,24 @@ pub fn set_synth_channel(id: u32, channel: u8, state: State<SynthState>) -> Resu
 }
 
 #[tauri::command]
+pub fn set_synth_brightness_range(
+    id: u32,
+    brightness_min: u8,
+    brightness_max: u8,
+    state: State<SynthState>,
+) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.brightness_min = brightness_min.min(127);
+            synth.brightness_max = brightness_max.min(127);
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
 pub fn set_synth_loop(id: u32, loop_enabled: bool, state: State<SynthState>) -> Result<(), String> {
     let mut synths = state.synths.lock().unwrap();
     match synths.get_mut(&id) {

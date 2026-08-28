@@ -106,13 +106,17 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         let y = px / width as u32;
                         let pixel = image.get_pixel(x, y);
                         let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
-                        synth.note = brightness_to_midi_note(r, g, b);
+                        let note = brightness_to_midi_note(r, g, b);
+                        let in_range = note >= synth.brightness_min && note <= synth.brightness_max;
+                        synth.note = note;
+                        synth.active_note = in_range; // mémorise si ce pixel doit sonner
 
                         let _ = app.emit("synth-pixel-tick", serde_json::json!({
                             "id": synth.id,
                             "cursor": synth.cursor,
                             "r": r, "g": g, "b": b, "a": a,
-                            "note": synth.note,
+                            "note": note,
+                            "muted": !in_range,
                         }));
                     }
                 }
@@ -126,7 +130,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                 let mut conn_guard = midi_state.connection.lock().unwrap();
 
                 if let Some(conn) = conn_guard.as_mut() {
-                    for synth in synths.values().filter(|s| s.playing) {
+                    for synth in synths.values().filter(|s| s.playing && s.active_note) {
                         send_note_on(conn, synth.channel, synth.note, 100);
                     }
                 }
@@ -144,7 +148,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                 let mut conn_guard = midi_state.connection.lock().unwrap();
 
                 if let Some(conn) = conn_guard.as_mut() {
-                    for synth in synths.values().filter(|s| s.playing) {
+                    for synth in synths.values().filter(|s| s.playing && s.active_note) {
                         send_note_off(conn, synth.channel, synth.note);
                     }
                 }
