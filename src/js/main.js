@@ -115,6 +115,80 @@ function clearOverlay() {
     synthCursors.clear();
 }
 
+// ---------- Sélection de range de pixels à la souris ----------
+// Un seul synthé peut être en mode sélection à la fois.
+let rangePickState = null; // { id, btn, firstPixel: number|null }
+
+function cursorFromClientPoint(clientX, clientY) {
+    const layout = getImageLayout();
+    if (!layout) return null;
+    const rect = pixelOverlay.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const { offsetX, offsetY, cellW, cellH } = layout;
+
+    const col = Math.floor((px - offsetX) / cellW);
+    const row = Math.floor((py - offsetY) / cellH);
+    if (col < 0 || row < 0 || col >= gridW || row >= gridH) return null;
+
+    return row * gridW + col;
+}
+
+function startRangePicking(id, btn) {
+    // Annuler un éventuel mode de sélection déjà actif sur un autre synthé
+    if (rangePickState && rangePickState.id !== id) {
+        cancelRangePicking();
+    }
+    rangePickState = { id, btn, firstPixel: null };
+    btn.classList.add('active');
+    pixelOverlay.classList.add('picking');
+}
+
+function cancelRangePicking() {
+    if (!rangePickState) return;
+    rangePickState.btn.classList.remove('active');
+    pixelOverlay.classList.remove('picking');
+    rangePickState = null;
+}
+
+pixelOverlay.addEventListener('click', (e) => {
+    if (!rangePickState || !hasImage) return;
+    const cursor = cursorFromClientPoint(e.clientX, e.clientY);
+    if (cursor === null) return;
+
+    const { id, firstPixel } = rangePickState;
+
+    if (firstPixel === null) {
+        // Premier clic : mémoriser le pixel de départ
+        rangePickState.firstPixel = cursor;
+        return;
+    }
+
+    // Second clic : définir le range (avec inversion si nécessaire)
+    const start = Math.min(firstPixel, cursor);
+    const end   = Math.max(firstPixel, cursor);
+    applySynthRangeFromPicker(id, start, end);
+    cancelRangePicking();
+});
+
+function applySynthRangeFromPicker(id, start, end) {
+    const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
+    if (!el) return;
+    const startInput = el.querySelector('.range-start');
+    const endInput   = el.querySelector('.range-end');
+    const startVal   = el.querySelector('.range-start-val');
+    const endVal     = el.querySelector('.range-end-val');
+
+    startInput.value = start;
+    endInput.value   = end;
+    startVal.textContent = start;
+    endVal.textContent   = end;
+
+    // Déclenche la mise à jour du fill, du highlight et l'appel Rust
+    startInput.dispatchEvent(new Event('input'));
+    endInput.dispatchEvent(new Event('input'));
+}
+
 // Calcule les dimensions de rendu de l'image dans le viewer (object-fit: contain)
 function getImageLayout() {
     const vw = pixelOverlay.width;
@@ -264,6 +338,7 @@ async function refresh() {
     gridW = result.width;
     gridH = result.height;
     clearOverlay();
+    cancelRangePicking();
     updateAllSynthRangeMax(totalPixels);
 
     dimensionsInfo.textContent =
@@ -467,10 +542,15 @@ function createSynthElement(id) {
                         <em class="range-start-val">0</em> – <em class="range-end-val">${maxPx}</em>
                     </span>
                 </div>
-                <div class="synth-range-track">
-                    <div class="synth-range-fill"></div>
-                    <input type="range" class="synth-range-input range-start" min="0" max="${maxPx}" value="0" step="1" />
-                    <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
+                <div class="synth-range-track-row">
+                    <div class="synth-range-track">
+                        <div class="synth-range-fill"></div>
+                        <input type="range" class="synth-range-input range-start" min="0" max="${maxPx}" value="0" step="1" />
+                        <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
+                    </div>
+                    <button class="synth-pick-range-btn" title="Sélectionner le range sur l'image">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13,13V21H11V13H3V11H11V3H13V11H21V13H13Z" /></svg>
+                    </button>
                 </div>
             </div>
             <div class="synth-range-wrapper">
@@ -560,6 +640,16 @@ function createSynthElement(id) {
             .catch(err => console.error('Erreur set_synth_threshold :', err));
     });
     thresholdVal.textContent = 'off';
+
+    // Bouton de sélection du range sur l'image
+    el.querySelector('.synth-pick-range-btn').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        if (rangePickState && rangePickState.id === id) {
+            cancelRangePicking();
+        } else {
+            startRangePicking(id, btn);
+        }
+    });
 
     initSynthRange(id, el);
     initBrightnessRange(id, el);
@@ -772,6 +862,8 @@ function restoreHighlightAfterStop(id, el) {
 async function onSynthRemoveClick(id, el) {
     await invoke('stop_synth', { id }).catch(() => {});
     await invoke('remove_synth', { id });
+
+    if (rangePickState && rangePickState.id === id) cancelRangePicking();
 
     synthColors.delete(id);
     synthCursors.delete(id);

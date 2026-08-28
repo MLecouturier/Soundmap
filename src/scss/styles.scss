@@ -107,6 +107,12 @@ html, body {
             width: 100%;
             height: 100%;
             pointer-events: none;
+
+            // Mode sélection de range de pixels au clic
+            &.picking {
+                pointer-events: auto;
+                cursor: crosshair;
+            }
         }
 
         img {
@@ -593,6 +599,48 @@ $metronome-led-transition: 0.05s ease;
                 em {
                     font-style: normal;
                 }
+            }
+        }
+
+        .synth-range-track-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            .synth-range-track {
+                flex: 1 1 auto;
+            }
+        }
+
+        .synth-pick-range-btn {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border: none;
+            border-radius: $border-radius-base;
+            background: none;
+            color: $color-text-muted;
+            cursor: pointer;
+            transition: color $transition-fast, background-color $transition-fast;
+
+            svg {
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
+            }
+
+            &:hover {
+                color: $color-text-primary;
+                background-color: rgba(255, 255, 255, 0.06);
+            }
+
+            &.active {
+                color: #fff;
+                background-color: $color-accent;
             }
         }
 
