@@ -52,11 +52,16 @@ fn luma_to_level(luma: f32) -> u8 {
     ((luma / 255.0) * 127.0).round() as u8
 }
 
-/// Mappe une luminosité (0–255) vers une vélocité MIDI 1–127
-/// (plus le pixel est lumineux, plus la vélocité est forte).
-fn luma_to_velocity(luma: f32) -> u8 {
-    let v = ((luma / 255.0) * 126.0).round() as u8;
-    v.max(1) // 0 équivaudrait à un Note Off en MIDI
+/// Mappe une luminosité (0–255) vers une vélocité MIDI comprise entre
+/// `velocity_min` et 127 (plus le pixel est sombre, plus la vélocité est
+/// forte : les zones claires sont jouées délicatement, les zones sombres
+/// avec plus d'intensité). `velocity_min` définit donc le plancher de la
+/// plage de vélocité, pas un seuil de silence.
+fn luma_to_velocity(luma: f32, velocity_min: u8) -> u8 {
+    let min = velocity_min.min(126) as f32;
+    let range = 127.0 - min;
+    let v = (min + ((255.0 - luma) / 255.0) * range).round() as u8;
+    v.clamp(1, 127) // 0 équivaudrait à un Note Off en MIDI
 }
 
 /// Traite un pixel en mode monophonique : la teinte (décalée de hue_shift)
@@ -88,7 +93,8 @@ fn process_monophonic(
         }
     };
 
-    let in_range = brightness_level >= synth.brightness_min && brightness_level <= synth.brightness_max;
+    let in_range = brightness_level >= synth.brightness_min
+        && brightness_level <= synth.brightness_max;
 
     // On ne (re)déclenche le MIDI que si la note change réellement ou si son
     // statut audible (muet / non muet) change. Sinon on laisse la note en
@@ -136,7 +142,8 @@ fn process_polyphonic(
 ) {
     let channel_values = [r, g, b];
     let channel_midi = synth.channel;
-    let global_in_range = brightness_level >= synth.brightness_min && brightness_level <= synth.brightness_max;
+    let global_in_range = brightness_level >= synth.brightness_min
+        && brightness_level <= synth.brightness_max;
     let note_threshold = synth.note_threshold;
 
     let mut conn = conn;
@@ -308,7 +315,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
                         let luma = pixel_luma(r, g, b);
                         let brightness_level = luma_to_level(luma);
-                        let velocity = luma_to_velocity(luma);
+                        let velocity = luma_to_velocity(luma, synth.velocity_min);
                         synth.velocity = velocity;
 
                         let mut payload = serde_json::json!({

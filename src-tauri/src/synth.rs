@@ -122,6 +122,22 @@ pub fn set_synth_threshold(
 }
 
 #[tauri::command]
+pub fn set_synth_velocity_min(
+    id: u32,
+    velocity_min: u8,
+    state: State<SynthState>,
+) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.velocity_min = velocity_min.min(126);
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
 pub fn set_synth_brightness_range(
     id: u32,
     brightness_min: u8,

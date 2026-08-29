@@ -244,6 +244,53 @@ function redrawAllHighlights() {
     synthHighlights.forEach((_, sid) => drawRangeHighlight(sid));
 }
 
+// ---------- Aperçu d'une couche de couleur (survol des boutons R/G/B) ----------
+// channelIndex : 0 = rouge, 1 = vert, 2 = bleu
+const CHANNEL_TINTS = [
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+];
+
+function drawChannelOverlay(channelIndex) {
+    if (!hasImage || !cachedPixelData) return;
+    const layout = getImageLayout();
+    if (!layout) return;
+    const { offsetX, offsetY, renderW, renderH } = layout;
+    const { width, height, pixels } = cachedPixelData;
+    if (!width || !height) return;
+
+    // Construire un canvas hors-écran à la résolution de la grille,
+    // où chaque pixel reflète l'intensité du canal choisi, teinté de sa couleur.
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = width;
+    offCanvas.height = height;
+    const offCtx = offCanvas.getContext('2d');
+    const imageData = offCtx.createImageData(width, height);
+    const [tr, tg, tb] = CHANNEL_TINTS[channelIndex];
+
+    for (let i = 0; i < width * height; i++) {
+        const value = pixels[i * 4 + channelIndex];
+        const o = i * 4;
+        imageData.data[o]     = (tr * value) / 255;
+        imageData.data[o + 1] = (tg * value) / 255;
+        imageData.data[o + 2] = (tb * value) / 255;
+        imageData.data[o + 3] = 255;
+    }
+    offCtx.putImageData(imageData, 0, 0);
+
+    const ctx = pixelOverlay.getContext('2d');
+    ctx.clearRect(0, 0, pixelOverlay.width, pixelOverlay.height);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(offCanvas, offsetX, offsetY, renderW, renderH);
+    ctx.restore();
+}
+
+function hideChannelOverlay() {
+    redrawAllHighlights();
+}
+
 new ResizeObserver(() => {
     resizeOverlay();
     clearOverlay();
@@ -256,6 +303,17 @@ let origHeight    = 0;
 let originalPng   = null;   // base64 de l'aperçu original
 let processedPng  = null;   // base64 du dernier rendu traité
 let totalPixels   = 0;      // nombre total de pixels dans la grille courante
+
+// Cache des pixels bruts de l'image traitée (RGBA à plat), pour l'aperçu par canal
+let cachedPixelData = null; // { width, height, pixels: Uint8ClampedArray-like }
+
+async function refreshPixelDataCache() {
+    try {
+        cachedPixelData = await invoke('get_pixel_data');
+    } catch (err) {
+        cachedPixelData = null;
+    }
+}
 
 // Couleurs prédéfinies pour les synthés
 const SYNTH_COLORS = [
@@ -340,6 +398,7 @@ async function refresh() {
     clearOverlay();
     cancelRangePicking();
     updateAllSynthRangeMax(totalPixels);
+    await refreshPixelDataCache();
 
     dimensionsInfo.textContent =
       `Original : ${origWidth} × ${origHeight}  —  ` +
@@ -591,6 +650,10 @@ function createSynthElement(id) {
                 <span>Seuil de variation <em class="threshold-val">0</em></span>
                 <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
             </label>
+            <label class="synth-slider-label">
+                <span>Vélocité minimum <em class="velocity-min-val">0</em></span>
+                <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
+            </label>
             <p class="synth-pixel-info">Pixel : -</p>
         </div>
     `;
@@ -676,6 +739,15 @@ function createSynthElement(id) {
             invoke('set_synth_channel_enabled', { id, channelIndex, enabled })
                 .catch(err => console.error('Erreur set_synth_channel_enabled :', err));
         });
+
+        // Aperçu visuel de la couche survolée, superposé sur l'image
+        toggleBtn.addEventListener('mouseenter', () => {
+            const channelIndex = Number(toggleBtn.dataset.channel);
+            drawChannelOverlay(channelIndex);
+        });
+        toggleBtn.addEventListener('mouseleave', () => {
+            hideChannelOverlay();
+        });
     });
 
     // Initialiser l'état du highlight (masqué par défaut)
@@ -701,6 +773,17 @@ function createSynthElement(id) {
             .catch(err => console.error('Erreur set_synth_threshold :', err));
     });
     thresholdVal.textContent = 'off';
+
+    // Slider vélocité minimum : plancher de la plage de vélocité (la luminosité
+    // est transposée entre cette valeur et 127)
+    const velocityMinInput = el.querySelector('.synth-velocity-min');
+    const velocityMinVal   = el.querySelector('.velocity-min-val');
+    velocityMinInput.addEventListener('input', () => {
+        const velocityMin = Number(velocityMinInput.value);
+        velocityMinVal.textContent = velocityMin;
+        invoke('set_synth_velocity_min', { id, velocityMin })
+            .catch(err => console.error('Erreur set_synth_velocity_min :', err));
+    });
 
     // Bouton de sélection du range sur l'image
     el.querySelector('.synth-pick-range-btn').addEventListener('click', (e) => {

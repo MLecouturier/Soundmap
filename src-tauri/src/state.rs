@@ -62,6 +62,8 @@ pub struct Synth {
     pub last_played_note: Option<u8>, // dernière note effectivement jouée
     pub note_is_on: bool,      // true si une note MIDI est actuellement en train de sonner (sustain)
     pub velocity: u8,          // vélocité MIDI courante, dérivée de la luminosité du pixel (1–127)
+    pub velocity_min: u8,      // plancher de la plage de vélocité (0–126) : la luminosité est
+                               // transposée entre cette valeur et 127 (vélocité maximale)
 
     // --- Modes de traduction pixel → note ---
     pub mode: SynthMode,
@@ -88,6 +90,7 @@ impl Synth {
             last_played_note: None,
             note_is_on: false,
             velocity: 100,
+            velocity_min: 0,
 
             mode: SynthMode::Monophonic,
             hue_shift: 0,
