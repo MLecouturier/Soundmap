@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use image::GenericImageView;
 
 use crate::midi::{send_note_off, send_note_on};
-use crate::state::{ImageState, SynthState, MidiState};
+use crate::state::{ImageState, Synth, SynthMode, SynthState, MidiState};
 
 /// Calcule la luminosité perçue d'un pixel RGBA (formule Rec.601), 0.0–255.0.
 fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
@@ -41,6 +41,11 @@ fn hue_to_midi_note(hue: f32) -> u8 {
     ((hue / 360.0) * 127.0).round().clamp(0.0, 127.0) as u8
 }
 
+/// Mappe une valeur de canal de couleur (0–255) vers une note MIDI 0–127.
+fn channel_to_midi_note(value: u8) -> u8 {
+    ((value as f32 / 255.0) * 127.0).round() as u8
+}
+
 /// Mappe une luminosité (0–255) vers un niveau MIDI 0–127 (utilisé pour le
 /// filtrage par seuil de luminosité, indépendamment de la note jouée).
 fn luma_to_level(luma: f32) -> u8 {
@@ -52,6 +57,146 @@ fn luma_to_level(luma: f32) -> u8 {
 fn luma_to_velocity(luma: f32) -> u8 {
     let v = ((luma / 255.0) * 126.0).round() as u8;
     v.max(1) // 0 équivaudrait à un Note Off en MIDI
+}
+
+/// Traite un pixel en mode monophonique : la teinte (décalée de hue_shift)
+/// détermine une note unique.
+fn process_monophonic(
+    synth: &mut Synth,
+    conn: Option<&mut midir::MidiOutputConnection>,
+    r: u8, g: u8, b: u8,
+    brightness_level: u8,
+    velocity: u8,
+    payload: &mut serde_json::Value,
+) {
+    let hue = pixel_hue(r, g, b);
+    let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
+    let raw_note = hue_to_midi_note(shifted_hue);
+
+    // Appliquer le seuil de variation de note : si l'écart avec la dernière
+    // note retenue est insuffisant, on garde cette dernière (la note en
+    // cours sera donc prolongée, pas rejouée).
+    let effective_note = if synth.note_threshold == 0 {
+        raw_note
+    } else {
+        match synth.last_played_note {
+            None => raw_note,
+            Some(last) => {
+                let diff = (raw_note as i16 - last as i16).unsigned_abs() as u8;
+                if diff >= synth.note_threshold { raw_note } else { last }
+            }
+        }
+    };
+
+    let in_range = brightness_level >= synth.brightness_min && brightness_level <= synth.brightness_max;
+
+    // On ne (re)déclenche le MIDI que si la note change réellement ou si son
+    // statut audible (muet / non muet) change. Sinon on laisse la note en
+    // cours sonner sans interruption (legato).
+    let note_changed = effective_note != synth.note;
+    let needs_off = synth.note_is_on && (note_changed || !in_range);
+    let needs_on  = in_range && (!synth.note_is_on || note_changed);
+
+    let mut conn = conn;
+    if needs_off {
+        if let Some(c) = conn.as_mut() {
+            send_note_off(c, synth.channel, synth.note);
+        }
+        synth.note_is_on = false;
+    }
+
+    synth.note = effective_note;
+    synth.active_note = in_range;
+    if in_range {
+        synth.last_played_note = Some(effective_note);
+    }
+
+    if needs_on {
+        if let Some(c) = conn.as_mut() {
+            send_note_on(c, synth.channel, effective_note, velocity);
+        }
+        synth.note_is_on = true;
+    }
+
+    payload["note"] = serde_json::json!(effective_note);
+    payload["raw_note"] = serde_json::json!(raw_note);
+    payload["hue"] = serde_json::json!(hue);
+    payload["muted"] = serde_json::json!(!in_range);
+}
+
+/// Traite un pixel en mode polyphonique : chaque canal R/G/B activé génère
+/// sa propre note indépendante, formant un accord de 1 à 3 notes.
+fn process_polyphonic(
+    synth: &mut Synth,
+    conn: Option<&mut midir::MidiOutputConnection>,
+    r: u8, g: u8, b: u8,
+    brightness_level: u8,
+    velocity: u8,
+    payload: &mut serde_json::Value,
+) {
+    let channel_values = [r, g, b];
+    let channel_midi = synth.channel;
+    let global_in_range = brightness_level >= synth.brightness_min && brightness_level <= synth.brightness_max;
+    let note_threshold = synth.note_threshold;
+
+    let mut conn = conn;
+    let mut voices_payload = Vec::with_capacity(3);
+
+    for i in 0..3 {
+        let enabled = synth.channel_enabled[i];
+        let raw_note = channel_to_midi_note(channel_values[i]);
+        let voice = &mut synth.poly_voices[i];
+
+        let effective_note = if note_threshold == 0 {
+            raw_note
+        } else {
+            match voice.last_played_note {
+                None => raw_note,
+                Some(last) => {
+                    let diff = (raw_note as i16 - last as i16).unsigned_abs() as u8;
+                    if diff >= note_threshold { raw_note } else { last }
+                }
+            }
+        };
+
+        let in_range = enabled && global_in_range;
+
+        let note_changed = effective_note != voice.note;
+        let needs_off = voice.note_is_on && (note_changed || !in_range);
+        let needs_on  = in_range && (!voice.note_is_on || note_changed);
+
+        if needs_off {
+            if let Some(c) = conn.as_mut() {
+                send_note_off(c, channel_midi, voice.note);
+            }
+            voice.note_is_on = false;
+        }
+
+        voice.note = effective_note;
+        if in_range {
+            voice.last_played_note = Some(effective_note);
+        }
+
+        if needs_on {
+            if let Some(c) = conn.as_mut() {
+                send_note_on(c, channel_midi, effective_note, velocity);
+            }
+            voice.note_is_on = true;
+        }
+
+        voices_payload.push(serde_json::json!({
+            "enabled": enabled,
+            "note": effective_note,
+            "raw_note": raw_note,
+            "muted": !in_range,
+        }));
+    }
+
+    // active_note global : true si au moins une voix sonne (utile pour le highlight/UI)
+    synth.active_note = synth.poly_voices.iter().enumerate().any(|(i, v)| v.note_is_on && synth.channel_enabled[i]);
+
+    payload["voices"] = serde_json::json!(voices_payload);
+    payload["muted"] = serde_json::json!(!global_in_range);
 }
 
 pub struct MetronomeState {
@@ -132,12 +277,22 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                             synth.playing = false;
                             synth.cursor = range_start;
                             synth.last_played_note = None;
-                            // Éteindre la note en cours si elle sonne encore
+                            // Éteindre la note mono en cours si elle sonne encore
                             if synth.note_is_on {
                                 if let Some(conn) = conn_guard.as_mut() {
                                     send_note_off(conn, synth.channel, synth.note);
                                 }
                                 synth.note_is_on = false;
+                            }
+                            // Éteindre les voix polyphoniques en cours
+                            for voice in synth.poly_voices.iter_mut() {
+                                if voice.note_is_on {
+                                    if let Some(conn) = conn_guard.as_mut() {
+                                        send_note_off(conn, synth.channel, voice.note);
+                                    }
+                                    voice.note_is_on = false;
+                                }
+                                voice.last_played_note = None;
                             }
                             let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
                             continue;
@@ -145,75 +300,42 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
                         synth.cursor = range_start + next_pos % range_len;
 
-                        // Lire le pixel courant et déduire la note MIDI depuis la luminosité
+                        // Lire le pixel courant
                         let px = synth.cursor as u32;
                         let x = px % width as u32;
                         let y = px / width as u32;
                         let pixel = image.get_pixel(x, y);
                         let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
                         let luma = pixel_luma(r, g, b);
-                        let hue = pixel_hue(r, g, b);
-                        let raw_note = hue_to_midi_note(hue);
                         let brightness_level = luma_to_level(luma);
                         let velocity = luma_to_velocity(luma);
+                        synth.velocity = velocity;
 
-                        // Appliquer le seuil de variation de note : si l'écart avec la
-                        // dernière note retenue est insuffisant, on garde cette dernière
-                        // (la note en cours sera donc prolongée, pas rejouée).
-                        let effective_note = if synth.note_threshold == 0 {
-                            raw_note
-                        } else {
-                            match synth.last_played_note {
-                                None => raw_note, // pas encore de référence : on démarre avec la note brute
-                                Some(last) => {
-                                    let diff = (raw_note as i16 - last as i16).unsigned_abs() as u8;
-                                    if diff >= synth.note_threshold { raw_note } else { last }
-                                }
-                            }
-                        };
-
-                        let in_range = brightness_level >= synth.brightness_min
-                            && brightness_level <= synth.brightness_max;
-
-                        // On ne (re)déclenche le MIDI que si la note change réellement
-                        // ou si son statut audible (muet / non muet) change. Sinon on
-                        // laisse la note en cours sonner sans interruption (legato).
-                        let note_changed = effective_note != synth.note;
-                        let needs_off = synth.note_is_on && (note_changed || !in_range);
-                        let needs_on  = in_range && (!synth.note_is_on || note_changed);
-
-                        if needs_off {
-                            if let Some(conn) = conn_guard.as_mut() {
-                                send_note_off(conn, synth.channel, synth.note);
-                            }
-                            synth.note_is_on = false;
-                        }
-
-                        synth.note = effective_note;
-                        synth.active_note = in_range;
-                        if in_range {
-                            synth.last_played_note = Some(effective_note);
-                        }
-
-                        if needs_on {
-                            synth.velocity = velocity;
-                            if let Some(conn) = conn_guard.as_mut() {
-                                send_note_on(conn, synth.channel, effective_note, synth.velocity);
-                            }
-                            synth.note_is_on = true;
-                        }
-
-                        let _ = app.emit("synth-pixel-tick", serde_json::json!({
+                        let mut payload = serde_json::json!({
                             "id": synth.id,
                             "cursor": synth.cursor,
                             "r": r, "g": g, "b": b, "a": a,
-                            "note": effective_note,
-                            "raw_note": raw_note,
-                            "hue": hue,
                             "brightness_level": brightness_level,
                             "velocity": velocity,
-                            "muted": !in_range,
-                        }));
+                            "mode": synth.mode,
+                        });
+
+                        match synth.mode {
+                            SynthMode::Monophonic => {
+                                process_monophonic(
+                                    synth, conn_guard.as_mut(), r, g, b,
+                                    brightness_level, velocity, &mut payload,
+                                );
+                            }
+                            SynthMode::Polyphonic => {
+                                process_polyphonic(
+                                    synth, conn_guard.as_mut(), r, g, b,
+                                    brightness_level, velocity, &mut payload,
+                                );
+                            }
+                        }
+
+                        let _ = app.emit("synth-pixel-tick", payload);
                     }
                 }
             }

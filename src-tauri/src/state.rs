@@ -1,7 +1,34 @@
 use image::DynamicImage;
 use midir::MidiOutputConnection;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
+
+/// Mode de traduction des pixels en notes.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SynthMode {
+    Monophonic,
+    Polyphonic,
+}
+
+/// État d'une voix individuelle en mode polyphonique (une par canal R/G/B).
+#[derive(Clone, Copy, Debug)]
+pub struct ChannelVoice {
+    pub note: u8,
+    pub note_is_on: bool,
+    pub last_played_note: Option<u8>,
+}
+
+impl ChannelVoice {
+    pub fn new() -> Self {
+        Self {
+            note: 0,
+            note_is_on: false,
+            last_played_note: None,
+        }
+    }
+}
 
 pub struct ImageState {
     pub original: Mutex<Option<DynamicImage>>,
@@ -35,6 +62,12 @@ pub struct Synth {
     pub last_played_note: Option<u8>, // dernière note effectivement jouée
     pub note_is_on: bool,      // true si une note MIDI est actuellement en train de sonner (sustain)
     pub velocity: u8,          // vélocité MIDI courante, dérivée de la luminosité du pixel (1–127)
+
+    // --- Modes de traduction pixel → note ---
+    pub mode: SynthMode,
+    pub hue_shift: u16,             // décalage de teinte en degrés (0–360), mode monophonique
+    pub channel_enabled: [bool; 3], // R, G, B activés/désactivés, mode polyphonique
+    pub poly_voices: [ChannelVoice; 3], // état MIDI indépendant par canal R, G, B
 }
 
 impl Synth {
@@ -55,6 +88,11 @@ impl Synth {
             last_played_note: None,
             note_is_on: false,
             velocity: 100,
+
+            mode: SynthMode::Monophonic,
+            hue_shift: 0,
+            channel_enabled: [true, true, true],
+            poly_voices: [ChannelVoice::new(), ChannelVoice::new(), ChannelVoice::new()],
         }
     }
 }

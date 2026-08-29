@@ -1,6 +1,6 @@
 use tauri::State;
 use crate::midi::send_note_off;
-use crate::state::{ImageState, Synth, SynthState, MidiState};
+use crate::state::{ImageState, Synth, SynthMode, SynthState, MidiState};
 
 // --- SynthConfig / SynthEngine existants (logique pure de traitement pixel) ---
 // (inchangés, on suppose qu'ils restent au-dessus ou en dessous dans ce fichier)
@@ -53,12 +53,25 @@ pub fn stop_synth(
         Some(synth) => {
             synth.playing = false;
             synth.last_played_note = None;
-            // Éteindre immédiatement la note en cours, si elle sonne encore
+            let mut conn_guard = midi_state.connection.lock().unwrap();
+
+            // Éteindre immédiatement la note mono en cours, si elle sonne encore
             if synth.note_is_on {
-                if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
+                if let Some(conn) = conn_guard.as_mut() {
                     send_note_off(conn, synth.channel, synth.note);
                 }
                 synth.note_is_on = false;
+            }
+
+            // Éteindre les voix polyphoniques en cours
+            for voice in synth.poly_voices.iter_mut() {
+                if voice.note_is_on {
+                    if let Some(conn) = conn_guard.as_mut() {
+                        send_note_off(conn, synth.channel, voice.note);
+                    }
+                    voice.note_is_on = false;
+                }
+                voice.last_played_note = None;
             }
             Ok(())
         }
@@ -132,6 +145,89 @@ pub fn set_synth_loop(id: u32, loop_enabled: bool, state: State<SynthState>) -> 
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.loop_enabled = loop_enabled;
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_mode(
+    id: u32,
+    mode: SynthMode,
+    state: State<SynthState>,
+    midi_state: State<MidiState>,
+) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            if synth.mode == mode {
+                return Ok(());
+            }
+            // Éteindre toutes les notes en cours avant de changer de mode,
+            // pour éviter des notes bloquées lors de la bascule.
+            let mut conn_guard = midi_state.connection.lock().unwrap();
+            if synth.note_is_on {
+                if let Some(conn) = conn_guard.as_mut() {
+                    send_note_off(conn, synth.channel, synth.note);
+                }
+                synth.note_is_on = false;
+            }
+            for voice in synth.poly_voices.iter_mut() {
+                if voice.note_is_on {
+                    if let Some(conn) = conn_guard.as_mut() {
+                        send_note_off(conn, synth.channel, voice.note);
+                    }
+                    voice.note_is_on = false;
+                }
+                voice.last_played_note = None;
+            }
+            synth.last_played_note = None;
+            synth.mode = mode;
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_hue_shift(id: u32, hue_shift: u16, state: State<SynthState>) -> Result<(), String> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.hue_shift = hue_shift.min(360);
+            Ok(())
+        }
+        None => Err(format!("Synthé {id} introuvable")),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_channel_enabled(
+    id: u32,
+    channel_index: usize,
+    enabled: bool,
+    state: State<SynthState>,
+    midi_state: State<MidiState>,
+) -> Result<(), String> {
+    if channel_index > 2 {
+        return Err("Index de canal invalide (attendu 0, 1 ou 2)".to_string());
+    }
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.channel_enabled[channel_index] = enabled;
+            // Si on désactive un canal dont la voix sonne encore, l'éteindre immédiatement.
+            if !enabled {
+                let voice = &mut synth.poly_voices[channel_index];
+                if voice.note_is_on {
+                    if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
+                        send_note_off(conn, synth.channel, voice.note);
+                    }
+                    voice.note_is_on = false;
+                }
+                voice.last_played_note = None;
+            }
             Ok(())
         }
         None => Err(format!("Synthé {id} introuvable")),

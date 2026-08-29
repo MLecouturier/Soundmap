@@ -15,6 +15,7 @@ $color-text-muted: #888;
 $color-accent: #3a7bd5;
 $color-accent-alt: #219a52;
 $color-accent-hover: #2d5fa8;
+$color-disactivated: #555;
 
 $sidebar-width: 320px;
 $footer-height: 140px;
@@ -485,7 +486,8 @@ $metronome-led-transition: 0.05s ease;
         flex-direction: column;
         gap: 6px;
 
-        select:disabled {
+        select:disabled,
+        input[type="range"]:disabled {
             opacity: 0.4;
             cursor: not-allowed;
         }
@@ -577,6 +579,86 @@ $metronome-led-transition: 0.05s ease;
             font-size: 0.78rem;
             color: $color-text-muted;
             font-variant-numeric: tabular-nums;
+        }
+
+        // Ligne de sélection du mode monophonique / polyphonique
+        .synth-mode-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: $color-text-secondary;
+        }
+
+        .synth-mode-btn {
+            font-size: 0.78rem;
+            padding: 4px 10px;
+            border-radius: $border-radius-base;
+            border: 1px solid $color-accent;
+            background-color: transparent;
+            color: $color-accent;
+            cursor: pointer;
+            transition: background-color $transition-fast, color $transition-fast;
+
+            &:hover {
+                background-color: $color-accent;
+                color: #fff;
+            }
+
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+        }
+
+        // Panneaux conditionnels selon le mode actif
+        .synth-mode-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+
+            &.hidden { display: none; }
+
+            .synth-mode-panel-label {
+                font-size: 0.78rem;
+                color: $color-text-secondary;
+            }
+        }
+
+        .synth-channel-toggles {
+            display: flex;
+            gap: 8px;
+        }
+
+        .synth-channel-toggle {
+            flex: 1 1 0;
+            padding: 6px 0;
+            border-radius: $border-radius-base;
+            border: 1px solid $color-disactivated;
+            background-color: $color-disactivated;
+            color: $color-text-muted;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background-color $transition-fast, color $transition-fast, border-color $transition-fast;
+
+            &.active {
+                background-color: $color-accent;
+                border-color: $color-accent;
+                color: #fff;
+            }
+
+            &:not(.active):hover {
+                border-color: $color-accent;
+                color: $color-text-primary;
+            }
+
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
         }
     }
 

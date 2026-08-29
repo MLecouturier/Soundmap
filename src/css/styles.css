@@ -424,7 +424,8 @@ input[type=range].synth-range-input::-moz-range-track {
   flex-direction: column;
   gap: 6px;
 }
-.synth-block .synth-body select:disabled {
+.synth-block .synth-body select:disabled,
+.synth-block .synth-body input[type=range]:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -503,6 +504,74 @@ input[type=range].synth-range-input::-moz-range-track {
   font-size: 0.78rem;
   color: #888;
   font-variant-numeric: tabular-nums;
+}
+.synth-block .synth-body .synth-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #ccc;
+}
+.synth-block .synth-body .synth-mode-btn {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #3a7bd5;
+  background-color: transparent;
+  color: #3a7bd5;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.synth-block .synth-body .synth-mode-btn:hover {
+  background-color: #3a7bd5;
+  color: #fff;
+}
+.synth-block .synth-body .synth-mode-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.synth-block .synth-body .synth-mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.synth-block .synth-body .synth-mode-panel.hidden {
+  display: none;
+}
+.synth-block .synth-body .synth-mode-panel .synth-mode-panel-label {
+  font-size: 0.78rem;
+  color: #ccc;
+}
+.synth-block .synth-body .synth-channel-toggles {
+  display: flex;
+  gap: 8px;
+}
+.synth-block .synth-body .synth-channel-toggle {
+  flex: 1 1 0;
+  padding: 6px 0;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background-color: #555;
+  color: #888;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.synth-block .synth-body .synth-channel-toggle.active {
+  background-color: #3a7bd5;
+  border-color: #3a7bd5;
+  color: #fff;
+}
+.synth-block .synth-body .synth-channel-toggle:not(.active):hover {
+  border-color: #3a7bd5;
+  color: #e0e0e0;
+}
+.synth-block .synth-body .synth-channel-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 .synth-block .synth-range-wrapper {
   display: flex;

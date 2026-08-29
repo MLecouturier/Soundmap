@@ -38,6 +38,9 @@ pub fn run() {
             synth::set_synth_brightness_range,
             synth::set_synth_loop,
             synth::set_synth_range,
+            synth::set_synth_mode,
+            synth::set_synth_hue_shift,
+            synth::set_synth_channel_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur lors du lancement de l'application Tauri");

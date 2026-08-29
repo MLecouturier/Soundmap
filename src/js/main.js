@@ -535,6 +535,27 @@ function createSynthElement(id) {
                 <span>Canal MIDI</span>
                 <select class="synth-channel">${channelOptions}</select>
             </label>
+
+            <div class="synth-mode-row">
+                <span>Mode</span>
+                <button class="synth-mode-btn" data-mode="monophonic" title="Basculer le mode de traduction pixel → note">Monophonique</button>
+            </div>
+
+            <div class="synth-mode-panel synth-mode-panel-mono">
+                <label class="synth-slider-label">
+                    <span>Décalage de teinte <em class="hue-shift-val">0°</em></span>
+                    <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
+                </label>
+            </div>
+
+            <div class="synth-mode-panel synth-mode-panel-poly hidden">
+                <span class="synth-mode-panel-label">Canaux de couleur (accord)</span>
+                <div class="synth-channel-toggles">
+                    <button class="synth-channel-toggle active" data-channel="0" title="Activer/désactiver le rouge">R</button>
+                    <button class="synth-channel-toggle active" data-channel="1" title="Activer/désactiver le vert">G</button>
+                    <button class="synth-channel-toggle active" data-channel="2" title="Activer/désactiver le bleu">B</button>
+                </div>
+            </div>
             <div class="synth-range-wrapper">
                 <div class="synth-range-labels">
                     <span>Pixels</span>
@@ -615,6 +636,46 @@ function createSynthElement(id) {
         btn.classList.toggle('active', loopEnabled);
         invoke('set_synth_loop', { id, loopEnabled })
             .catch(err => console.error('Erreur set_synth_loop :', err));
+    });
+
+    // ---- Mode monophonique / polyphonique ----
+    const modeBtn      = el.querySelector('.synth-mode-btn');
+    const monoPanel     = el.querySelector('.synth-mode-panel-mono');
+    const polyPanel      = el.querySelector('.synth-mode-panel-poly');
+
+    modeBtn.addEventListener('click', async () => {
+        const isMono = modeBtn.dataset.mode === 'monophonic';
+        const newMode = isMono ? 'polyphonic' : 'monophonic';
+        try {
+            await invoke('set_synth_mode', { id, mode: newMode });
+            modeBtn.dataset.mode = newMode;
+            modeBtn.textContent = newMode === 'monophonic' ? 'Monophonique' : 'Polyphonique';
+            monoPanel.classList.toggle('hidden', newMode !== 'monophonic');
+            polyPanel.classList.toggle('hidden', newMode !== 'polyphonic');
+        } catch (err) {
+            console.error('Erreur set_synth_mode :', err);
+        }
+    });
+
+    // ---- Décalage de teinte (mode monophonique) ----
+    const hueShiftInput = el.querySelector('.synth-hue-shift');
+    const hueShiftVal    = el.querySelector('.hue-shift-val');
+    hueShiftInput.addEventListener('input', () => {
+        const hueShift = Number(hueShiftInput.value);
+        hueShiftVal.textContent = `${hueShift}°`;
+        invoke('set_synth_hue_shift', { id, hueShift })
+            .catch(err => console.error('Erreur set_synth_hue_shift :', err));
+    });
+
+    // ---- Toggles de canaux R/G/B (mode polyphonique) ----
+    el.querySelectorAll('.synth-channel-toggle').forEach(toggleBtn => {
+        toggleBtn.addEventListener('click', () => {
+            const channelIndex = Number(toggleBtn.dataset.channel);
+            const enabled = !toggleBtn.classList.contains('active');
+            toggleBtn.classList.toggle('active', enabled);
+            invoke('set_synth_channel_enabled', { id, channelIndex, enabled })
+                .catch(err => console.error('Erreur set_synth_channel_enabled :', err));
+        });
     });
 
     // Initialiser l'état du highlight (masqué par défaut)
@@ -810,6 +871,15 @@ function syncPlayAllButton() {
         : 'Démarrer tous les synthétiseurs';
 }
 
+// Verrouille/déverrouille les contrôles spécifiques à un synthé pendant sa lecture
+// (canal MIDI, mode, décalage de teinte, toggles de canaux R/G/B)
+function setSynthControlsLocked(el, locked) {
+    el.querySelector('.synth-channel').disabled = locked;
+    el.querySelector('.synth-mode-btn').disabled = locked;
+    el.querySelector('.synth-hue-shift').disabled = locked;
+    el.querySelectorAll('.synth-channel-toggle').forEach(btn => { btn.disabled = locked; });
+}
+
 async function startSynthPlayback(id, el) {
     const btn = el.querySelector('.synth-play');
     await ensureMetronomeStarted();
@@ -818,8 +888,8 @@ async function startSynthPlayback(id, el) {
     btn.classList.add('active');
     // Masquer le surlignage pendant la lecture
     hideHighlightForPlay(id);
-    // Verrouiller le canal MIDI de ce synthé pendant la lecture
-    el.querySelector('.synth-channel').disabled = true;
+    // Verrouiller les contrôles de ce synthé pendant la lecture
+    setSynthControlsLocked(el, true);
     updateImageControlsLockState();
 }
 
@@ -831,8 +901,8 @@ async function stopSynthPlayback(id, el) {
     // Réafficher le surlignage si le bouton œil est actif
     restoreHighlightAfterStop(id, el);
     await stopMetronomeIfIdle();
-    // Déverrouiller le canal MIDI de ce synthé
-    el.querySelector('.synth-channel').disabled = false;
+    // Déverrouiller les contrôles de ce synthé
+    setSynthControlsLocked(el, false);
     updateImageControlsLockState();
 }
 
@@ -928,20 +998,34 @@ window.__TAURI__.event.listen('synth-stopped', async (event) => {
     restoreHighlightAfterStop(id, el);
     syncPlayAllButton();
     await stopMetronomeIfIdle();
-    // Déverrouiller le canal MIDI de ce synthé
-    el.querySelector('.synth-channel').disabled = false;
+    // Déverrouiller les contrôles de ce synthé
+    setSynthControlsLocked(el, false);
     updateImageControlsLockState();
 });
 
 // Réception des ticks de pixels, un par synthé
 window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
-    const { id, cursor, r, g, b, a, note, velocity, muted } = event.payload;
+    const { id, cursor, r, g, b, a, velocity, muted, mode, note, voices } = event.payload;
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
-    const noteName = midiNoteToName(note);
-    const muteLabel = muted ? ' — muet' : '';
+
+    const rgbaStr = `rgba(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'}, ${a ?? '-'})`;
+    let noteInfo;
+
+    if (mode === 'polyphonic' && Array.isArray(voices)) {
+        const labels = ['R', 'G', 'B'];
+        noteInfo = voices.map((v, i) => {
+            if (!v.enabled) return `${labels[i]}:off`;
+            const name = midiNoteToName(v.note);
+            return `${labels[i]}:${name}${v.muted ? '(muet)' : ''}`;
+        }).join('  ');
+    } else {
+        const noteName = midiNoteToName(note);
+        noteInfo = `Note ${noteName}${muted ? ' — muet' : ''}`;
+    }
+
     el.querySelector('.synth-pixel-info').textContent =
-        `Pixel ${cursor} — rgba(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'}, ${a ?? '-'}) — Note ${noteName} — Vel ${velocity ?? '-'}${muteLabel}`;
+        `Pixel ${cursor} — ${rgbaStr} — ${noteInfo} — Vel ${velocity ?? '-'}`;
     drawSynthPixel(id, cursor, muted);
 });
 
