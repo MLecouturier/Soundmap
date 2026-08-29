@@ -33,6 +33,14 @@ function localeDisplayName(code) {
 
 renderLanguageSwitcher();
 
+// Updates a synth's play/stop button: icon, label, and active state stay
+// in sync, whatever the trigger (click, locale change, remote event, ...).
+function setPlayButtonState(btn, playing) {
+    btn.classList.toggle('active', playing);
+    btn.querySelector('.synth-play-icon').textContent = playing ? 'pause' : 'play_arrow';
+    btn.querySelector('.synth-play-label').textContent = playing ? t('synth.stop') : t('synth.play');
+}
+
 // Re-translates an existing synth card: static parts via data-i18n*, plus
 // the few labels whose text depends on dynamic state (play/stop, mode,
 // threshold "off" state) that data-i18n alone can't express.
@@ -43,14 +51,12 @@ function retranslateSynthElement(el) {
     el.querySelector('.synth-title-label').textContent = t('synth.title', { id });
 
     const playBtn = el.querySelector('.synth-play');
-    playBtn.textContent = playBtn.classList.contains('active') ? t('synth.stop') : t('synth.play');
+    setPlayButtonState(playBtn, playBtn.classList.contains('active'));
 
     el.querySelector('.synth-loop-label').textContent = t('synth.loop');
 
-    const modeBtn = el.querySelector('.synth-mode-btn');
-    modeBtn.textContent = modeBtn.dataset.mode === 'monophonic'
-        ? t('synth.modeMonophonic')
-        : t('synth.modePolyphonic');
+    el.querySelector('.synth-mode-btn[data-mode="monophonic"]').textContent = t('synth.modeMonophonic');
+    el.querySelector('.synth-mode-btn[data-mode="polyphonic"]').textContent = t('synth.modePolyphonic');
 
     const thresholdInput = el.querySelector('.synth-threshold');
     const thresholdVal = el.querySelector('.threshold-val');
@@ -663,13 +669,19 @@ function createSynthElement(id) {
         </div>
         <div class="synth-header">
             <span class="synth-title-label"></span>
-            <button class="synth-remove" data-i18n-title="synth.remove">✕</button>
+            <button class="synth-remove" data-i18n-title="synth.remove"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
         </div>
         <div class="synth-body">
             <div class="synth-controls-row">
-                <button class="synth-play synth-play-label"></button>
-                <button class="synth-loop-btn active synth-loop-label" data-i18n-title="synth.toggleLoop"></button>
-                <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg></button>
+                <button class="synth-play">
+                    <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
+                    <span class="synth-play-label"></span>
+                </button>
+                <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
+                    <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
+                    <span class="synth-loop-label"></span>
+                </button>
+                <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
             </div>
             <label class="synth-channel-label">
                 <span data-i18n="synth.channelLabel"></span>
@@ -678,7 +690,10 @@ function createSynthElement(id) {
 
             <div class="synth-mode-row">
                 <span data-i18n="synth.modeLabel"></span>
-                <button class="synth-mode-btn" data-mode="monophonic" data-i18n-title="synth.modeToggle"></button>
+                <div class="synth-mode-buttons">
+                    <button class="synth-mode-btn active" data-mode="monophonic"></button>
+                    <button class="synth-mode-btn" data-mode="polyphonic"></button>
+                </div>
             </div>
 
             <div class="synth-mode-panel synth-mode-panel-mono">
@@ -710,7 +725,7 @@ function createSynthElement(id) {
                         <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
                     </div>
                     <button class="synth-pick-range-btn" data-i18n-title="synth.pickRange">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13,13V21H11V13H3V11H11V3H13V11H21V13H13Z" /></svg>
+                        <span class="material-symbols-outlined" aria-hidden="true">crop_free</span>
                     </button>
                 </div>
             </div>
@@ -743,10 +758,10 @@ function createSynthElement(id) {
     // whose text depends on dynamic state (title, play button, pixel info).
     applyTranslations(el);
     el.querySelector('.synth-title-label').textContent = t('synth.title', { id });
-    el.querySelector('.synth-play-label').textContent = t('synth.play');
+    setPlayButtonState(el.querySelector('.synth-play'), false);
     el.querySelector('.synth-loop-label').textContent = t('synth.loop');
-    const modeBtnEl = el.querySelector('.synth-mode-btn');
-    modeBtnEl.textContent = t('synth.modeMonophonic');
+    el.querySelector('.synth-mode-btn[data-mode="monophonic"]').textContent = t('synth.modeMonophonic');
+    el.querySelector('.synth-mode-btn[data-mode="polyphonic"]').textContent = t('synth.modePolyphonic');
     el.querySelector('.threshold-val').textContent = t('synth.noteThresholdOff');
     el.querySelector('.synth-pixel-info').textContent = t('synth.pixelInfoEmpty');
 
@@ -794,22 +809,23 @@ function createSynthElement(id) {
     });
 
     // ---- Monophonic / polyphonic mode ----
-    const modeBtn      = el.querySelector('.synth-mode-btn');
-    const monoPanel     = el.querySelector('.synth-mode-panel-mono');
-    const polyPanel      = el.querySelector('.synth-mode-panel-poly');
+    const modeBtns  = el.querySelectorAll('.synth-mode-btn');
+    const monoPanel = el.querySelector('.synth-mode-panel-mono');
+    const polyPanel = el.querySelector('.synth-mode-panel-poly');
 
-    modeBtn.addEventListener('click', async () => {
-        const isMono = modeBtn.dataset.mode === 'monophonic';
-        const newMode = isMono ? 'polyphonic' : 'monophonic';
-        try {
-            await invoke('set_synth_mode', { id, mode: newMode });
-            modeBtn.dataset.mode = newMode;
-            modeBtn.textContent = newMode === 'monophonic' ? t('synth.modeMonophonic') : t('synth.modePolyphonic');
-            monoPanel.classList.toggle('hidden', newMode !== 'monophonic');
-            polyPanel.classList.toggle('hidden', newMode !== 'polyphonic');
-        } catch (err) {
-            console.error('Error in set_synth_mode:', err);
-        }
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const newMode = btn.dataset.mode;
+            if (btn.classList.contains('active')) return; // already the active mode
+            try {
+                await invoke('set_synth_mode', { id, mode: newMode });
+                modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === newMode));
+                monoPanel.classList.toggle('hidden', newMode !== 'monophonic');
+                polyPanel.classList.toggle('hidden', newMode !== 'polyphonic');
+            } catch (err) {
+                console.error('Error in set_synth_mode:', err);
+            }
+        });
     });
 
     // ---- Hue shift (monophonic mode) ----
@@ -1039,27 +1055,35 @@ async function onSynthPlayClick(id, el) {
 function syncPlayAllButton() {
     const blocks = Array.from(synthListBody.querySelectorAll('.synth-block'));
     const anyPlaying = blocks.some(el => el.querySelector('.synth-play').classList.contains('active'));
-    playAllBtn.textContent = anyPlaying ? '⏸' : '▶';
+    playAllBtn.querySelector('.material-symbols-outlined').textContent = anyPlaying ? 'pause' : 'play_arrow';
     playAllBtn.title = anyPlaying
         ? t('synthList.playAllStop')
         : t('synthList.playAllStart');
 }
 
 // Locks/unlocks the controls specific to a synth while it is playing
-// (MIDI channel, mode, hue shift, R/G/B channel toggles)
+// (MIDI channel, mono/poly mode, and the pixel range). Everything else
+// (hue shift, R/G/B toggles, thresholds, velocity, loop, highlight...)
+// remains editable on the fly while the synth is playing.
 function setSynthControlsLocked(el, locked) {
     el.querySelector('.synth-channel').disabled = locked;
-    el.querySelector('.synth-mode-btn').disabled = locked;
-    el.querySelector('.synth-hue-shift').disabled = locked;
-    el.querySelectorAll('.synth-channel-toggle').forEach(btn => { btn.disabled = locked; });
+    el.querySelectorAll('.synth-mode-btn').forEach(btn => { btn.disabled = locked; });
+    el.querySelector('.range-start').disabled = locked;
+    el.querySelector('.range-end').disabled = locked;
+    el.querySelector('.synth-pick-range-btn').disabled = locked;
+
+    // If this synth was mid-selection when it started playing, cancel it.
+    const id = Number(el.dataset.synthId);
+    if (locked && rangePickState && rangePickState.id === id) {
+        cancelRangePicking();
+    }
 }
 
 async function startSynthPlayback(id, el) {
     const btn = el.querySelector('.synth-play');
     await ensureMetronomeStarted();
     await invoke('start_synth', { id });
-    btn.textContent = t('synth.stop');
-    btn.classList.add('active');
+    setPlayButtonState(btn, true);
     // Hide the highlight during playback
     hideHighlightForPlay(id);
     // Lock this synth's controls while it is playing
@@ -1070,8 +1094,7 @@ async function startSynthPlayback(id, el) {
 async function stopSynthPlayback(id, el) {
     const btn = el.querySelector('.synth-play');
     await invoke('stop_synth', { id });
-    btn.textContent = t('synth.play');
-    btn.classList.remove('active');
+    setPlayButtonState(btn, false);
     // Show the highlight again if the eye button is active
     restoreHighlightAfterStop(id, el);
     await stopMetronomeIfIdle();
@@ -1166,8 +1189,7 @@ window.__TAURI__.event.listen('synth-stopped', async (event) => {
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
     const btn = el.querySelector('.synth-play');
-    btn.textContent = t('synth.play');
-    btn.classList.remove('active');
+    setPlayButtonState(btn, false);
     synthCursors.delete(id);
     restoreHighlightAfterStop(id, el);
     syncPlayAllButton();
