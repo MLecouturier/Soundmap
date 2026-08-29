@@ -1,6 +1,82 @@
+import { initI18n, t, translateError, getLocale, setLocale, AVAILABLE_LOCALES, applyTranslations } from './i18n.js';
+
 const { invoke } = window.__TAURI__.core;
 
-// ---------- Éléments ----------
+await initI18n();
+
+// ---------- Language switcher ----------
+function renderLanguageSwitcher() {
+    const container = document.querySelector('#language-switcher');
+    if (!container) return;
+    const current = getLocale();
+    container.innerHTML = `
+        <select id="language-select" aria-label="Language">
+            ${AVAILABLE_LOCALES.map(l => {
+                // We read each locale's own display name via a tiny lookup,
+                // falling back to the code if unavailable.
+                return `<option value="${l.code}" ${l.code === current ? 'selected' : ''}>${localeDisplayName(l.code)}</option>`;
+            }).join('')}
+        </select>
+    `;
+    container.querySelector('#language-select').addEventListener('change', (e) => {
+        setLocale(e.target.value);
+    });
+}
+
+// Display names are hardcoded here (not translated) so a language always
+// shows its own name (e.g. "Français" stays "Français" no matter the
+// active locale). Add an entry here when adding a new language.
+const LOCALE_DISPLAY_NAMES = { en: 'English', fr: 'Français' };
+function localeDisplayName(code) {
+    return LOCALE_DISPLAY_NAMES[code] || code.toUpperCase();
+}
+
+renderLanguageSwitcher();
+
+// Re-translates an existing synth card: static parts via data-i18n*, plus
+// the few labels whose text depends on dynamic state (play/stop, mode,
+// threshold "off" state) that data-i18n alone can't express.
+function retranslateSynthElement(el) {
+    applyTranslations(el);
+
+    const id = Number(el.dataset.synthId);
+    el.querySelector('.synth-title-label').textContent = t('synth.title', { id });
+
+    const playBtn = el.querySelector('.synth-play');
+    playBtn.textContent = playBtn.classList.contains('active') ? t('synth.stop') : t('synth.play');
+
+    el.querySelector('.synth-loop-label').textContent = t('synth.loop');
+
+    const modeBtn = el.querySelector('.synth-mode-btn');
+    modeBtn.textContent = modeBtn.dataset.mode === 'monophonic'
+        ? t('synth.modeMonophonic')
+        : t('synth.modePolyphonic');
+
+    const thresholdInput = el.querySelector('.synth-threshold');
+    const thresholdVal = el.querySelector('.threshold-val');
+    thresholdVal.textContent = Number(thresholdInput.value) === 0
+        ? t('synth.noteThresholdOff')
+        : thresholdInput.value;
+
+    // Pixel info: only reset to the empty placeholder if no tick has been
+    // received yet (i.e. it still shows the untranslated empty state).
+    const pixelInfo = el.querySelector('.synth-pixel-info');
+    if (!pixelInfo.dataset.hasTick) {
+        pixelInfo.textContent = t('synth.pixelInfoEmpty');
+    }
+}
+
+// Re-apply translations everywhere (static markup + dynamically created
+// synth cards) whenever the locale changes.
+window.addEventListener('locale-changed', () => {
+    renderLanguageSwitcher();
+    document.querySelectorAll('.synth-block').forEach(el => retranslateSynthElement(el));
+    if (typeof syncLabels === 'function') syncLabels();
+    if (lastDimensionsInfo) dimensionsInfo.textContent = t('controls.dimensionsInfo', lastDimensionsInfo);
+    if (typeof syncPlayAllButton === 'function') syncPlayAllButton();
+});
+
+// ---------- Elements ----------
 const loadBtn         = document.querySelector('#load-btn');
 const resetBtn        = document.querySelector('#reset-btn');
 const showOriginal    = document.querySelector('#show-original');
@@ -21,11 +97,11 @@ const posterizeValue  = document.querySelector('#posterize-value');
 
 const dimensionsInfo  = document.querySelector('#dimensions-info');
 
-// Contrôles d'image à verrouiller pendant la lecture d'un synthétiseur
-// (le bouton "Voir l'original" reste volontairement exclu)
+// Image controls to lock while a synthesizer is playing
+// (the "Show original" button is intentionally excluded)
 const imageLockControls = [loadBtn, resetBtn, gridSlider, contrast, brightness, grayscale, posterize];
 
-// Verrouille/déverrouille les contrôles d'image selon qu'un synthé joue ou non
+// Locks/unlocks image controls depending on whether a synth is playing
 function updateImageControlsLockState() {
     const anyPlaying = synthListBody.querySelectorAll('.synth-play.active').length > 0;
     imageLockControls.forEach(el => { el.disabled = anyPlaying; });
@@ -33,8 +109,8 @@ function updateImageControlsLockState() {
 }
 
 // ---------- Canvas overlay ----------
-let gridW = 1; // largeur courante de la grille en pixels
-let gridH = 1; // hauteur courante de la grille en pixels
+let gridW = 1; // current grid width in pixels
+let gridH = 1; // current grid height in pixels
 
 // Tracks the current cursor per synth for drawing: Map<id, cursor>
 const synthCursors = new Map();
@@ -51,7 +127,7 @@ function drawSynthPixel(synthId, cursor, muted) {
 
     const ctx = pixelOverlay.getContext('2d');
 
-    // Dimensions rendues de l'image dans le viewer (object-fit: contain)
+    // Rendered dimensions of the image in the viewer (object-fit: contain)
     const vw = pixelOverlay.width;
     const vh = pixelOverlay.height;
     const imgRatio = gridW / gridH;
@@ -75,7 +151,7 @@ function drawSynthPixel(synthId, cursor, muted) {
     const x = offsetX + col * cellW;
     const y = offsetY + row * cellH;
 
-    // Effacer uniquement le pixel précédent de ce synthé
+    // Only clear the previous pixel of this synth
     const prev = synthCursors.get(synthId);
     if (prev !== undefined) {
         const pc = prev % gridW;
@@ -85,7 +161,7 @@ function drawSynthPixel(synthId, cursor, muted) {
             offsetY + pr * cellH - 1,
             cellW + 2, cellH + 2
         );
-        // Redessiner les autres synthés qui occupent ce pixel
+        // Redraw other synths that occupy this pixel
         synthCursors.forEach((c, sid) => {
             if (sid !== synthId && c === prev) drawPixelAt(ctx, sid, c, offsetX, offsetY, cellW, cellH);
         });
@@ -115,8 +191,8 @@ function clearOverlay() {
     synthCursors.clear();
 }
 
-// ---------- Sélection de range de pixels à la souris ----------
-// Un seul synthé peut être en mode sélection à la fois.
+// ---------- Mouse-based pixel range selection ----------
+// Only one synth can be in selection mode at a time.
 let rangePickState = null; // { id, btn, firstPixel: number|null }
 
 function cursorFromClientPoint(clientX, clientY) {
@@ -135,7 +211,7 @@ function cursorFromClientPoint(clientX, clientY) {
 }
 
 function startRangePicking(id, btn) {
-    // Annuler un éventuel mode de sélection déjà actif sur un autre synthé
+    // Cancel any selection mode already active on another synth
     if (rangePickState && rangePickState.id !== id) {
         cancelRangePicking();
     }
@@ -159,12 +235,12 @@ pixelOverlay.addEventListener('click', (e) => {
     const { id, firstPixel } = rangePickState;
 
     if (firstPixel === null) {
-        // Premier clic : mémoriser le pixel de départ
+        // First click: remember the start pixel
         rangePickState.firstPixel = cursor;
         return;
     }
 
-    // Second clic : définir le range (avec inversion si nécessaire)
+    // Second click: define the range (with inversion if necessary)
     const start = Math.min(firstPixel, cursor);
     const end   = Math.max(firstPixel, cursor);
     applySynthRangeFromPicker(id, start, end);
@@ -184,12 +260,12 @@ function applySynthRangeFromPicker(id, start, end) {
     startVal.textContent = start;
     endVal.textContent   = end;
 
-    // Déclenche la mise à jour du fill, du highlight et l'appel Rust
+    // Triggers the fill update, the highlight update, and the Rust call
     startInput.dispatchEvent(new Event('input'));
     endInput.dispatchEvent(new Event('input'));
 }
 
-// Calcule les dimensions de rendu de l'image dans le viewer (object-fit: contain)
+// Computes the render dimensions of the image in the viewer (object-fit: contain)
 function getImageLayout() {
     const vw = pixelOverlay.width;
     const vh = pixelOverlay.height;
@@ -233,19 +309,19 @@ function drawRangeHighlight(synthId) {
 }
 
 function clearRangeHighlight(synthId) {
-    // On redessine tout le canvas à partir de zéro (plus sûr que de cibler zone par zone)
+    // We redraw the whole canvas from scratch (safer than targeting individual areas)
     redrawAllHighlights();
 }
 
 function redrawAllHighlights() {
     const ctx = pixelOverlay.getContext('2d');
     ctx.clearRect(0, 0, pixelOverlay.width, pixelOverlay.height);
-    synthCursors.clear(); // les curseurs actifs seront redessinés au prochain tick
+    synthCursors.clear(); // active cursors will be redrawn on the next tick
     synthHighlights.forEach((_, sid) => drawRangeHighlight(sid));
 }
 
-// ---------- Aperçu d'une couche de couleur (survol des boutons R/G/B) ----------
-// channelIndex : 0 = rouge, 1 = vert, 2 = bleu
+// ---------- Color channel preview (hovering the R/G/B buttons) ----------
+// channelIndex: 0 = red, 1 = green, 2 = blue
 const CHANNEL_TINTS = [
     [255, 0, 0],
     [0, 255, 0],
@@ -260,8 +336,8 @@ function drawChannelOverlay(channelIndex) {
     const { width, height, pixels } = cachedPixelData;
     if (!width || !height) return;
 
-    // Construire un canvas hors-écran à la résolution de la grille,
-    // où chaque pixel reflète l'intensité du canal choisi, teinté de sa couleur.
+    // Build an offscreen canvas at the grid's resolution, where each pixel
+    // reflects the intensity of the chosen channel, tinted with its color.
     const offCanvas = document.createElement('canvas');
     offCanvas.width = width;
     offCanvas.height = height;
@@ -296,15 +372,15 @@ new ResizeObserver(() => {
     clearOverlay();
 }).observe(pixelOverlay);
 
-// ---------- État ----------
+// ---------- State ----------
 let hasImage      = false;
 let origWidth     = 0;
 let origHeight    = 0;
-let originalPng   = null;   // base64 de l'aperçu original
-let processedPng  = null;   // base64 du dernier rendu traité
-let totalPixels   = 0;      // nombre total de pixels dans la grille courante
+let originalPng   = null;   // base64 of the original preview
+let processedPng  = null;   // base64 of the last processed render
+let totalPixels   = 0;      // total number of pixels in the current grid
 
-// Cache des pixels bruts de l'image traitée (RGBA à plat), pour l'aperçu par canal
+// Cache of the processed image's raw pixels (flat RGBA), for the channel preview
 let cachedPixelData = null; // { width, height, pixels: Uint8ClampedArray-like }
 
 async function refreshPixelDataCache() {
@@ -315,14 +391,14 @@ async function refreshPixelDataCache() {
     }
 }
 
-// Couleurs prédéfinies pour les synthés
+// Predefined colors for the synths
 const SYNTH_COLORS = [
     '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
     '#1abc9c', '#3498db', '#9b59b6', '#e91e63',
     '#ff5722', '#00bcd4', '#8bc34a', '#ffffff',
 ];
 
-// Map id → couleur courante
+// Map id → current color
 const synthColors = new Map();
 
 // Map id → { visible: bool, start: number, end: number }
@@ -331,7 +407,7 @@ const synthHighlights = new Map();
 const SLIDER_STEPS = 1000;
 const MIN_CELLS    = 2;
 
-// ---------- Échelle logarithmique ----------
+// ---------- Logarithmic scale ----------
 function sliderToCells(v, maxCells) {
   if (!maxCells || maxCells < MIN_CELLS) return MIN_CELLS;
   const lmin = Math.log(MIN_CELLS);
@@ -346,12 +422,12 @@ function currentGridWidth() {
   return sliderToCells(Number(gridSlider.value), origWidth);
 }
 
-// ---------- Paramètres ----------
+// ---------- Settings ----------
 function buildParams() {
   const levels = Number(posterize.value);
   return {
     grid_width:       currentGridWidth(),
-    grid_height:      null,              // toujours déduit du ratio
+    grid_height:      null,              // always deduced from the ratio
     contrast:         Number(contrast.value),
     brightness:       Number(brightness.value),
     grayscale:        grayscale.checked,
@@ -359,7 +435,7 @@ function buildParams() {
   };
 }
 
-// ---------- Affichage ----------
+// ---------- Display ----------
 function updatePreviewSrc() {
   const showOrig = showOriginal.checked;
   const data = showOrig ? originalPng : processedPng;
@@ -374,11 +450,12 @@ function syncLabels() {
   brightnessValue.textContent = Number(brightness.value).toFixed(0);
 
   const p = Number(posterize.value);
-  posterizeValue.textContent = p > 1 ? `${p} niveaux` : 'off';
+  posterizeValue.textContent = p > 1 ? t('controls.posterizeLevels', { count: p }) : t('controls.posterizeOff');
 }
 
-// ---------- Rafraîchissement ----------
+// ---------- Refresh ----------
 let pending = false;
+let lastDimensionsInfo = null; // remembers the last result, to retranslate on locale change
 
 async function refresh() {
   if (!hasImage || pending) return;
@@ -400,12 +477,15 @@ async function refresh() {
     updateAllSynthRangeMax(totalPixels);
     await refreshPixelDataCache();
 
-    dimensionsInfo.textContent =
-      `Original : ${origWidth} × ${origHeight}  —  ` +
-      `Grille : ${result.width} × ${result.height}  (${result.cell_count} cellules)`;
+    lastDimensionsInfo = {
+      origWidth, origHeight,
+      width: result.width, height: result.height,
+      cellCount: result.cell_count,
+    };
+    dimensionsInfo.textContent = t('controls.dimensionsInfo', lastDimensionsInfo);
   } catch (err) {
-    console.error('Erreur lors du traitement :', err);
-    dimensionsInfo.textContent = `Erreur : ${err}`;
+    console.error('Error while processing:', err);
+    dimensionsInfo.textContent = translateError(err);
   } finally {
     pending = false;
   }
@@ -417,7 +497,7 @@ function scheduleRefresh(delay = 60) {
   debounceId = setTimeout(refresh, delay);
 }
 
-// ---------- Chargement ----------
+// ---------- Loading ----------
 loadBtn.addEventListener('click', async () => {
   try {
     const result = await invoke('load_image');
@@ -437,11 +517,12 @@ loadBtn.addEventListener('click', async () => {
     syncLabels();
     await refresh();
   } catch (err) {
-    console.error('Erreur lors du chargement de l\'image :', err);
+    console.error('Error while loading the image:', err);
+    dimensionsInfo.textContent = translateError(err);
   }
 });
 
-// ---------- Réinitialisation ----------
+// ---------- Reset ----------
 resetBtn.addEventListener('click', () => {
   gridSlider.value  = SLIDER_STEPS;
   grayscale.checked = false;
@@ -453,7 +534,7 @@ resetBtn.addEventListener('click', () => {
   refresh();
 });
 
-// ---------- Écouteurs ----------
+// ---------- Listeners ----------
 [gridSlider, contrast, brightness, posterize].forEach(el => {
   el.addEventListener('input', () => {
     syncLabels();
@@ -471,7 +552,7 @@ showOriginal.addEventListener('change', updatePreviewSrc);
 // ---------- Init ----------
 syncLabels();
 
-// ---------- Métronome ----------
+// ---------- Metronome ----------
 const bpmInput = document.querySelector('#bpm-input');
 const bpmMinus10 = document.querySelector('#bpm-minus10');
 const bpmMinus1  = document.querySelector('#bpm-minus1');
@@ -496,7 +577,7 @@ async function applyBpm(newBpm) {
     }
 }
 
-// Démarre le métronome Rust s'il n'est pas déjà en cours
+// Starts the Rust metronome if it's not already running
 async function ensureMetronomeStarted() {
     if (metronomeRunning) return;
     await invoke('set_metronome_bpm', { bpm: clampBpm(Number(bpmInput.value)) });
@@ -504,7 +585,7 @@ async function ensureMetronomeStarted() {
     metronomeRunning = true;
 }
 
-// Arrête le métronome Rust s'il n'y a plus aucun synthé en lecture
+// Stops the Rust metronome if no synth is playing anymore
 async function stopMetronomeIfIdle() {
     if (!metronomeRunning) return;
     const anyPlaying = synthListBody.querySelectorAll('.synth-play.active').length > 0;
@@ -513,7 +594,7 @@ async function stopMetronomeIfIdle() {
     await invoke('stop_metronome');
     metronomeRunning = false;
 
-    // Restaurer les highlights masqués pendant la lecture
+    // Restore the highlights hidden during playback
     synthListBody.querySelectorAll('.synth-block').forEach(el => {
         const sid = Number(el.dataset.synthId);
         synthCursors.delete(sid);
@@ -528,13 +609,13 @@ bpmMinus1.addEventListener('click',  () => applyBpm(Number(bpmInput.value) - 1))
 bpmPlus1.addEventListener('click',   () => applyBpm(Number(bpmInput.value) + 1));
 bpmPlus10.addEventListener('click',  () => applyBpm(Number(bpmInput.value) + 10));
 
-// Saisie directe au clavier : on valide au blur ou sur "Enter"
+// Direct keyboard input: validated on blur or on "Enter"
 bpmInput.addEventListener('change', () => applyBpm(Number(bpmInput.value)));
 
-// Support clavier : flèches ↑/↓ pour incrémenter/décrémenter de 1
+// Keyboard support: ↑/↓ arrows to increment/decrement by 1
 bpmInput.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowUp') {
-        event.preventDefault(); // évite le comportement natif du <input type="number">
+        event.preventDefault(); // prevents the native <input type="number"> behavior
         applyBpm(Number(bpmInput.value) + 1);
     } else if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -542,14 +623,14 @@ bpmInput.addEventListener('keydown', (event) => {
     }
 });
 
-// Écoute des ticks émis par le backend Rust
+// Listens to ticks emitted by the Rust backend
 window.__TAURI__.event.listen('metronome-tick', (event) => {
     metronomeLed.classList.add('active');
     setTimeout(() => metronomeLed.classList.remove('active'), 100);
 });
 
 // ==========================================
-// Synthétiseurs
+// Synthesizers
 // ==========================================
 const addSynthBtn   = document.querySelector('#add-synth-btn');
 const playAllBtn    = document.querySelector('#play-all-btn');
@@ -561,12 +642,12 @@ function createSynthElement(id) {
     el.className = 'synth-block';
     el.dataset.synthId = id;
 
-    // Couleur par défaut : rotation dans la palette
+    // Default color: rotate through the palette
     const defaultColor = SYNTH_COLORS[(synthColors.size) % SYNTH_COLORS.length];
     synthColors.set(id, defaultColor);
 
     const channelOptions = Array.from({ length: 16 }, (_, i) =>
-        `<option value="${i}">Canal ${i + 1}</option>`
+        `<option value="${i}">${t('synth.channelOption', { number: i + 1 })}</option>`
     ).join('');
 
     const maxPx = totalPixels > 0 ? totalPixels - 1 : 0;
@@ -576,48 +657,48 @@ function createSynthElement(id) {
     ).join('');
 
     el.innerHTML = `
-        <div class="synth-color-band" style="background:${defaultColor}" title="Choisir une couleur"></div>
+        <div class="synth-color-band" style="background:${defaultColor}" data-i18n-title="synth.pickColor"></div>
         <div class="synth-color-picker hidden">
             <div class="color-swatches">${colorSwatches}</div>
         </div>
         <div class="synth-header">
-            <span>Synthé #${id}</span>
-            <button class="synth-remove" title="Supprimer">✕</button>
+            <span class="synth-title-label"></span>
+            <button class="synth-remove" data-i18n-title="synth.remove">✕</button>
         </div>
         <div class="synth-body">
             <div class="synth-controls-row">
-                <button class="synth-play">▶ Play</button>
-                <button class="synth-loop-btn active" title="Activer/désactiver la boucle">Boucle</button>
-                <button class="synth-eye-btn" title="Afficher/masquer le surlignage du range"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg></button>
+                <button class="synth-play synth-play-label"></button>
+                <button class="synth-loop-btn active synth-loop-label" data-i18n-title="synth.toggleLoop"></button>
+                <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg></button>
             </div>
             <label class="synth-channel-label">
-                <span>Canal MIDI</span>
+                <span data-i18n="synth.channelLabel"></span>
                 <select class="synth-channel">${channelOptions}</select>
             </label>
 
             <div class="synth-mode-row">
-                <span>Mode</span>
-                <button class="synth-mode-btn" data-mode="monophonic" title="Basculer le mode de traduction pixel → note">Monophonique</button>
+                <span data-i18n="synth.modeLabel"></span>
+                <button class="synth-mode-btn" data-mode="monophonic" data-i18n-title="synth.modeToggle"></button>
             </div>
 
             <div class="synth-mode-panel synth-mode-panel-mono">
                 <label class="synth-slider-label">
-                    <span>Décalage de teinte <em class="hue-shift-val">0°</em></span>
+                    <span><span data-i18n="synth.hueShift"></span> <em class="hue-shift-val">0°</em></span>
                     <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
                 </label>
             </div>
 
             <div class="synth-mode-panel synth-mode-panel-poly hidden">
-                <span class="synth-mode-panel-label">Canaux de couleur (accord)</span>
+                <span class="synth-mode-panel-label" data-i18n="synth.channelsPanelLabel"></span>
                 <div class="synth-channel-toggles">
-                    <button class="synth-channel-toggle active" data-channel="0" title="Activer/désactiver le rouge">R</button>
-                    <button class="synth-channel-toggle active" data-channel="1" title="Activer/désactiver le vert">G</button>
-                    <button class="synth-channel-toggle active" data-channel="2" title="Activer/désactiver le bleu">B</button>
+                    <button class="synth-channel-toggle active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
+                    <button class="synth-channel-toggle active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
+                    <button class="synth-channel-toggle active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
                 </div>
             </div>
             <div class="synth-range-wrapper">
                 <div class="synth-range-labels">
-                    <span>Pixels</span>
+                    <span data-i18n="synth.pixelsLabel"></span>
                     <span class="synth-range-values">
                         <em class="range-start-val">0</em> – <em class="range-end-val">${maxPx}</em>
                     </span>
@@ -628,14 +709,14 @@ function createSynthElement(id) {
                         <input type="range" class="synth-range-input range-start" min="0" max="${maxPx}" value="0" step="1" />
                         <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
                     </div>
-                    <button class="synth-pick-range-btn" title="Sélectionner le range sur l'image">
+                    <button class="synth-pick-range-btn" data-i18n-title="synth.pickRange">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13,13V21H11V13H3V11H11V3H13V11H21V13H13Z" /></svg>
                     </button>
                 </div>
             </div>
             <div class="synth-range-wrapper">
                 <div class="synth-range-labels">
-                    <span>Seuil de luminosité</span>
+                    <span data-i18n="synth.brightnessThreshold"></span>
                     <span class="synth-range-values">
                         <em class="brightness-start-val">0</em> – <em class="brightness-end-val">127</em>
                     </span>
@@ -647,50 +728,61 @@ function createSynthElement(id) {
                 </div>
             </div>
             <label class="synth-slider-label">
-                <span>Seuil de variation <em class="threshold-val">0</em></span>
+                <span><span data-i18n="synth.noteThreshold"></span> <em class="threshold-val">0</em></span>
                 <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
             </label>
             <label class="synth-slider-label">
-                <span>Vélocité minimum <em class="velocity-min-val">0</em></span>
+                <span><span data-i18n="synth.velocityMin"></span> <em class="velocity-min-val">0</em></span>
                 <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
             </label>
-            <p class="synth-pixel-info">Pixel : -</p>
+            <p class="synth-pixel-info"></p>
         </div>
     `;
+
+    // Translate everything marked with data-i18n* above, plus the elements
+    // whose text depends on dynamic state (title, play button, pixel info).
+    applyTranslations(el);
+    el.querySelector('.synth-title-label').textContent = t('synth.title', { id });
+    el.querySelector('.synth-play-label').textContent = t('synth.play');
+    el.querySelector('.synth-loop-label').textContent = t('synth.loop');
+    const modeBtnEl = el.querySelector('.synth-mode-btn');
+    modeBtnEl.textContent = t('synth.modeMonophonic');
+    el.querySelector('.threshold-val').textContent = t('synth.noteThresholdOff');
+    el.querySelector('.synth-pixel-info').textContent = t('synth.pixelInfoEmpty');
 
     el.querySelector('.synth-play').addEventListener('click', () => onSynthPlayClick(id, el));
     el.querySelector('.synth-remove').addEventListener('click', () => onSynthRemoveClick(id, el));
 
-    // Bande de couleur → toggle du picker
+    // Color band → toggle the picker
     const colorBand   = el.querySelector('.synth-color-band');
     const colorPicker = el.querySelector('.synth-color-picker');
     colorBand.addEventListener('click', () => {
-        // Fermer les autres pickers ouverts
+        // Close any other open pickers
         document.querySelectorAll('.synth-color-picker').forEach(p => {
             if (p !== colorPicker) p.classList.add('hidden');
         });
         colorPicker.classList.toggle('hidden');
     });
 
-    // Clic sur une couleur
+    // Click on a color
     colorPicker.querySelectorAll('.color-swatch').forEach(btn => {
         btn.addEventListener('click', () => {
             const color = btn.dataset.color;
             synthColors.set(id, color);
             colorBand.style.background = color;
             colorPicker.classList.add('hidden');
-            // Redessiner le surlignage avec la nouvelle couleur
+            // Redraw the highlight with the new color
             redrawAllHighlights();
         });
     });
 
-    // Fermer le picker en cliquant ailleurs
+    // Close the picker when clicking elsewhere
     document.addEventListener('click', (e) => {
         if (!el.contains(e.target)) colorPicker.classList.add('hidden');
     });
     el.querySelector('.synth-channel').addEventListener('change', (e) => {
         invoke('set_synth_channel', { id, channel: Number(e.target.value) })
-            .catch(err => console.error('Erreur set_synth_channel :', err));
+            .catch(err => console.error('Error in set_synth_channel:', err));
     });
 
     el.querySelector('.synth-loop-btn').addEventListener('click', (e) => {
@@ -698,10 +790,10 @@ function createSynthElement(id) {
         const loopEnabled = !btn.classList.contains('active');
         btn.classList.toggle('active', loopEnabled);
         invoke('set_synth_loop', { id, loopEnabled })
-            .catch(err => console.error('Erreur set_synth_loop :', err));
+            .catch(err => console.error('Error in set_synth_loop:', err));
     });
 
-    // ---- Mode monophonique / polyphonique ----
+    // ---- Monophonic / polyphonic mode ----
     const modeBtn      = el.querySelector('.synth-mode-btn');
     const monoPanel     = el.querySelector('.synth-mode-panel-mono');
     const polyPanel      = el.querySelector('.synth-mode-panel-poly');
@@ -712,35 +804,35 @@ function createSynthElement(id) {
         try {
             await invoke('set_synth_mode', { id, mode: newMode });
             modeBtn.dataset.mode = newMode;
-            modeBtn.textContent = newMode === 'monophonic' ? 'Monophonique' : 'Polyphonique';
+            modeBtn.textContent = newMode === 'monophonic' ? t('synth.modeMonophonic') : t('synth.modePolyphonic');
             monoPanel.classList.toggle('hidden', newMode !== 'monophonic');
             polyPanel.classList.toggle('hidden', newMode !== 'polyphonic');
         } catch (err) {
-            console.error('Erreur set_synth_mode :', err);
+            console.error('Error in set_synth_mode:', err);
         }
     });
 
-    // ---- Décalage de teinte (mode monophonique) ----
+    // ---- Hue shift (monophonic mode) ----
     const hueShiftInput = el.querySelector('.synth-hue-shift');
     const hueShiftVal    = el.querySelector('.hue-shift-val');
     hueShiftInput.addEventListener('input', () => {
         const hueShift = Number(hueShiftInput.value);
         hueShiftVal.textContent = `${hueShift}°`;
         invoke('set_synth_hue_shift', { id, hueShift })
-            .catch(err => console.error('Erreur set_synth_hue_shift :', err));
+            .catch(err => console.error('Error in set_synth_hue_shift:', err));
     });
 
-    // ---- Toggles de canaux R/G/B (mode polyphonique) ----
+    // ---- R/G/B channel toggles (polyphonic mode) ----
     el.querySelectorAll('.synth-channel-toggle').forEach(toggleBtn => {
         toggleBtn.addEventListener('click', () => {
             const channelIndex = Number(toggleBtn.dataset.channel);
             const enabled = !toggleBtn.classList.contains('active');
             toggleBtn.classList.toggle('active', enabled);
             invoke('set_synth_channel_enabled', { id, channelIndex, enabled })
-                .catch(err => console.error('Erreur set_synth_channel_enabled :', err));
+                .catch(err => console.error('Error in set_synth_channel_enabled:', err));
         });
 
-        // Aperçu visuel de la couche survolée, superposé sur l'image
+        // Visual preview of the hovered channel, overlaid on the image
         toggleBtn.addEventListener('mouseenter', () => {
             const channelIndex = Number(toggleBtn.dataset.channel);
             drawChannelOverlay(channelIndex);
@@ -750,10 +842,10 @@ function createSynthElement(id) {
         });
     });
 
-    // Initialiser l'état du highlight (masqué par défaut)
+    // Initialize the highlight state (hidden by default)
     synthHighlights.set(id, { visible: false, start: 0, end: maxPx });
 
-    // Bouton œil
+    // Eye button
     el.querySelector('.synth-eye-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
         const hi = synthHighlights.get(id);
@@ -763,29 +855,28 @@ function createSynthElement(id) {
         else            clearRangeHighlight(id);
     });
 
-    // Slider seuil de variation
+    // Note change threshold slider
     const thresholdInput = el.querySelector('.synth-threshold');
     const thresholdVal   = el.querySelector('.threshold-val');
     thresholdInput.addEventListener('input', () => {
         const threshold = Number(thresholdInput.value);
-        thresholdVal.textContent = threshold === 0 ? 'off' : threshold;
+        thresholdVal.textContent = threshold === 0 ? t('synth.noteThresholdOff') : threshold;
         invoke('set_synth_threshold', { id, threshold })
-            .catch(err => console.error('Erreur set_synth_threshold :', err));
+            .catch(err => console.error('Error in set_synth_threshold:', err));
     });
-    thresholdVal.textContent = 'off';
 
-    // Slider vélocité minimum : plancher de la plage de vélocité (la luminosité
-    // est transposée entre cette valeur et 127)
+    // Minimum velocity slider: floor of the velocity range (brightness is
+    // mapped between this value and 127)
     const velocityMinInput = el.querySelector('.synth-velocity-min');
     const velocityMinVal   = el.querySelector('.velocity-min-val');
     velocityMinInput.addEventListener('input', () => {
         const velocityMin = Number(velocityMinInput.value);
         velocityMinVal.textContent = velocityMin;
         invoke('set_synth_velocity_min', { id, velocityMin })
-            .catch(err => console.error('Erreur set_synth_velocity_min :', err));
+            .catch(err => console.error('Error in set_synth_velocity_min:', err));
     });
 
-    // Bouton de sélection du range sur l'image
+    // Range selection button on the image
     el.querySelector('.synth-pick-range-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
         if (rangePickState && rangePickState.id === id) {
@@ -815,8 +906,8 @@ function initSynthRange(id, el) {
         fill.style.left  = `${s}%`;
         fill.style.width = `${e - s}%`;
 
-        // Le thumb gauche doit toujours être cliquable : on le passe devant
-        // quand il est proche ou égal au thumb droit
+        // The left thumb must always stay clickable: bring it to the front
+        // when it is close to or equal to the right thumb
         const atEnd = Number(startInput.value) >= Number(endInput.value);
         startInput.style.zIndex = atEnd ? '3' : '2';
         endInput.style.zIndex   = atEnd ? '1' : '2';
@@ -826,8 +917,8 @@ function initSynthRange(id, el) {
         const pixelStart = Number(startInput.value);
         const pixelEnd   = Number(endInput.value);
         invoke('set_synth_range', { id, pixelStart, pixelEnd })
-            .catch(err => console.error('Erreur set_synth_range :', err));
-        // Mettre à jour le highlight si visible
+            .catch(err => console.error('Error in set_synth_range:', err));
+        // Update the highlight if visible
         const hi = synthHighlights.get(id);
         if (hi) { hi.start = pixelStart; hi.end = pixelEnd; }
         redrawAllHighlights();
@@ -878,7 +969,7 @@ function initBrightnessRange(id, el) {
             id,
             brightnessMin: Number(startInput.value),
             brightnessMax: Number(endInput.value),
-        }).catch(err => console.error('Erreur set_synth_brightness_range :', err));
+        }).catch(err => console.error('Error in set_synth_brightness_range:', err));
     }
 
     startInput.addEventListener('input', () => {
@@ -908,14 +999,14 @@ function updateAllSynthRangeMax(newTotal) {
         startInput.max = maxPx;
         endInput.max   = maxPx;
 
-        // Reclamper les valeurs si elles dépassent le nouveau max
+        // Reclamp the values if they exceed the new max
         if (Number(startInput.value) > maxPx) startInput.value = maxPx;
         if (Number(endInput.value)   > maxPx || Number(endInput.value) === 0) endInput.value = maxPx;
 
         endVal.textContent = endInput.value;
         el.querySelector('.synth-range-fill') && initFillUpdate(el);
 
-        // Recaler les bornes du highlight
+        // Recalibrate the highlight bounds
         const synthId = Number(el.dataset.synthId);
         const hi = synthHighlights.get(synthId);
         if (hi) { hi.start = Number(el.querySelector('.range-start').value); hi.end = Number(endInput.value); }
@@ -944,18 +1035,18 @@ async function onSynthPlayClick(id, el) {
     syncPlayAllButton();
 }
 
-// Met à jour le libellé du bouton "play all" selon l'état courant des synthés
+// Updates the "play all" button's label based on the synths' current state
 function syncPlayAllButton() {
     const blocks = Array.from(synthListBody.querySelectorAll('.synth-block'));
     const anyPlaying = blocks.some(el => el.querySelector('.synth-play').classList.contains('active'));
     playAllBtn.textContent = anyPlaying ? '⏸' : '▶';
     playAllBtn.title = anyPlaying
-        ? 'Arrêter tous les synthétiseurs'
-        : 'Démarrer tous les synthétiseurs';
+        ? t('synthList.playAllStop')
+        : t('synthList.playAllStart');
 }
 
-// Verrouille/déverrouille les contrôles spécifiques à un synthé pendant sa lecture
-// (canal MIDI, mode, décalage de teinte, toggles de canaux R/G/B)
+// Locks/unlocks the controls specific to a synth while it is playing
+// (MIDI channel, mode, hue shift, R/G/B channel toggles)
 function setSynthControlsLocked(el, locked) {
     el.querySelector('.synth-channel').disabled = locked;
     el.querySelector('.synth-mode-btn').disabled = locked;
@@ -967,11 +1058,11 @@ async function startSynthPlayback(id, el) {
     const btn = el.querySelector('.synth-play');
     await ensureMetronomeStarted();
     await invoke('start_synth', { id });
-    btn.textContent = '⏸ Stop';
+    btn.textContent = t('synth.stop');
     btn.classList.add('active');
-    // Masquer le surlignage pendant la lecture
+    // Hide the highlight during playback
     hideHighlightForPlay(id);
-    // Verrouiller les contrôles de ce synthé pendant la lecture
+    // Lock this synth's controls while it is playing
     setSynthControlsLocked(el, true);
     updateImageControlsLockState();
 }
@@ -979,12 +1070,12 @@ async function startSynthPlayback(id, el) {
 async function stopSynthPlayback(id, el) {
     const btn = el.querySelector('.synth-play');
     await invoke('stop_synth', { id });
-    btn.textContent = '▶ Play';
+    btn.textContent = t('synth.play');
     btn.classList.remove('active');
-    // Réafficher le surlignage si le bouton œil est actif
+    // Show the highlight again if the eye button is active
     restoreHighlightAfterStop(id, el);
     await stopMetronomeIfIdle();
-    // Déverrouiller les contrôles de ce synthé
+    // Unlock this synth's controls
     setSynthControlsLocked(el, false);
     updateImageControlsLockState();
 }
@@ -992,7 +1083,7 @@ async function stopSynthPlayback(id, el) {
 function hideHighlightForPlay(id) {
     const hi = synthHighlights.get(id);
     if (!hi) return;
-    hi._wasVisible = hi.visible; // mémoriser l'état
+    hi._wasVisible = hi.visible; // remember the state
     if (hi.visible) {
         hi.visible = false;
         redrawAllHighlights();
@@ -1007,7 +1098,7 @@ function restoreHighlightAfterStop(id, el) {
         hi._wasVisible = false;
         redrawAllHighlights();
     }
-    // Effacer le curseur de ce synthé du canvas
+    // Clear this synth's cursor from the canvas
     synthCursors.delete(id);
     redrawAllHighlights();
 }
@@ -1038,21 +1129,21 @@ addSynthBtn.addEventListener('click', async () => {
         placeholder.classList.add('hidden');
         synthListBody.appendChild(createSynthElement(id));
     } catch (err) {
-        console.error('Erreur lors de l\'ajout du synthétiseur :', err);
-        alert(err); // ou un affichage plus discret type toast/message d'erreur dans l'UI
+        console.error('Error while adding the synthesizer:', err);
+        alert(translateError(err)); // or a more discreet display like a toast/error message in the UI
     }
 });
 
-// ---------- Démarrer/arrêter tous les synthétiseurs ----------
+// ---------- Start/stop all synthesizers ----------
 playAllBtn.addEventListener('click', async () => {
     const blocks = Array.from(synthListBody.querySelectorAll('.synth-block'));
     if (blocks.length === 0) return;
 
-    // On considère l'ensemble "en lecture" si au moins un synthé joue déjà.
+    // We consider the whole set "playing" if at least one synth is already playing.
     const anyPlaying = blocks.some(el => el.querySelector('.synth-play').classList.contains('active'));
 
     if (anyPlaying) {
-        // Tout arrêter
+        // Stop everything
         for (const el of blocks) {
             const id = Number(el.dataset.synthId);
             if (el.querySelector('.synth-play').classList.contains('active')) {
@@ -1060,7 +1151,7 @@ playAllBtn.addEventListener('click', async () => {
             }
         }
     } else {
-        // Tout démarrer
+        // Start everything
         for (const el of blocks) {
             const id = Number(el.dataset.synthId);
             await startSynthPlayback(id, el);
@@ -1069,24 +1160,24 @@ playAllBtn.addEventListener('click', async () => {
     syncPlayAllButton();
 });
 
-// Arrêt automatique en fin de séquence (mode sans boucle)
+// Automatic stop at the end of the sequence (non-loop mode)
 window.__TAURI__.event.listen('synth-stopped', async (event) => {
     const { id } = event.payload;
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
     const btn = el.querySelector('.synth-play');
-    btn.textContent = '▶ Play';
+    btn.textContent = t('synth.play');
     btn.classList.remove('active');
     synthCursors.delete(id);
     restoreHighlightAfterStop(id, el);
     syncPlayAllButton();
     await stopMetronomeIfIdle();
-    // Déverrouiller les contrôles de ce synthé
+    // Unlock this synth's controls
     setSynthControlsLocked(el, false);
     updateImageControlsLockState();
 });
 
-// Réception des ticks de pixels, un par synthé
+// Receiving pixel ticks, one per synth
 window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     const { id, cursor, r, g, b, a, velocity, muted, mode, note, voices } = event.payload;
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
@@ -1098,17 +1189,20 @@ window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     if (mode === 'polyphonic' && Array.isArray(voices)) {
         const labels = ['R', 'G', 'B'];
         noteInfo = voices.map((v, i) => {
-            if (!v.enabled) return `${labels[i]}:off`;
+            if (!v.enabled) return t('synth.voiceOff', { channel: labels[i] });
             const name = midiNoteToName(v.note);
-            return `${labels[i]}:${name}${v.muted ? '(muet)' : ''}`;
+            return v.muted
+                ? t('synth.voiceMuted', { channel: labels[i], note: name })
+                : `${labels[i]}:${name}`;
         }).join('  ');
     } else {
         const noteName = midiNoteToName(note);
-        noteInfo = `Note ${noteName}${muted ? ' — muet' : ''}`;
+        noteInfo = t('synth.noteLabel', { note: noteName }) + (muted ? t('synth.noteMuted') : '');
     }
 
-    el.querySelector('.synth-pixel-info').textContent =
-        `Pixel ${cursor} — ${rgbaStr} — ${noteInfo} — Vel ${velocity ?? '-'}`;
+    const pixelInfoEl = el.querySelector('.synth-pixel-info');
+    pixelInfoEl.textContent = t('synth.pixelInfo', { cursor, rgba: rgbaStr, noteInfo, velocity: velocity ?? '-' });
+    pixelInfoEl.dataset.hasTick = '1';
     drawSynthPixel(id, cursor, muted);
 });
 

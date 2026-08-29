@@ -1,3 +1,4 @@
+use crate::error::{err, AppError};
 use crate::state::ImageState;
 use base64::{engine::general_purpose, Engine as _};
 use image::{DynamicImage, GenericImageView, ImageFormat};
@@ -30,7 +31,7 @@ pub struct AdjustedImageInfo {
 #[derive(Deserialize)]
 pub struct AdjustmentParams {
     pub grid_width: u32,
-    pub grid_height: Option<u32>, // toujours None pour l'instant : ratio déduit
+    pub grid_height: Option<u32>, // always None for now: ratio is deduced
     pub contrast: f32,
     pub brightness: i32,
     pub grayscale: bool,
@@ -41,13 +42,13 @@ pub struct AdjustmentParams {
 pub struct PixelData {
     pub width: u32,
     pub height: u32,
-    pub pixels: Vec<u8>, // RGBA à plat : r,g,b,a, r,g,b,a, ...
+    pub pixels: Vec<u8>, // flat RGBA: r,g,b,a, r,g,b,a, ...
 }
 
-fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
+fn encode_to_base64_png(img: &DynamicImage) -> Result<String, AppError> {
     let mut buffer = Cursor::new(Vec::new());
     img.write_to(&mut buffer, ImageFormat::Png)
-        .map_err(|e| format!("Erreur d'encodage PNG: {}", e))?;
+        .map_err(|e| err("png_encoding_error").with_param("details", e))?;
     Ok(general_purpose::STANDARD.encode(buffer.into_inner()))
 }
 
@@ -55,7 +56,7 @@ fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 pub async fn load_image(
     app_handle: tauri::AppHandle,
     state: State<'_, ImageState>,
-) -> Result<LoadedImageInfo, String> {
+) -> Result<LoadedImageInfo, AppError> {
     use tauri_plugin_dialog::DialogExt;
 
     let file_path = app_handle
@@ -64,14 +65,14 @@ pub async fn load_image(
         .add_filter("Images", &["png", "jpg", "jpeg", "bmp", "gif"])
         .blocking_pick_file();
 
-    let path = file_path.ok_or_else(|| "Aucun fichier sélectionné".to_string())?;
+    let path = file_path.ok_or_else(|| err("no_file_selected"))?;
 
     let path_buf = path
         .as_path()
-        .ok_or_else(|| "Chemin de fichier invalide".to_string())?;
+        .ok_or_else(|| err("invalid_file_path"))?;
 
     let img = image::open(path_buf)
-        .map_err(|e| format!("Erreur de chargement de l'image: {}", e))?;
+        .map_err(|e| err("image_load_error").with_param("details", e))?;
 
     let (width, height) = img.dimensions();
     let base64_png = encode_to_base64_png(&img)?;
@@ -90,16 +91,16 @@ pub async fn load_image(
 pub fn apply_image_adjustments(
     state: State<'_, ImageState>,
     params: AdjustmentParams,
-) -> Result<AdjustedImageInfo, String> {
+) -> Result<AdjustedImageInfo, AppError> {
     let original_guard = state.original.lock().unwrap();
     let original = original_guard
         .as_ref()
-        .ok_or_else(|| "Aucune image chargée".to_string())?;
+        .ok_or_else(|| err("no_image_loaded"))?;
 
     let (orig_w, orig_h) = original.dimensions();
 
-    // --- Downsampling réel : grid_width devient le nombre de colonnes/notes ---
-    // Le ratio est toujours déduit de l'image originale (pas de grid_height indépendant).
+    // --- Actual downsampling: grid_width becomes the number of columns/notes ---
+    // The ratio is always deduced from the original image (no independent grid_height).
     let target_w = params.grid_width.max(1);
     let target_h = ((orig_h as f64) * (target_w as f64) / (orig_w as f64))
         .round()
@@ -111,10 +112,10 @@ pub fn apply_image_adjustments(
         image::imageops::FilterType::Nearest,
     );
 
-    // --- Ajustements ---
+    // --- Adjustments ---
     if params.grayscale {
         img = DynamicImage::ImageLuma8(img.to_luma8()).into();
-        // reconversion en RGBA pour rester cohérent avec la suite du pipeline
+        // convert back to RGBA to stay consistent with the rest of the pipeline
         img = DynamicImage::ImageRgba8(img.to_rgba8());
     }
 
@@ -147,7 +148,7 @@ pub fn apply_image_adjustments(
     })
 }
 
-/// Réduit chaque canal RGB à `levels` paliers distincts (posterize classique).
+/// Reduces each RGB channel to `levels` distinct steps (classic posterize).
 fn posterize(img: &DynamicImage, levels: u8) -> DynamicImage {
     let levels = levels.max(2) as f32;
     let step = 255.0 / (levels - 1.0);
@@ -164,11 +165,11 @@ fn posterize(img: &DynamicImage, levels: u8) -> DynamicImage {
 }
 
 #[tauri::command]
-pub fn get_pixel_data(state: State<'_, ImageState>) -> Result<PixelData, String> {
+pub fn get_pixel_data(state: State<'_, ImageState>) -> Result<PixelData, AppError> {
     let processed_guard = state.processed.lock().unwrap();
     let processed = processed_guard
         .as_ref()
-        .ok_or_else(|| "Aucune image traitée disponible".to_string())?;
+        .ok_or_else(|| err("no_processed_image"))?;
 
     let (width, height) = processed.dimensions();
     let rgba_img = processed.to_rgba8();

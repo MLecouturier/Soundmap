@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "name": "English",
+    "code": "en"
+  },
+  "app": {
+    "title": "SoundMap"
+  },
+  "viewer": {
+    "previewAlt": "Image preview",
+    "noImage": "No image loaded"
+  },
+  "controls": {
+    "load": "Load an image",
+    "reset": "Reset",
+    "showOriginal": "Show original",
+    "columns": "Columns",
+    "contrast": "Contrast",
+    "brightness": "Brightness",
+    "grayscale": "Grayscale",
+    "posterize": "Posterize",
+    "posterizeOff": "off",
+    "posterizeLevels": "{count} levels",
+    "dimensionsInfo": "Original: {origWidth} × {origHeight}  —  Grid: {width} × {height}  ({cellCount} cells)"
+  },
+  "metronome": {
+    "title": "Metronome",
+    "tempo": "Tempo (BPM)"
+  },
+  "synthList": {
+    "title": "Synthesizers",
+    "playAllStart": "Start all synthesizers",
+    "playAllStop": "Stop all synthesizers",
+    "add": "Add a synthesizer",
+    "empty": "No synthesizer yet.",
+    "commonControlsTitle": "Common controls",
+    "commonControlsText": "Global settings applied to all synthesizers."
+  },
+  "synth": {
+    "title": "Synth #{id}",
+    "remove": "Remove",
+    "pickColor": "Choose a color",
+    "play": "▶ Play",
+    "stop": "⏸ Stop",
+    "loop": "Loop",
+    "toggleLoop": "Enable/disable looping",
+    "toggleHighlight": "Show/hide the range highlight",
+    "channelLabel": "MIDI channel",
+    "channelOption": "Channel {number}",
+    "modeLabel": "Mode",
+    "modeToggle": "Switch the pixel-to-note translation mode",
+    "modeMonophonic": "Monophonic",
+    "modePolyphonic": "Polyphonic",
+    "hueShift": "Hue shift",
+    "channelsPanelLabel": "Color channels (chord)",
+    "toggleRed": "Enable/disable red",
+    "toggleGreen": "Enable/disable green",
+    "toggleBlue": "Enable/disable blue",
+    "pixelsLabel": "Pixels",
+    "pickRange": "Select the range on the image",
+    "brightnessThreshold": "Brightness threshold",
+    "noteThreshold": "Note change threshold",
+    "noteThresholdOff": "off",
+    "velocityMin": "Minimum velocity",
+    "pixelInfoEmpty": "Pixel: -",
+    "pixelInfo": "Pixel {cursor} — {rgba} — {noteInfo} — Vel {velocity}",
+    "noteLabel": "Note {note}",
+    "noteMuted": " — muted",
+    "voiceOff": "{channel}:off",
+    "voiceMuted": "{channel}:{note}(muted)"
+  },
+  "errors": {
+    "generic": "An error occurred: {details}",
+    "no_image_loaded_for_synth": "Please load an image before adding a synthesizer.",
+    "synth_not_found": "Synth {id} not found.",
+    "invalid_channel_index": "Invalid channel index (expected 0, 1, or 2).",
+    "no_file_selected": "No file selected.",
+    "invalid_file_path": "Invalid file path.",
+    "image_load_error": "Error loading image: {details}",
+    "no_image_loaded": "No image loaded.",
+    "no_processed_image": "No processed image available.",
+    "png_encoding_error": "PNG encoding error: {details}",
+    "add_synth_failed": "Error while adding the synthesizer.",
+    "load_image_failed": "Error while loading the image.",
+    "processing_failed": "Error while processing."
+  }
+}

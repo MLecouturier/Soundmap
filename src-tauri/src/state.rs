@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-/// Mode de traduction des pixels en notes.
+/// Mode used to translate pixels into notes.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SynthMode {
@@ -12,7 +12,7 @@ pub enum SynthMode {
     Polyphonic,
 }
 
-/// État d'une voix individuelle en mode polyphonique (une par canal R/G/B).
+/// State of an individual voice in polyphonic mode (one per R/G/B channel).
 #[derive(Clone, Copy, Debug)]
 pub struct ChannelVoice {
     pub note: u8,
@@ -44,32 +44,32 @@ impl Default for ImageState {
     }
 }
 
-/// État d'un synthétiseur individuel.
+/// State of an individual synthesizer.
 #[derive(Clone)]
 pub struct Synth {
     pub id: u32,
     pub playing: bool,
-    pub cursor: usize,      // index du pixel courant (0..width*height)
-    pub note: u8,           // note MIDI fixe pour l'instant : LA4 = 69
-    pub channel: u8,        // canal MIDI 0-15
-    pub pixel_start: usize,   // pixel d'entrée (inclusif)
-    pub pixel_end: usize,     // pixel de sortie (inclusif, 0 = jusqu'à la fin)
-    pub loop_enabled: bool,   // lecture en boucle ou arrêt en fin de range
-    pub brightness_min: u8,   // seuil de luminosité minimum (0–127)
-    pub brightness_max: u8,   // seuil de luminosité maximum (0–127)
-    pub active_note: bool,     // false si le pixel courant est hors seuil (muet)
-    pub note_threshold: u8,    // écart minimum de note pour déclencher un changement (0 = toujours)
-    pub last_played_note: Option<u8>, // dernière note effectivement jouée
-    pub note_is_on: bool,      // true si une note MIDI est actuellement en train de sonner (sustain)
-    pub velocity: u8,          // vélocité MIDI courante, dérivée de la luminosité du pixel (1–127)
-    pub velocity_min: u8,      // plancher de la plage de vélocité (0–126) : la luminosité est
-                               // transposée entre cette valeur et 127 (vélocité maximale)
+    pub cursor: usize,      // index of the current pixel (0..width*height)
+    pub note: u8,           // fixed MIDI note for now: A4 = 69
+    pub channel: u8,        // MIDI channel 0-15
+    pub pixel_start: usize,   // entry pixel (inclusive)
+    pub pixel_end: usize,     // exit pixel (inclusive, 0 = end of image)
+    pub loop_enabled: bool,   // loop playback or stop at end of range
+    pub brightness_min: u8,   // minimum brightness threshold (0–127)
+    pub brightness_max: u8,   // maximum brightness threshold (0–127)
+    pub active_note: bool,     // false if the current pixel is out of range (muted)
+    pub note_threshold: u8,    // minimum note gap required to trigger a change (0 = always)
+    pub last_played_note: Option<u8>, // last note actually played
+    pub note_is_on: bool,      // true if a MIDI note is currently sounding (sustain)
+    pub velocity: u8,          // current MIDI velocity, derived from the pixel's brightness (1–127)
+    pub velocity_min: u8,      // floor of the velocity range (0–126): brightness is
+                               // mapped between this value and 127 (maximum velocity)
 
-    // --- Modes de traduction pixel → note ---
+    // --- Pixel-to-note translation modes ---
     pub mode: SynthMode,
-    pub hue_shift: u16,             // décalage de teinte en degrés (0–360), mode monophonique
-    pub channel_enabled: [bool; 3], // R, G, B activés/désactivés, mode polyphonique
-    pub poly_voices: [ChannelVoice; 3], // état MIDI indépendant par canal R, G, B
+    pub hue_shift: u16,             // hue shift in degrees (0–360), monophonic mode
+    pub channel_enabled: [bool; 3], // R, G, B enabled/disabled, polyphonic mode
+    pub poly_voices: [ChannelVoice; 3], // independent MIDI state per R, G, B channel
 }
 
 impl Synth {
@@ -78,11 +78,11 @@ impl Synth {
             id,
             playing: false,
             cursor: 0,
-            note: 69, // LA4
+            note: 69, // A4
             channel: 0,
             pixel_start: 0,
-            pixel_end: 0,         // 0 signifie "fin de l'image"
-            loop_enabled: true,   // boucle activée par défaut
+            pixel_end: 0,         // 0 means "end of the image"
+            loop_enabled: true,   // loop enabled by default
             brightness_min: 0,
             brightness_max: 127,
             active_note: true,
@@ -100,7 +100,7 @@ impl Synth {
     }
 }
 
-/// Registre de tous les synthés créés par l'utilisateur.
+/// Registry of all synthesizers created by the user.
 pub struct SynthState {
     pub synths: Mutex<HashMap<u32, Synth>>,
     pub next_id: Mutex<u32>,
@@ -115,8 +115,8 @@ impl Default for SynthState {
     }
 }
 
-/// Connexion MIDI unique, partagée par tous les synthés pour l'instant.
-/// Chaque synthé pourra plus tard choisir son propre port.
+/// Single MIDI connection, shared by all synths for now.
+/// Each synth may later be able to choose its own port.
 pub struct MidiState {
     pub connection: Mutex<Option<MidiOutputConnection>>,
 }

@@ -1,3 +1,4 @@
+pub mod error;
 pub mod image_processing;
 pub mod metronome;
 pub mod midi;
@@ -44,5 +45,5 @@ pub fn run() {
             synth::set_synth_channel_enabled,
         ])
         .run(tauri::generate_context!())
-        .expect("Erreur lors du lancement de l'application Tauri");
+        .expect("Error while launching the Tauri application");
 }

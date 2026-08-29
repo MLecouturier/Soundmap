@@ -46,7 +46,7 @@ html, body {
 }
 
 // ==========================================================================
-// Layout principal
+// Main layout
 // ==========================================================================
 .app-container {
     display: flex;
@@ -80,7 +80,7 @@ html, body {
 }
 
 // ==========================================================================
-// Viewer d'image (colonne gauche - zone principale)
+// Image viewer (left column - main area)
 // ==========================================================================
 #image-viewer-container {
     background-color: $color-bg-viewer;
@@ -113,7 +113,7 @@ html, body {
             height: 100%;
             pointer-events: none;
 
-            // Mode sélection de range de pixels au clic
+            // Pixel range click-selection mode
             &.picking {
                 pointer-events: auto;
                 cursor: crosshair;
@@ -125,7 +125,7 @@ html, body {
             height: 100%;
             object-fit: contain;
 
-            // Affiche les cellules comme des blocs nets, sans lissage
+            // Display cells as crisp blocks, without smoothing
             &.pixelated {
                 image-rendering: pixelated;
                 image-rendering: crisp-edges;
@@ -148,11 +148,11 @@ html, body {
 }
 
 // ==========================================================================
-// Slider — style réutilisable (simple et double)
+// Slider — reusable style (single and dual)
 // ==========================================================================
 //
-// Usage simple :   <input type="range" class="slider" />
-// Usage double :   voir .synth-range-track (deux .slider superposés + .slider-fill)
+// Simple usage:   <input type="range" class="slider" />
+// Dual usage:      see .synth-range-track (two overlapping .slider + .slider-fill)
 //
 @mixin slider-thumb {
     appearance: none;
@@ -200,7 +200,7 @@ input[type="range"].synth-range-input {
 }
 
 // ==========================================================================
-// Controls (colonne gauche)
+// Controls (left column)
 // ==========================================================================
 #controls {
     flex: 0 0 auto;
@@ -217,15 +217,34 @@ input[type="range"].synth-range-input {
         }
     }
 
+    // Language switcher, pushed to the right of the controls row
+    #language-switcher {
+        margin-left: auto;
+
+        select {
+            background-color: $color-bg-light;
+            color: $color-text-secondary;
+            border: 1px solid $color-border;
+            border-radius: $border-radius-base;
+            padding: 5px 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+
+            &:hover {
+                border-color: $color-accent;
+            }
+        }
+    }
+
     .controls-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 10px 18px;
     }
 
-    // Contrôles verrouillés pendant la lecture d'un synthétiseur
-    // (le bouton "Voir l'original" reste actif, donc on cible chaque élément
-    // désactivé plutôt que la .controls-row entière)
+    // Controls locked while a synthesizer is playing
+    // (the "Show original" button stays active, so we target each disabled
+    // element individually rather than the whole .controls-row)
     button:disabled,
     input:disabled {
         opacity: 0.4;
@@ -346,7 +365,7 @@ $metronome-led-transition: 0.05s ease;
 }
 
 // ==========================================================================
-// Liste de synthétiseurs (colonne droite - zone principale)
+// Synthesizer list (right column - main area)
 // ==========================================================================
 #synth-list {
     background-color: $color-bg-medium;
@@ -411,12 +430,12 @@ $metronome-led-transition: 0.05s ease;
     position: relative;
     background-color: $color-bg-light;
     border: 1px solid $color-border;
-    border-left: 5px solid $color-border; // sera visuellement couvert par .synth-color-band
+    border-left: 5px solid $color-border; // will be visually covered by .synth-color-band
     border-radius: $border-radius-base;
     padding: 10px 10px 10px 14px;
     overflow: visible;
 
-    // Bande de couleur cliquable sur le bord gauche
+    // Clickable color band on the left edge
     .synth-color-band {
         position: absolute;
         left: -5px;
@@ -430,7 +449,7 @@ $metronome-led-transition: 0.05s ease;
         &:hover { filter: brightness(1.3); }
     }
 
-    // Picker de couleurs
+    // Color picker
     .synth-color-picker {
         position: absolute;
         left: 8px;
@@ -585,7 +604,7 @@ $metronome-led-transition: 0.05s ease;
             font-variant-numeric: tabular-nums;
         }
 
-        // Ligne de sélection du mode monophonique / polyphonique
+        // Monophonic / polyphonic mode selection row
         .synth-mode-row {
             display: flex;
             align-items: center;
@@ -616,7 +635,7 @@ $metronome-led-transition: 0.05s ease;
             }
         }
 
-        // Panneaux conditionnels selon le mode actif
+        // Conditional panels depending on the active mode
         .synth-mode-panel {
             display: flex;
             flex-direction: column;
@@ -666,7 +685,7 @@ $metronome-led-transition: 0.05s ease;
         }
     }
 
-    // Double slider de range pixel
+    // Pixel range dual slider
     .synth-range-wrapper {
         display: flex;
         flex-direction: column;
@@ -736,7 +755,7 @@ $metronome-led-transition: 0.05s ease;
             display: flex;
             align-items: center;
 
-            // Rail de fond
+            // Background rail
             &::before {
                 content: '';
                 position: absolute;
@@ -748,7 +767,7 @@ $metronome-led-transition: 0.05s ease;
                 pointer-events: none;
             }
 
-            // Segment coloré entre les deux poignées
+            // Colored segment between the two handles
             .synth-range-fill {
                 position: absolute;
                 height: 4px;
@@ -757,16 +776,16 @@ $metronome-led-transition: 0.05s ease;
                 pointer-events: none;
             }
 
-            // Les deux inputs superposés — le style du thumb vient du mixin global
+            // The two overlapping inputs — the thumb style comes from the global mixin
             .synth-range-input {
                 position: absolute;
                 left: 0;
                 top: 0;
                 width: 100%;
-                height: 100%; // occupe toute la hauteur pour centrer le thumb
-                background: transparent; // le rail est géré par ::before et .slider-fill
+                height: 100%; // occupies the full height to center the thumb
+                background: transparent; // the rail is handled by ::before and .slider-fill
 
-                // Le track est transparent : le rail visuel est le ::before du conteneur
+                // The track is transparent: the visual rail is the container's ::before
                 &::-webkit-slider-runnable-track { background: transparent; border: none; }
                 &::-moz-range-track              { background: transparent; border: none; }
 
@@ -783,7 +802,7 @@ $metronome-led-transition: 0.05s ease;
 }
 
 // ==========================================================================
-// Zones fixes (footers)
+// Fixed areas (footers)
 // ==========================================================================
 .footer-area {
     flex: 0 0 auto;
@@ -804,7 +823,7 @@ $metronome-led-transition: 0.05s ease;
 }
 
 // ==========================================================================
-// Scrollbars (esthétique)
+// Scrollbars (aesthetics)
 // ==========================================================================
 ::-webkit-scrollbar {
     width: 8px;

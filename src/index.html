@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,48 +9,49 @@
 <body>
     <div class="app-container">
 
-        <!-- Colonne gauche : largeur variable -->
+        <!-- Left column: variable width -->
         <div class="column column-left">
             <div class="content-area" id="image-viewer-container">
                 <div id="image-viewer">
-                    <img id="preview" alt="Aperçu de l'image" class="hidden" />
+                    <img id="preview" data-i18n-alt="viewer.previewAlt" class="hidden" />
                     <canvas id="pixel-overlay"></canvas>
-                    <p class="viewer-empty" id="viewer-empty">Aucune image chargée</p>
+                    <p class="viewer-empty" id="viewer-empty" data-i18n="viewer.noImage"></p>
                 </div>
 
                 <div id="controls">
                     <div class="controls-row">
-                        <button id="load-btn">Charger une image</button>
-                        <button id="reset-btn" class="secondary">Réinitialiser</button>
+                        <button id="load-btn" data-i18n="controls.load"></button>
+                        <button id="reset-btn" class="secondary" data-i18n="controls.reset"></button>
                         <label class="checkbox">
                             <input type="checkbox" id="show-original" />
-                            Voir l'original
+                            <span data-i18n="controls.showOriginal"></span>
                         </label>
+                        <div id="language-switcher"></div>
                     </div>
 
                     <div class="controls-grid">
                         <label>
-                            <span>Colonnes <em id="grid-width-value">-</em></span>
+                            <span><span data-i18n="controls.columns"></span> <em id="grid-width-value">-</em></span>
                             <input type="range" id="grid-width" min="0" max="1000" value="1000" />
                         </label>
 
                         <label>
-                            <span>Contraste <em id="contrast-value">0</em></span>
+                            <span><span data-i18n="controls.contrast"></span> <em id="contrast-value">0</em></span>
                             <input type="range" id="contrast" min="-100" max="100" value="0" step="1" />
                         </label>
 
                         <label>
-                            <span>Luminosité <em id="brightness-value">0</em></span>
+                            <span><span data-i18n="controls.brightness"></span> <em id="brightness-value">0</em></span>
                             <input type="range" id="brightness" min="-100" max="100" value="0" step="1" />
                         </label>
 
                         <label class="checkbox">
                             <input type="checkbox" id="grayscale" />
-                            Niveaux de gris
+                            <span data-i18n="controls.grayscale"></span>
                         </label>
 
                         <label>
-                            <span>Postérisation <em id="posterize-value">off</em></span>
+                            <span><span data-i18n="controls.posterize"></span> <em id="posterize-value">off</em></span>
                             <input type="range" id="posterize" min="1" max="32" value="1" step="1" />
                         </label>
                     </div>
@@ -59,10 +60,10 @@
                 </div>
             </div>
             <div class="footer-area" id="metronome">
-                <h3>Métronome</h3>
+                <h3 data-i18n="metronome.title"></h3>
                 <div class="metronome-controls">
                     <div class="metronome-bpm">
-                        <label for="bpm-input">Tempo (BPM)</label>
+                        <label for="bpm-input" data-i18n="metronome.tempo"></label>
                         <div class="bpm-input-group">
                             <button id="bpm-minus10" class="bpm-step" title="-10 BPM">-10</button>
                             <button id="bpm-minus1"  class="bpm-step" title="-1 BPM">-1</button>
@@ -77,24 +78,24 @@
             </div>
         </div>
 
-        <!-- Colonne droite : largeur fixe -->
+        <!-- Right column: fixed width -->
         <div class="column column-right">
             <div class="content-area" id="synth-list">
                 <div class="synth-list-header">
-                    <h2>Synthétiseurs</h2>
+                    <h2 data-i18n="synthList.title"></h2>
                     <div class="synth-list-header-actions">
-                        <button id="play-all-btn" title="Démarrer/arrêter tous les synthétiseurs">▶</button>
-                        <button id="add-synth-btn" title="Ajouter un synthétiseur">+</button>
+                        <button id="play-all-btn" data-i18n-title="synthList.playAllStart">▶</button>
+                        <button id="add-synth-btn" data-i18n-title="synthList.add">+</button>
                     </div>
                 </div>
                 <div class="synth-list-body">
-                    <!-- Les synthétiseurs seront ajoutés dynamiquement ici -->
-                    <p class="placeholder-text">Aucun synthétiseur pour l'instant.</p>
+                    <!-- Synthesizers will be dynamically added here -->
+                    <p class="placeholder-text" data-i18n="synthList.empty"></p>
                 </div>
             </div>
             <div class="footer-area" id="common-controls">
-                <h3>Commandes communes</h3>
-                <p>Paramètres globaux appliqués à tous les synthétiseurs.</p>
+                <h3 data-i18n="synthList.commonControlsTitle"></h3>
+                <p data-i18n="synthList.commonControlsText"></p>
             </div>
         </div>
 

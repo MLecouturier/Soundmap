@@ -8,13 +8,13 @@ use image::GenericImageView;
 use crate::midi::{send_note_off, send_note_on};
 use crate::state::{ImageState, Synth, SynthMode, SynthState, MidiState};
 
-/// Calcule la luminosité perçue d'un pixel RGBA (formule Rec.601), 0.0–255.0.
+/// Computes the perceived brightness of an RGBA pixel (Rec.601 formula), 0.0–255.0.
 fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
     0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32
 }
 
-/// Calcule la teinte (Hue) d'un pixel RGB selon le modèle TSL/HSL, en degrés (0.0–360.0).
-/// Pour un pixel achromatique (gris pur, r=g=b), la teinte n'est pas définie ; on retourne 0.0.
+/// Computes the hue of an RGB pixel using the HSL color model, in degrees (0.0–360.0).
+/// For an achromatic pixel (pure gray, r=g=b), the hue is undefined; we return 0.0.
 fn pixel_hue(r: u8, g: u8, b: u8) -> f32 {
     let (r, g, b) = (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0);
     let max = r.max(g).max(b);
@@ -22,7 +22,7 @@ fn pixel_hue(r: u8, g: u8, b: u8) -> f32 {
     let delta = max - min;
 
     if delta.abs() < f32::EPSILON {
-        return 0.0; // gris : teinte indéfinie
+        return 0.0; // gray: hue undefined
     }
 
     let hue = if max == r {
@@ -36,36 +36,36 @@ fn pixel_hue(r: u8, g: u8, b: u8) -> f32 {
     if hue < 0.0 { hue + 360.0 } else { hue }
 }
 
-/// Mappe une teinte (0–360°) vers une note MIDI 0–127.
+/// Maps a hue (0–360°) to a MIDI note 0–127.
 fn hue_to_midi_note(hue: f32) -> u8 {
     ((hue / 360.0) * 127.0).round().clamp(0.0, 127.0) as u8
 }
 
-/// Mappe une valeur de canal de couleur (0–255) vers une note MIDI 0–127.
+/// Maps a color channel value (0–255) to a MIDI note 0–127.
 fn channel_to_midi_note(value: u8) -> u8 {
     ((value as f32 / 255.0) * 127.0).round() as u8
 }
 
-/// Mappe une luminosité (0–255) vers un niveau MIDI 0–127 (utilisé pour le
-/// filtrage par seuil de luminosité, indépendamment de la note jouée).
+/// Maps a brightness value (0–255) to a MIDI level 0–127 (used for
+/// brightness-threshold filtering, independently of the note played).
 fn luma_to_level(luma: f32) -> u8 {
     ((luma / 255.0) * 127.0).round() as u8
 }
 
-/// Mappe une luminosité (0–255) vers une vélocité MIDI comprise entre
-/// `velocity_min` et 127 (plus le pixel est sombre, plus la vélocité est
-/// forte : les zones claires sont jouées délicatement, les zones sombres
-/// avec plus d'intensité). `velocity_min` définit donc le plancher de la
-/// plage de vélocité, pas un seuil de silence.
+/// Maps a brightness value (0–255) to a MIDI velocity between
+/// `velocity_min` and 127 (the darker the pixel, the stronger the
+/// velocity: bright areas are played delicately, dark areas with more
+/// intensity). `velocity_min` therefore defines the floor of the
+/// velocity range, not a silence threshold.
 fn luma_to_velocity(luma: f32, velocity_min: u8) -> u8 {
     let min = velocity_min.min(126) as f32;
     let range = 127.0 - min;
     let v = (min + ((255.0 - luma) / 255.0) * range).round() as u8;
-    v.clamp(1, 127) // 0 équivaudrait à un Note Off en MIDI
+    v.clamp(1, 127) // 0 would be equivalent to a Note Off in MIDI
 }
 
-/// Traite un pixel en mode monophonique : la teinte (décalée de hue_shift)
-/// détermine une note unique.
+/// Processes a pixel in monophonic mode: the hue (shifted by hue_shift)
+/// determines a single note.
 fn process_monophonic(
     synth: &mut Synth,
     conn: Option<&mut midir::MidiOutputConnection>,
@@ -78,9 +78,9 @@ fn process_monophonic(
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
     let raw_note = hue_to_midi_note(shifted_hue);
 
-    // Appliquer le seuil de variation de note : si l'écart avec la dernière
-    // note retenue est insuffisant, on garde cette dernière (la note en
-    // cours sera donc prolongée, pas rejouée).
+    // Apply the note change threshold: if the gap with the last retained
+    // note is insufficient, keep that last note (the current note is
+    // therefore sustained, not retriggered).
     let effective_note = if synth.note_threshold == 0 {
         raw_note
     } else {
@@ -96,9 +96,9 @@ fn process_monophonic(
     let in_range = brightness_level >= synth.brightness_min
         && brightness_level <= synth.brightness_max;
 
-    // On ne (re)déclenche le MIDI que si la note change réellement ou si son
-    // statut audible (muet / non muet) change. Sinon on laisse la note en
-    // cours sonner sans interruption (legato).
+    // We only (re)trigger MIDI if the note actually changes or if its
+    // audible status (muted / not muted) changes. Otherwise we let the
+    // current note keep sounding without interruption (legato).
     let note_changed = effective_note != synth.note;
     let needs_off = synth.note_is_on && (note_changed || !in_range);
     let needs_on  = in_range && (!synth.note_is_on || note_changed);
@@ -130,8 +130,8 @@ fn process_monophonic(
     payload["muted"] = serde_json::json!(!in_range);
 }
 
-/// Traite un pixel en mode polyphonique : chaque canal R/G/B activé génère
-/// sa propre note indépendante, formant un accord de 1 à 3 notes.
+/// Processes a pixel in polyphonic mode: each enabled R/G/B channel generates
+/// its own independent note, forming a chord of 1 to 3 notes.
 fn process_polyphonic(
     synth: &mut Synth,
     conn: Option<&mut midir::MidiOutputConnection>,
@@ -199,7 +199,7 @@ fn process_polyphonic(
         }));
     }
 
-    // active_note global : true si au moins une voix sonne (utile pour le highlight/UI)
+    // global active_note: true if at least one voice is sounding (useful for the highlight/UI)
     synth.active_note = synth.poly_voices.iter().enumerate().any(|(i, v)| v.note_is_on && synth.channel_enabled[i]);
 
     payload["voices"] = serde_json::json!(voices_payload);
@@ -229,7 +229,7 @@ pub fn set_metronome_bpm(state: tauri::State<MetronomeState>, bpm: u32) {
 #[tauri::command]
 pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
     if state.running.load(Ordering::Relaxed) {
-        return; // déjà en cours
+            return; // already running
     }
     state.running.store(true, Ordering::Relaxed);
 
@@ -244,7 +244,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
             let _ = app.emit("metronome-tick", beat_index);
 
-            // --- Avancement des synthés actifs sur l'image ---
+            // --- Advancing active synths over the image ---
             let image_state = app.state::<ImageState>();
             let synth_state = app.state::<SynthState>();
             let midi_state = app.state::<MidiState>();
@@ -258,7 +258,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
                 for synth in synths.values_mut() {
                     if synth.playing && total_pixels > 0 {
-                        // Déterminer les bornes effectives du range
+                        // Determine the effective bounds of the range
                         let range_start = synth.pixel_start.min(total_pixels - 1);
                         let range_end = if synth.pixel_end == 0 || synth.pixel_end >= total_pixels {
                             total_pixels - 1
@@ -271,7 +271,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                             1
                         };
 
-                        // Avancer le curseur dans le range
+                        // Advance the cursor within the range
                         let pos_in_range = if synth.cursor >= range_start && synth.cursor <= range_end {
                             synth.cursor - range_start
                         } else {
@@ -280,18 +280,18 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         let next_pos = pos_in_range + 1;
 
                         if next_pos >= range_len && !synth.loop_enabled {
-                            // Fin de séquence sans boucle : on arrête le synthé
+                            // End of sequence without looping: stop the synth
                             synth.playing = false;
                             synth.cursor = range_start;
                             synth.last_played_note = None;
-                            // Éteindre la note mono en cours si elle sonne encore
+                            // Turn off the current mono note if it is still sounding
                             if synth.note_is_on {
                                 if let Some(conn) = conn_guard.as_mut() {
                                     send_note_off(conn, synth.channel, synth.note);
                                 }
                                 synth.note_is_on = false;
                             }
-                            // Éteindre les voix polyphoniques en cours
+                            // Turn off any currently sounding polyphonic voices
                             for voice in synth.poly_voices.iter_mut() {
                                 if voice.note_is_on {
                                     if let Some(conn) = conn_guard.as_mut() {
@@ -307,7 +307,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
                         synth.cursor = range_start + next_pos % range_len;
 
-                        // Lire le pixel courant
+                        // Read the current pixel
                         let px = synth.cursor as u32;
                         let x = px % width as u32;
                         let y = px / width as u32;

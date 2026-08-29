@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "name": "Français",
+    "code": "fr"
+  },
+  "app": {
+    "title": "SoundMap"
+  },
+  "viewer": {
+    "previewAlt": "Aperçu de l'image",
+    "noImage": "Aucune image chargée"
+  },
+  "controls": {
+    "load": "Charger une image",
+    "reset": "Réinitialiser",
+    "showOriginal": "Voir l'original",
+    "columns": "Colonnes",
+    "contrast": "Contraste",
+    "brightness": "Luminosité",
+    "grayscale": "Niveaux de gris",
+    "posterize": "Postérisation",
+    "posterizeOff": "off",
+    "posterizeLevels": "{count} niveaux",
+    "dimensionsInfo": "Original : {origWidth} × {origHeight}  —  Grille : {width} × {height}  ({cellCount} cellules)"
+  },
+  "metronome": {
+    "title": "Métronome",
+    "tempo": "Tempo (BPM)"
+  },
+  "synthList": {
+    "title": "Synthétiseurs",
+    "playAllStart": "Démarrer tous les synthétiseurs",
+    "playAllStop": "Arrêter tous les synthétiseurs",
+    "add": "Ajouter un synthétiseur",
+    "empty": "Aucun synthétiseur pour l'instant.",
+    "commonControlsTitle": "Commandes communes",
+    "commonControlsText": "Paramètres globaux appliqués à tous les synthétiseurs."
+  },
+  "synth": {
+    "title": "Synthé #{id}",
+    "remove": "Supprimer",
+    "pickColor": "Choisir une couleur",
+    "play": "▶ Play",
+    "stop": "⏸ Stop",
+    "loop": "Boucle",
+    "toggleLoop": "Activer/désactiver la boucle",
+    "toggleHighlight": "Afficher/masquer le surlignage du range",
+    "channelLabel": "Canal MIDI",
+    "channelOption": "Canal {number}",
+    "modeLabel": "Mode",
+    "modeToggle": "Basculer le mode de traduction pixel → note",
+    "modeMonophonic": "Monophonique",
+    "modePolyphonic": "Polyphonique",
+    "hueShift": "Décalage de teinte",
+    "channelsPanelLabel": "Canaux de couleur (accord)",
+    "toggleRed": "Activer/désactiver le rouge",
+    "toggleGreen": "Activer/désactiver le vert",
+    "toggleBlue": "Activer/désactiver le bleu",
+    "pixelsLabel": "Pixels",
+    "pickRange": "Sélectionner le range sur l'image",
+    "brightnessThreshold": "Seuil de luminosité",
+    "noteThreshold": "Seuil de variation",
+    "noteThresholdOff": "off",
+    "velocityMin": "Vélocité minimum",
+    "pixelInfoEmpty": "Pixel : -",
+    "pixelInfo": "Pixel {cursor} — {rgba} — {noteInfo} — Vel {velocity}",
+    "noteLabel": "Note {note}",
+    "noteMuted": " — muet",
+    "voiceOff": "{channel}:off",
+    "voiceMuted": "{channel}:{note}(muet)"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue : {details}",
+    "no_image_loaded_for_synth": "Veuillez charger une image avant d'ajouter un synthétiseur.",
+    "synth_not_found": "Synthé {id} introuvable.",
+    "invalid_channel_index": "Index de canal invalide (attendu 0, 1 ou 2).",
+    "no_file_selected": "Aucun fichier sélectionné.",
+    "invalid_file_path": "Chemin de fichier invalide.",
+    "image_load_error": "Erreur de chargement de l'image : {details}",
+    "no_image_loaded": "Aucune image chargée.",
+    "no_processed_image": "Aucune image traitée disponible.",
+    "png_encoding_error": "Erreur d'encodage PNG : {details}",
+    "add_synth_failed": "Erreur lors de l'ajout du synthétiseur.",
+    "load_image_failed": "Erreur lors du chargement de l'image.",
+    "processing_failed": "Erreur lors du traitement."
+  }
+}
