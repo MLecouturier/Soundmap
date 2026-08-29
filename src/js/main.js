@@ -561,8 +561,8 @@ syncLabels();
 // ---------- Metronome ----------
 const bpmInput = document.querySelector('#bpm-input');
 const bpmMinus10 = document.querySelector('#bpm-minus10');
-const bpmMinus1  = document.querySelector('#bpm-minus1');
-const bpmPlus1   = document.querySelector('#bpm-plus1');
+const bpmMinus5  = document.querySelector('#bpm-minus5');
+const bpmPlus5   = document.querySelector('#bpm-plus5');
 const bpmPlus10  = document.querySelector('#bpm-plus10');
 const metronomeLed = document.querySelector('#metronome-led');
 
@@ -611,8 +611,8 @@ async function stopMetronomeIfIdle() {
 }
 
 bpmMinus10.addEventListener('click', () => applyBpm(Number(bpmInput.value) - 10));
-bpmMinus1.addEventListener('click',  () => applyBpm(Number(bpmInput.value) - 1));
-bpmPlus1.addEventListener('click',   () => applyBpm(Number(bpmInput.value) + 1));
+bpmMinus5.addEventListener('click',  () => applyBpm(Number(bpmInput.value) - 5));
+bpmPlus5.addEventListener('click',   () => applyBpm(Number(bpmInput.value) + 5));
 bpmPlus10.addEventListener('click',  () => applyBpm(Number(bpmInput.value) + 10));
 
 // Direct keyboard input: validated on blur or on "Enter"
@@ -669,9 +669,31 @@ function createSynthElement(id) {
         </div>
         <div class="synth-header">
             <span class="synth-title-label"></span>
+            <select class="synth-channel">${channelOptions}</select>
+            <div class="flex-filler"></div>
             <button class="synth-remove" data-i18n-title="synth.remove"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
         </div>
         <div class="synth-body">
+            <div class="synth-range-wrapper">
+                <div class="synth-range-labels">
+                    <span data-i18n="synth.pixelsLabel"></span>
+                    <span class="synth-range-values">
+                        <em class="range-start-val">0</em> – <em class="range-end-val">${maxPx}</em>
+                    </span>
+                </div>
+                <div class="synth-range-track-row">
+                  <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
+                    <div class="synth-range-track">
+                        <div class="synth-range-fill"></div>
+                        <input type="range" class="synth-range-input range-start" min="0" max="${maxPx}" value="0" step="1" />
+                        <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
+                    </div>
+                    <button class="synth-pick-range-btn" data-i18n-title="synth.pickRange">
+                        <span class="material-symbols-outlined" aria-hidden="true">crop_free</span>
+                    </button>
+                </div>
+            </div>
+
             <div class="synth-controls-row">
                 <button class="synth-play">
                     <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
@@ -680,20 +702,12 @@ function createSynthElement(id) {
                 <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
                     <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
                     <span class="synth-loop-label"></span>
-                </button>
-                <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
-            </div>
-            <label class="synth-channel-label">
-                <span data-i18n="synth.channelLabel"></span>
-                <select class="synth-channel">${channelOptions}</select>
-            </label>
+                </button>                
+            </div>      
 
             <div class="synth-mode-row">
-                <span data-i18n="synth.modeLabel"></span>
-                <div class="synth-mode-buttons">
                     <button class="synth-mode-btn active" data-mode="monophonic"></button>
                     <button class="synth-mode-btn" data-mode="polyphonic"></button>
-                </div>
             </div>
 
             <div class="synth-mode-panel synth-mode-panel-mono">
@@ -706,29 +720,12 @@ function createSynthElement(id) {
             <div class="synth-mode-panel synth-mode-panel-poly hidden">
                 <span class="synth-mode-panel-label" data-i18n="synth.channelsPanelLabel"></span>
                 <div class="synth-channel-toggles">
-                    <button class="synth-channel-toggle active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
-                    <button class="synth-channel-toggle active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
-                    <button class="synth-channel-toggle active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
+                    <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
+                    <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
+                    <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
                 </div>
             </div>
-            <div class="synth-range-wrapper">
-                <div class="synth-range-labels">
-                    <span data-i18n="synth.pixelsLabel"></span>
-                    <span class="synth-range-values">
-                        <em class="range-start-val">0</em> – <em class="range-end-val">${maxPx}</em>
-                    </span>
-                </div>
-                <div class="synth-range-track-row">
-                    <div class="synth-range-track">
-                        <div class="synth-range-fill"></div>
-                        <input type="range" class="synth-range-input range-start" min="0" max="${maxPx}" value="0" step="1" />
-                        <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
-                    </div>
-                    <button class="synth-pick-range-btn" data-i18n-title="synth.pickRange">
-                        <span class="material-symbols-outlined" aria-hidden="true">crop_free</span>
-                    </button>
-                </div>
-            </div>
+            
             <div class="synth-range-wrapper">
                 <div class="synth-range-labels">
                     <span data-i18n="synth.brightnessThreshold"></span>

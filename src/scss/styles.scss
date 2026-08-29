@@ -17,14 +17,14 @@ $color-accent-alt: #219a52;
 $color-accent-hover: #2d5fa8;
 $color-disactivated: #555;
 
-$color-red: #FF0000;
-$color-green: #00FF00;
-$color-blue: #0000FF;
+$color-red: #c00000;
+$color-green: #00cd00;
+$color-blue: #2121c8;
 
-$sidebar-width: 320px;
+$sidebar-width: 22.5vw;
 $footer-height: 140px;
 
-$border-radius-base: 4px;
+$border-radius-base: .25rem;
 $transition-fast: 0.2s ease;
 
 // ==========================================================================
@@ -73,6 +73,13 @@ html, body {
     font-family: 'Segoe UI', Roboto, Arial, sans-serif;
     background-color: $color-bg-dark;
     color: $color-text-primary;
+    font-size: 1rem;
+}
+
+h2 {
+    font-size: 1.1rem;
+    margin-bottom: .5rem;
+    color: $color-text-secondary;
 }
 
 // ==========================================================================
@@ -106,7 +113,11 @@ html, body {
 .content-area {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 16px;
+    padding: 1rem;
+}
+
+.flex-filler {
+    flex-grow: 1;
 }
 
 // ==========================================================================
@@ -116,7 +127,7 @@ html, body {
     background-color: $color-bg-viewer;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: .75rem;
     overflow: hidden;
 
     #image-viewer {
@@ -131,8 +142,8 @@ html, body {
             linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
             linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
             linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
-        background-size: 16px 16px;
-        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+        background-size: 1rem 1rem;
+        background-position: 0 0, 0 .5rem, .5rem -.5rem, -.5rem 0;
         border: 1px solid $color-border;
         border-radius: $border-radius-base;
 
@@ -187,12 +198,12 @@ html, body {
 @mixin slider-thumb {
     appearance: none;
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
+    width: .875rem;
+    height: .875rem;
     margin-top: -5px;
     border-radius: 50%;
     background-color: $color-accent;
-    border: 2px solid $color-bg-dark;
+    border: .125rem solid $color-bg-dark;
     cursor: pointer;
     transition: background-color $transition-fast, transform $transition-fast;
 
@@ -203,9 +214,9 @@ html, body {
 }
 
 @mixin slider-track {
-    height: 4px;
+    height: .25rem;
     background-color: $color-border;
-    border-radius: 2px;
+    border-radius: .125rem;
     border: none;
 }
 
@@ -215,16 +226,16 @@ input[type="range"].synth-range-input {
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
-    height: 4px;
+    height: .25rem;
     background: $color-border;
-    border-radius: 2px;
+    border-radius: .125rem;
     outline: none;
     cursor: pointer;
     padding: 0;
     margin: 0;
 
     &::-webkit-slider-thumb     { @include slider-thumb; }
-    &::-moz-range-thumb         { @include slider-thumb; border: 2px solid $color-bg-dark; }
+    &::-moz-range-thumb         { @include slider-thumb; border: .125rem solid $color-bg-dark; }
     &::-webkit-slider-runnable-track { @include slider-track; }
     &::-moz-range-track         { @include slider-track; }
 }
@@ -239,7 +250,7 @@ input[type="range"].synth-range-input {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin-bottom: 12px;
+        margin-bottom: .75rem;
 
         &.disabled {
             opacity: 0.4;
@@ -256,7 +267,7 @@ input[type="range"].synth-range-input {
             color: $color-text-secondary;
             border: 1px solid $color-border;
             border-radius: $border-radius-base;
-            padding: 5px 8px;
+            padding: 5px .5rem;
             font-size: 0.8rem;
             cursor: pointer;
 
@@ -269,7 +280,7 @@ input[type="range"].synth-range-input {
     .controls-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 10px 18px;
+        gap: 10px 1.125rem;
     }
 
     // Controls locked while a synthesizer is playing
@@ -289,7 +300,7 @@ input[type="range"].synth-range-input {
     label {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: .25rem;
         font-size: 0.8rem;
         color: $color-text-secondary;
 
@@ -317,7 +328,7 @@ input[type="range"].synth-range-input {
         background-color: $color-accent;
         border: none;
         color: white;
-        padding: 6px 14px;
+        padding: 6px .875rem;
         border-radius: $border-radius-base;
         cursor: pointer;
         font-size: 0.85rem;
@@ -344,44 +355,53 @@ input[type="range"].synth-range-input {
 // ==========================================================================
 // Metronome
 // ==========================================================================
-$metronome-led-off: #444;
-$metronome-led-on: #2ecc71;
+$metronome-led-off: $color-disactivated;
+$metronome-led-on: $color-accent-alt;
 $metronome-led-transition: 0.05s ease;
 
 .metronome-controls {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 8px;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: .5rem;
 
     .metronome-bpm {
         display: flex;
         flex-direction: column;
         font-size: 0.85em;
-        gap: 4px;
+        gap: .25rem;
 
         .bpm-input-group {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: .5rem;
+
+            .bpm-step-group {
+                display: flex;
+                flex-direction: column;
+                gap: .25rem;
+            }
 
             #bpm-input {
                 width: 3.5em;
                 text-align: center;
-                font-size: 1em;
+                font-size: 2.25rem;
             }
 
             .bpm-step {
-                padding: 2px 6px;
+                padding: .125rem 6px;
                 font-size: 0.85em;
                 cursor: pointer;
             }
+
+
         }
     }
 
     .led {
-        width: 14px;
-        height: 14px;
+        width: 1.5rem;
+        height: 1.5rem;
         border-radius: 50%;
         background-color: $metronome-led-off;
         transition: background-color $metronome-led-transition;
@@ -389,7 +409,7 @@ $metronome-led-transition: 0.05s ease;
 
         &.active {
             background-color: $metronome-led-on;
-            box-shadow: 0 0 8px $metronome-led-on;
+            box-shadow: 0 0 .5rem $metronome-led-on;
         }
     }
 }
@@ -401,23 +421,20 @@ $metronome-led-transition: 0.05s ease;
     background-color: $color-bg-medium;
     display: flex;
     flex-direction: column;
+    padding: 1rem 0;
 }
 
 .synth-list-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
-
-    h2 {
-        font-size: 1.1rem;
-        color: $color-text-secondary;
-    }
+    padding: .5rem 1rem;
+    // margin-bottom: .75rem;
 
     .synth-list-header-actions {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: .5rem;
     }
 }
 
@@ -440,14 +457,13 @@ $metronome-led-transition: 0.05s ease;
     }
 
     .material-symbols-outlined {
-        font-size: 18px;
+        font-size: 1.125rem;
     }
 }
 
 .synth-list-body {
     display: flex;
     flex-direction: column;
-    gap: 10px;
     overflow-y: auto;
 }
 
@@ -462,15 +478,15 @@ $metronome-led-transition: 0.05s ease;
     border: 1px solid $color-border;
     border-left: 5px solid $color-border; // will be visually covered by .synth-color-band
     border-radius: $border-radius-base;
-    padding: 10px 10px 10px 14px;
+    padding: 10px 10px 10px .875rem;
     overflow: visible;
 
     // Clickable color band on the left edge
     .synth-color-band {
         position: absolute;
-        left: -5px;
+        left: -.5rem;
         top: 0;
-        width: 5px;
+        width: .5rem;
         height: 100%;
         border-radius: $border-radius-base 0 0 $border-radius-base;
         cursor: pointer;
@@ -482,28 +498,28 @@ $metronome-led-transition: 0.05s ease;
     // Color picker
     .synth-color-picker {
         position: absolute;
-        left: 8px;
+        left: .5rem;
         top: 0;
         z-index: 100;
         background-color: $color-bg-dark;
         border: 1px solid $color-border;
         border-radius: $border-radius-base;
-        padding: 8px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        padding: .5rem;
+        box-shadow: 0 .25rem 1rem rgba(0,0,0,0.5);
 
         &.hidden { display: none; }
 
         .color-swatches {
             display: grid;
-            grid-template-columns: repeat(4, 22px);
+            grid-template-columns: repeat(4, 1.5rem);
             gap: 6px;
         }
 
         .color-swatch {
-            width: 22px;
-            height: 22px;
+            width: 1.5rem;
+            height: 1.5rem;
             border-radius: 50%;
-            border: 2px solid transparent;
+            border: .125rem solid transparent;
             cursor: pointer;
             padding: 0;
             transition: border-color $transition-fast, transform $transition-fast;
@@ -519,7 +535,8 @@ $metronome-led-transition: 0.05s ease;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        gap: .5rem;
+        margin-bottom: .5rem;
         font-size: 0.9rem;
         color: $color-text-secondary;
 
@@ -531,7 +548,7 @@ $metronome-led-transition: 0.05s ease;
             display: flex;
             align-items: center;
 
-            .material-symbols-outlined { font-size: 18px; }
+            .material-symbols-outlined { font-size: 1.125rem; }
 
             &:hover { color: $color-text-primary; }
         }
@@ -551,12 +568,13 @@ $metronome-led-transition: 0.05s ease;
         .synth-controls-row {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: .75rem;
+            margin: 0 0 .5rem 0
         }
 
         .synth-eye-btn {
             font-size: 0.9rem;
-            padding: 4px 8px;
+            padding: .25rem .5rem;
             border-radius: $border-radius-base;
             border: none;
             background: none;
@@ -575,13 +593,13 @@ $metronome-led-transition: 0.05s ease;
             display: flex;
             align-items: center;
             font-size: 0.82rem;
-            padding: 4px 10px;
+            padding: .25rem 10px;
             border-radius: $border-radius-base;
             border: none;
             cursor: pointer;
-            gap: 4px;
+            gap: .25rem;
 
-            .material-symbols-outlined { font-size: 18px; }
+            .material-symbols-outlined { font-size: 1.125rem; }
         }
 
         .synth-loop-btn {
@@ -589,6 +607,10 @@ $metronome-led-transition: 0.05s ease;
             transition: background-color $transition-fast, color $transition-fast;
             background-color: #444;
             color: $color-text-muted;
+
+            .synth-loop-label {
+                display: none;
+            }
 
             &.active {
                 background-color: #27ae60;
@@ -610,7 +632,7 @@ $metronome-led-transition: 0.05s ease;
         .synth-slider-label {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: .25rem;
             font-size: 0.78rem;
             color: $color-text-secondary;
 
@@ -639,16 +661,13 @@ $metronome-led-transition: 0.05s ease;
             justify-content: space-between;
             font-size: 0.78rem;
             color: $color-text-secondary;
-        }
-
-        .synth-mode-buttons {
-            display: flex;
-            gap: 6px;
+            gap: .5rem;
         }
 
         .synth-mode-btn {
+            flex-grow: 1;
             font-size: 0.78rem;
-            padding: 4px 10px;
+            padding: .25rem 10px;
             border-radius: $border-radius-base;
             border: 1px solid $color-accent;
             background-color: transparent;
@@ -689,7 +708,7 @@ $metronome-led-transition: 0.05s ease;
 
         .synth-channel-toggles {
             display: flex;
-            gap: 8px;
+            gap: .5rem;
         }
 
         .synth-channel-toggle {
@@ -705,20 +724,56 @@ $metronome-led-transition: 0.05s ease;
             transition: background-color $transition-fast, color $transition-fast, border-color $transition-fast;
 
             &.active {
-                background-color: $color-accent;
-                border-color: $color-accent;
+                // background-color: $color-accent;
+                // border-color: $color-accent;
                 color: #fff;
             }
 
-            &:not(.active):hover {
-                border-color: $color-accent;
-                color: $color-text-primary;
-            }
+            // &:not(.active):hover {
+            //     border-color: $color-accent;
+            //     color: $color-text-primary;
+            // }
 
             &:disabled {
                 opacity: 0.4;
                 cursor: not-allowed;
                 pointer-events: none;
+            }
+
+            &.channel-red {
+
+                &.active {
+                    background-color: $color-red;
+                    border-color: $color-red;
+                }
+
+                &:not(.active):hover {
+                    border-color: $color-red;
+                }
+            }
+
+            &.channel-green {
+
+                &.active {
+                    background-color: $color-green;
+                    border-color: $color-green;
+                }
+
+                &:not(.active):hover {
+                    border-color: $color-green;
+                }
+            }
+
+            &.channel-blue {
+
+                &.active {
+                    background-color: $color-blue;
+                    border-color: $color-blue;
+                }
+
+                &:not(.active):hover {
+                    border-color: $color-blue;
+                }
             }
         }
     }
@@ -727,7 +782,7 @@ $metronome-led-transition: 0.05s ease;
     .synth-range-wrapper {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: .25rem;
 
         .synth-range-labels {
             display: flex;
@@ -748,7 +803,7 @@ $metronome-led-transition: 0.05s ease;
         .synth-range-track-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: .5rem;
 
             .synth-range-track {
                 flex: 1 1 auto;
@@ -760,8 +815,8 @@ $metronome-led-transition: 0.05s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
+            width: 1.5rem;
+            height: 1.5rem;
             padding: 0;
             border: none;
             border-radius: $border-radius-base;
@@ -771,7 +826,7 @@ $metronome-led-transition: 0.05s ease;
             transition: color $transition-fast, background-color $transition-fast;
 
             .material-symbols-outlined {
-                font-size: 16px;
+                font-size: 1rem;
             }
 
             &:hover {
@@ -803,18 +858,18 @@ $metronome-led-transition: 0.05s ease;
                 position: absolute;
                 left: 0;
                 right: 0;
-                height: 4px;
+                height: .25rem;
                 background-color: $color-border;
-                border-radius: 2px;
+                border-radius: .125rem;
                 pointer-events: none;
             }
 
             // Colored segment between the two handles
             .synth-range-fill {
                 position: absolute;
-                height: 4px;
+                height: .25rem;
                 background-color: $color-accent;
-                border-radius: 2px;
+                border-radius: .125rem;
                 pointer-events: none;
             }
 
@@ -848,17 +903,23 @@ $metronome-led-transition: 0.05s ease;
 // ==========================================================================
 .footer-area {
     flex: 0 0 auto;
-    height: $footer-height;
-    padding: 12px 16px;
+    padding: .75rem 1rem 1rem;
     border-top: 1px solid $color-border;
     background-color: $color-bg-light;
     overflow-y: auto;
 }
 
+.header-area {
+    flex: 0 0 auto;
+    padding: 12px 1rem;
+    border-bottom: 1px solid $color-border;
+    background-color: $color-bg-light;
+}
+
 #metronome,
 #common-controls {
     h3 {
-        margin-bottom: 8px;
+        margin-bottom: .5rem;
         font-size: 1rem;
         color: $color-text-secondary;
     }
@@ -868,7 +929,7 @@ $metronome-led-transition: 0.05s ease;
 // Scrollbars (aesthetics)
 // ==========================================================================
 ::-webkit-scrollbar {
-    width: 8px;
+    width: .5rem;
 }
 
 ::-webkit-scrollbar-track {

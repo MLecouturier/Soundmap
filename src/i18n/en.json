@@ -24,7 +24,7 @@
     "dimensionsInfo": "Original: {origWidth} × {origHeight}  —  Grid: {width} × {height}  ({cellCount} cells)"
   },
   "metronome": {
-    "title": "Metronome",
+    "title": "Tempo (BPM)",
     "tempo": "Tempo (BPM)"
   },
   "synthList": {
@@ -32,7 +32,6 @@
     "playAllStart": "Start all synthesizers",
     "playAllStop": "Stop all synthesizers",
     "add": "Add a synthesizer",
-    "empty": "No synthesizer yet.",
     "commonControlsTitle": "Common controls",
     "commonControlsText": "Global settings applied to all synthesizers."
   },
@@ -55,7 +54,7 @@
     "toggleRed": "Enable/disable red",
     "toggleGreen": "Enable/disable green",
     "toggleBlue": "Enable/disable blue",
-    "pixelsLabel": "Pixels",
+    "pixelsLabel": "Pixels to play",
     "pickRange": "Select the range on the image",
     "brightnessThreshold": "Brightness threshold",
     "noteThreshold": "Note change threshold",

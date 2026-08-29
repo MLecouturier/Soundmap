@@ -35,6 +35,13 @@ html, body {
   font-family: "Segoe UI", Roboto, Arial, sans-serif;
   background-color: #1e1e1e;
   color: #e0e0e0;
+  font-size: 1rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: #ccc;
 }
 
 .app-container {
@@ -58,21 +65,25 @@ html, body {
 }
 
 .column-right {
-  flex: 0 0 320px;
-  width: 320px;
+  flex: 0 0 22.5vw;
+  width: 22.5vw;
 }
 
 .content-area {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 16px;
+  padding: 1rem;
+}
+
+.flex-filler {
+  flex-grow: 1;
 }
 
 #image-viewer-container {
   background-color: #141414;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
   overflow: hidden;
 }
 #image-viewer-container #image-viewer {
@@ -83,10 +94,10 @@ html, body {
   justify-content: center;
   position: relative;
   background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
-  background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 1rem 1rem;
+  background-position: 0 0, 0 0.5rem, 0.5rem -0.5rem, -0.5rem 0;
   border: 1px solid #333;
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 #image-viewer-container #image-viewer #pixel-overlay {
   position: absolute;
@@ -125,9 +136,9 @@ input[type=range].synth-range-input {
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
-  height: 4px;
+  height: 0.25rem;
   background: #333;
-  border-radius: 2px;
+  border-radius: 0.125rem;
   outline: none;
   cursor: pointer;
   padding: 0;
@@ -138,12 +149,12 @@ input[type=range].slider::-webkit-slider-thumb,
 input[type=range].synth-range-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   margin-top: -5px;
   border-radius: 50%;
   background-color: #3a7bd5;
-  border: 2px solid #1e1e1e;
+  border: 0.125rem solid #1e1e1e;
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
@@ -158,12 +169,12 @@ input[type=range].slider::-moz-range-thumb,
 input[type=range].synth-range-input::-moz-range-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   margin-top: -5px;
   border-radius: 50%;
   background-color: #3a7bd5;
-  border: 2px solid #1e1e1e;
+  border: 0.125rem solid #1e1e1e;
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
@@ -176,22 +187,22 @@ input[type=range].synth-range-input::-moz-range-thumb:hover {
 input[type=range]::-moz-range-thumb,
 input[type=range].slider::-moz-range-thumb,
 input[type=range].synth-range-input::-moz-range-thumb {
-  border: 2px solid #1e1e1e;
+  border: 0.125rem solid #1e1e1e;
 }
 input[type=range]::-webkit-slider-runnable-track,
 input[type=range].slider::-webkit-slider-runnable-track,
 input[type=range].synth-range-input::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 0.25rem;
   background-color: #333;
-  border-radius: 2px;
+  border-radius: 0.125rem;
   border: none;
 }
 input[type=range]::-moz-range-track,
 input[type=range].slider::-moz-range-track,
 input[type=range].synth-range-input::-moz-range-track {
-  height: 4px;
+  height: 0.25rem;
   background-color: #333;
-  border-radius: 2px;
+  border-radius: 0.125rem;
   border: none;
 }
 
@@ -202,7 +213,7 @@ input[type=range].synth-range-input::-moz-range-track {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
 }
 #controls .controls-row.disabled {
   opacity: 0.4;
@@ -215,8 +226,8 @@ input[type=range].synth-range-input::-moz-range-track {
   background-color: #262626;
   color: #ccc;
   border: 1px solid #333;
-  border-radius: 4px;
-  padding: 5px 8px;
+  border-radius: 0.25rem;
+  padding: 5px 0.5rem;
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -226,7 +237,7 @@ input[type=range].synth-range-input::-moz-range-track {
 #controls .controls-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px 18px;
+  gap: 10px 1.125rem;
 }
 #controls button:disabled,
 #controls input:disabled {
@@ -240,7 +251,7 @@ input[type=range].synth-range-input::-moz-range-track {
 #controls label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
   font-size: 0.8rem;
   color: #ccc;
 }
@@ -265,8 +276,8 @@ input[type=range].synth-range-input::-moz-range-track {
   background-color: #3a7bd5;
   border: none;
   color: white;
-  padding: 6px 14px;
-  border-radius: 4px;
+  padding: 6px 0.875rem;
+  border-radius: 0.25rem;
   cursor: pointer;
   font-size: 0.85rem;
   transition: background-color 0.2s ease;
@@ -292,63 +303,66 @@ input[type=range].synth-range-input::-moz-range-track {
 .metronome-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 8px;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 .metronome-controls .metronome-bpm {
   display: flex;
   flex-direction: column;
   font-size: 0.85em;
-  gap: 4px;
+  gap: 0.25rem;
 }
 .metronome-controls .metronome-bpm .bpm-input-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.5rem;
+}
+.metronome-controls .metronome-bpm .bpm-input-group .bpm-step-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 .metronome-controls .metronome-bpm .bpm-input-group #bpm-input {
   width: 3.5em;
   text-align: center;
-  font-size: 1em;
+  font-size: 2.25rem;
 }
 .metronome-controls .metronome-bpm .bpm-input-group .bpm-step {
-  padding: 2px 6px;
+  padding: 0.125rem 6px;
   font-size: 0.85em;
   cursor: pointer;
 }
 .metronome-controls .led {
-  width: 14px;
-  height: 14px;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
-  background-color: #444;
+  background-color: #555;
   transition: background-color 0.05s ease;
   flex-shrink: 0;
 }
 .metronome-controls .led.active {
-  background-color: #2ecc71;
-  box-shadow: 0 0 8px #2ecc71;
+  background-color: #219a52;
+  box-shadow: 0 0 0.5rem #219a52;
 }
 
 #synth-list {
   background-color: #232323;
   display: flex;
   flex-direction: column;
+  padding: 1rem 0;
 }
 
 .synth-list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-}
-.synth-list-header h2 {
-  font-size: 1.1rem;
-  color: #ccc;
+  padding: 0.5rem 1rem;
 }
 .synth-list-header .synth-list-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 #add-synth-btn,
@@ -371,13 +385,12 @@ input[type=range].synth-range-input::-moz-range-track {
 }
 #add-synth-btn .material-symbols-outlined,
 #play-all-btn .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .synth-list-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   overflow-y: auto;
 }
 
@@ -391,17 +404,17 @@ input[type=range].synth-range-input::-moz-range-track {
   background-color: #262626;
   border: 1px solid #333;
   border-left: 5px solid #333;
-  border-radius: 4px;
-  padding: 10px 10px 10px 14px;
+  border-radius: 0.25rem;
+  padding: 10px 10px 10px 0.875rem;
   overflow: visible;
 }
 .synth-block .synth-color-band {
   position: absolute;
-  left: -5px;
+  left: -0.5rem;
   top: 0;
-  width: 5px;
+  width: 0.5rem;
   height: 100%;
-  border-radius: 4px 0 0 4px;
+  border-radius: 0.25rem 0 0 0.25rem;
   cursor: pointer;
   transition: filter 0.2s ease;
 }
@@ -410,28 +423,28 @@ input[type=range].synth-range-input::-moz-range-track {
 }
 .synth-block .synth-color-picker {
   position: absolute;
-  left: 8px;
+  left: 0.5rem;
   top: 0;
   z-index: 100;
   background-color: #1e1e1e;
   border: 1px solid #333;
-  border-radius: 4px;
-  padding: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  border-radius: 0.25rem;
+  padding: 0.5rem;
+  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.5);
 }
 .synth-block .synth-color-picker.hidden {
   display: none;
 }
 .synth-block .synth-color-picker .color-swatches {
   display: grid;
-  grid-template-columns: repeat(4, 22px);
+  grid-template-columns: repeat(4, 1.5rem);
   gap: 6px;
 }
 .synth-block .synth-color-picker .color-swatch {
-  width: 22px;
-  height: 22px;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 0.125rem solid transparent;
   cursor: pointer;
   padding: 0;
   transition: border-color 0.2s ease, transform 0.2s ease;
@@ -444,7 +457,8 @@ input[type=range].synth-range-input::-moz-range-track {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
   font-size: 0.9rem;
   color: #ccc;
 }
@@ -457,7 +471,7 @@ input[type=range].synth-range-input::-moz-range-track {
   align-items: center;
 }
 .synth-block .synth-header .synth-remove .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .synth-block .synth-header .synth-remove:hover {
   color: #e0e0e0;
@@ -475,12 +489,13 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-controls-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem 0;
 }
 .synth-block .synth-body .synth-eye-btn {
   font-size: 0.9rem;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
   border: none;
   background: none;
   color: #555;
@@ -500,20 +515,23 @@ input[type=range].synth-range-input::-moz-range-track {
   display: flex;
   align-items: center;
   font-size: 0.82rem;
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 0.25rem 10px;
+  border-radius: 0.25rem;
   border: none;
   cursor: pointer;
-  gap: 4px;
+  gap: 0.25rem;
 }
 .synth-block .synth-body .synth-play .material-symbols-outlined,
 .synth-block .synth-body .synth-loop-btn .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .synth-block .synth-body .synth-loop-btn {
   transition: background-color 0.2s ease, color 0.2s ease;
   background-color: #444;
   color: #888;
+}
+.synth-block .synth-body .synth-loop-btn .synth-loop-label {
+  display: none;
 }
 .synth-block .synth-body .synth-loop-btn.active {
   background-color: #27ae60;
@@ -535,7 +553,7 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-slider-label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
   font-size: 0.78rem;
   color: #ccc;
 }
@@ -559,15 +577,13 @@ input[type=range].synth-range-input::-moz-range-track {
   justify-content: space-between;
   font-size: 0.78rem;
   color: #ccc;
-}
-.synth-block .synth-body .synth-mode-buttons {
-  display: flex;
-  gap: 6px;
+  gap: 0.5rem;
 }
 .synth-block .synth-body .synth-mode-btn {
+  flex-grow: 1;
   font-size: 0.78rem;
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 0.25rem 10px;
+  border-radius: 0.25rem;
   border: 1px solid #3a7bd5;
   background-color: transparent;
   color: #3a7bd5;
@@ -601,12 +617,12 @@ input[type=range].synth-range-input::-moz-range-track {
 }
 .synth-block .synth-body .synth-channel-toggles {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
 }
 .synth-block .synth-body .synth-channel-toggle {
   flex: 1 1 0;
   padding: 6px 0;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   border: 1px solid #555;
   background-color: #555;
   color: #888;
@@ -616,23 +632,38 @@ input[type=range].synth-range-input::-moz-range-track {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 .synth-block .synth-body .synth-channel-toggle.active {
-  background-color: #3a7bd5;
-  border-color: #3a7bd5;
   color: #fff;
-}
-.synth-block .synth-body .synth-channel-toggle:not(.active):hover {
-  border-color: #3a7bd5;
-  color: #e0e0e0;
 }
 .synth-block .synth-body .synth-channel-toggle:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   pointer-events: none;
 }
+.synth-block .synth-body .synth-channel-toggle.channel-red.active {
+  background-color: #c00000;
+  border-color: #c00000;
+}
+.synth-block .synth-body .synth-channel-toggle.channel-red:not(.active):hover {
+  border-color: #c00000;
+}
+.synth-block .synth-body .synth-channel-toggle.channel-green.active {
+  background-color: #00cd00;
+  border-color: #00cd00;
+}
+.synth-block .synth-body .synth-channel-toggle.channel-green:not(.active):hover {
+  border-color: #00cd00;
+}
+.synth-block .synth-body .synth-channel-toggle.channel-blue.active {
+  background-color: #2121c8;
+  border-color: #2121c8;
+}
+.synth-block .synth-body .synth-channel-toggle.channel-blue:not(.active):hover {
+  border-color: #2121c8;
+}
 .synth-block .synth-range-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
 }
 .synth-block .synth-range-wrapper .synth-range-labels {
   display: flex;
@@ -650,7 +681,7 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-range-wrapper .synth-range-track-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 .synth-block .synth-range-wrapper .synth-range-track-row .synth-range-track {
   flex: 1 1 auto;
@@ -660,18 +691,18 @@ input[type=range].synth-range-input::-moz-range-track {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 1.5rem;
+  height: 1.5rem;
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   background: none;
   color: #888;
   cursor: pointer;
   transition: color 0.2s ease, background-color 0.2s ease;
 }
 .synth-block .synth-range-wrapper .synth-pick-range-btn .material-symbols-outlined {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .synth-block .synth-range-wrapper .synth-pick-range-btn:hover {
   color: #e0e0e0;
@@ -697,16 +728,16 @@ input[type=range].synth-range-input::-moz-range-track {
   position: absolute;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 0.25rem;
   background-color: #333;
-  border-radius: 2px;
+  border-radius: 0.125rem;
   pointer-events: none;
 }
 .synth-block .synth-range-wrapper .synth-range-track .synth-range-fill {
   position: absolute;
-  height: 4px;
+  height: 0.25rem;
   background-color: #3a7bd5;
-  border-radius: 2px;
+  border-radius: 0.125rem;
   pointer-events: none;
 }
 .synth-block .synth-range-wrapper .synth-range-track .synth-range-input {
@@ -743,22 +774,28 @@ input[type=range].synth-range-input::-moz-range-track {
 
 .footer-area {
   flex: 0 0 auto;
-  height: 140px;
-  padding: 12px 16px;
+  padding: 0.75rem 1rem 1rem;
   border-top: 1px solid #333;
   background-color: #262626;
   overflow-y: auto;
 }
 
+.header-area {
+  flex: 0 0 auto;
+  padding: 12px 1rem;
+  border-bottom: 1px solid #333;
+  background-color: #262626;
+}
+
 #metronome h3,
 #common-controls h3 {
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem;
   font-size: 1rem;
   color: #ccc;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 ::-webkit-scrollbar-track {
@@ -767,5 +804,5 @@ input[type=range].synth-range-input::-moz-range-track {
 
 ::-webkit-scrollbar-thumb {
   background-color: #444;
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }/*# sourceMappingURL=styles.css.map */
