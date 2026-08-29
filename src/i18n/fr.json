@@ -32,7 +32,7 @@
     "playAllStart": "Démarrer tous les synthétiseurs",
     "playAllStop": "Arrêter tous les synthétiseurs",
     "add": "Ajouter un synthétiseur",
-    "commonControlsTitle": "Commandes communes",
+    "commonControlsTitle": "Paramètres de l'application",
     "commonControlsText": "Paramètres globaux appliqués à tous les synthétiseurs."
   },
   "synth": {
