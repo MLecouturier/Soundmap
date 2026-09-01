@@ -52,15 +52,29 @@ fn luma_to_level(luma: f32) -> u8 {
     ((luma / 255.0) * 127.0).round() as u8
 }
 
-/// Maps a brightness value (0–255) to a MIDI velocity between
-/// `velocity_min` and 127 (the darker the pixel, the stronger the
-/// velocity: bright areas are played delicately, dark areas with more
-/// intensity). `velocity_min` therefore defines the floor of the
-/// velocity range, not a silence threshold.
-fn luma_to_velocity(luma: f32, velocity_min: u8) -> u8 {
+/// Computes the HSL saturation of an RGB pixel, in 0.0–255.0.
+fn pixel_saturation(r: u8, g: u8, b: u8) -> f32 {
+    let (r, g, b) = (r as f32, g as f32, b as f32);
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+
+    if max <= f32::EPSILON {
+        0.0 // black: saturation undefined
+    } else {
+        delta / max * 255.0
+    }
+}
+
+/// Maps a saturation value (0–255) to a MIDI velocity between
+/// `velocity_min` and 127 (the more saturated the pixel, the stronger
+/// the velocity: achromatic areas are played delicately, vivid colors
+/// with more intensity). `velocity_min` therefore defines the floor of
+/// the velocity range, not a silence threshold.
+fn saturation_to_velocity(saturation: f32, velocity_min: u8) -> u8 {
     let min = velocity_min.min(126) as f32;
     let range = 127.0 - min;
-    let v = (min + ((255.0 - luma) / 255.0) * range).round() as u8;
+    let v = (min + (saturation / 255.0) * range).round() as u8;
     v.clamp(1, 127) // 0 would be equivalent to a Note Off in MIDI
 }
 
@@ -315,7 +329,8 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
                         let luma = pixel_luma(r, g, b);
                         let brightness_level = luma_to_level(luma);
-                        let velocity = luma_to_velocity(luma, synth.velocity_min);
+                        let saturation = pixel_saturation(r, g, b);
+                        let velocity = saturation_to_velocity(saturation, synth.velocity_min);
                         synth.velocity = velocity;
 
                         let mut payload = serde_json::json!({

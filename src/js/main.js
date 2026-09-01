@@ -93,7 +93,8 @@ const pixelOverlay    = document.querySelector('#pixel-overlay');
 const gridSlider      = document.querySelector('#grid-width');
 const gridValue       = document.querySelector('#grid-width-value');
 
-const grayscale       = document.querySelector('#grayscale');
+const saturation      = document.querySelector('#saturation');
+const saturationValue = document.querySelector('#saturation-value');
 const contrast        = document.querySelector('#contrast');
 const contrastValue   = document.querySelector('#contrast-value');
 const brightness      = document.querySelector('#brightness');
@@ -105,7 +106,7 @@ const dimensionsInfo  = document.querySelector('#dimensions-info');
 
 // Image controls to lock while a synthesizer is playing
 // (the "Show original" button is intentionally excluded)
-const imageLockControls = [loadBtn, resetBtn, gridSlider, contrast, brightness, grayscale, posterize];
+const imageLockControls = [loadBtn, resetBtn, gridSlider, contrast, brightness, saturation, posterize];
 
 // Locks/unlocks image controls depending on whether a synth is playing
 function updateImageControlsLockState() {
@@ -436,7 +437,7 @@ function buildParams() {
     grid_height:      null,              // always deduced from the ratio
     contrast:         Number(contrast.value),
     brightness:       Number(brightness.value),
-    grayscale:        grayscale.checked,
+    saturation:       Number(saturation.value),
     posterize_levels: levels > 1 ? levels : null,
   };
 }
@@ -454,6 +455,7 @@ function syncLabels() {
   gridValue.textContent       = hasImage ? currentGridWidth() : '-';
   contrastValue.textContent   = Number(contrast.value).toFixed(0);
   brightnessValue.textContent = Number(brightness.value).toFixed(0);
+  saturationValue.textContent = Number(saturation.value).toFixed(0);
 
   const p = Number(posterize.value);
   posterizeValue.textContent = p > 1 ? t('controls.posterizeLevels', { count: p }) : t('controls.posterizeOff');
@@ -531,9 +533,9 @@ loadBtn.addEventListener('click', async () => {
 // ---------- Reset ----------
 resetBtn.addEventListener('click', () => {
   gridSlider.value  = SLIDER_STEPS;
-  grayscale.checked = false;
   contrast.value    = 0;
   brightness.value  = 0;
+  saturation.value  = 0;
   posterize.value   = 1;
 
   syncLabels();
@@ -541,16 +543,11 @@ resetBtn.addEventListener('click', () => {
 });
 
 // ---------- Listeners ----------
-[gridSlider, contrast, brightness, posterize].forEach(el => {
+[gridSlider, contrast, brightness, saturation, posterize].forEach(el => {
   el.addEventListener('input', () => {
     syncLabels();
     scheduleRefresh();
   });
-});
-
-grayscale.addEventListener('change', () => {
-  syncLabels();
-  scheduleRefresh(0);
 });
 
 showOriginal.addEventListener('change', updatePreviewSrc);
@@ -861,7 +858,7 @@ function createSynthElement(id) {
     // Eye button
     el.querySelector('.synth-eye-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
-        const hi = synthHighlights.get(id);
+        const hi = synthHighlights.get(id); 
         hi.visible = !hi.visible;
         btn.classList.toggle('active', hi.visible);
         if (hi.visible) drawRangeHighlight(id);

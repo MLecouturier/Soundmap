@@ -17,7 +17,7 @@
     "columns": "Columns",
     "contrast": "Contrast",
     "brightness": "Brightness",
-    "grayscale": "Grayscale",
+    "saturation": "Saturation",
     "posterize": "Posterize",
     "posterizeOff": "off",
     "posterizeLevels": "{count} levels",

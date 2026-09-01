@@ -52,7 +52,34 @@ $transition-fast: 0.2s ease;
     word-wrap: normal;
     direction: ltr;
     vertical-align: middle;
+    font-feature-settings: 'liga';
     -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+// ==========================================================================
+// Noto Music — musical symbols font
+// ==========================================================================
+// Self-hosted Google Fonts subset (musical glyphs only), loaded on demand
+// thanks to unicode-range: any Unicode music symbol in the UI will render
+// with it, even without the .noto-music class.
+@font-face {
+    font-family: 'Noto Music';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/NotoMusic.woff2') format('woff2');
+    unicode-range: U+25CC, U+2669-266F, U+1D000-1D0F5, U+1D100-1D126, U+1D129-1D1EA, U+1D200-1D245;
+}
+
+// Usage: <span class="noto-music">𝄞</span>
+.noto-music {
+    font-family: 'Noto Music';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    display: inline-block;
+    white-space: nowrap;
     -webkit-font-smoothing: antialiased;
     user-select: none;
 }
@@ -70,7 +97,7 @@ html, body {
     height: 100%;
     width: 100%;
     overflow: hidden;
-    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    font-family: 'Segoe UI', Roboto, Arial, 'Noto Music', sans-serif;
     background-color: $color-bg-dark;
     color: $color-text-primary;
     font-size: 1rem;

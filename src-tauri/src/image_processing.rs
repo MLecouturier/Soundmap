@@ -34,7 +34,7 @@ pub struct AdjustmentParams {
     pub grid_height: Option<u32>, // always None for now: ratio is deduced
     pub contrast: f32,
     pub brightness: i32,
-    pub grayscale: bool,
+    pub saturation: f32,
     pub posterize_levels: Option<u8>,
 }
 
@@ -113,10 +113,8 @@ pub fn apply_image_adjustments(
     );
 
     // --- Adjustments ---
-    if params.grayscale {
-        img = DynamicImage::ImageLuma8(img.to_luma8()).into();
-        // convert back to RGBA to stay consistent with the rest of the pipeline
-        img = DynamicImage::ImageRgba8(img.to_rgba8());
+    if params.saturation != 0.0 {
+        img = adjust_saturation(&img, params.saturation);
     }
 
     if params.contrast != 0.0 {
@@ -146,6 +144,32 @@ pub fn apply_image_adjustments(
         height,
         cell_count,
     })
+}
+
+/// Adjusts color saturation. `factor` is a percentage in [-100, 100]:
+/// -100 fully desaturates (grayscale), 0 is a no-op, positive values
+/// amplify the chroma relative to each pixel's luma.
+fn adjust_saturation(img: &DynamicImage, factor: f32) -> DynamicImage {
+    let scale = 1.0 + (factor / 100.0).max(-1.0);
+
+    let mut rgba = img.to_rgba8();
+    for pixel in rgba.pixels_mut() {
+        let luma = pixel_luma8(pixel) as f32;
+        for channel in 0..3 {
+            let v = pixel[channel] as f32;
+            let saturated = (luma + (v - luma) * scale).clamp(0.0, 255.0);
+            pixel[channel] = saturated as u8;
+        }
+    }
+    DynamicImage::ImageRgba8(rgba)
+}
+
+fn pixel_luma8(pixel: &image::Rgba<u8>) -> u8 {
+    // Rec. 601 luma, same weights as image::Luma conversion
+    let r = pixel[0] as u32;
+    let g = pixel[1] as u32;
+    let b = pixel[2] as u32;
+    ((r * 299 + g * 587 + b * 114) / 1000) as u8
 }
 
 /// Reduces each RGB channel to `levels` distinct steps (classic posterize).
