@@ -373,13 +373,60 @@ function sendSynthZones(id) {
         .catch(err => console.error('Error in set_synth_zones:', err));
 }
 
+// Number of pixels a synth will play: the sum of its zone areas (clipped
+// to the grid), or the whole image when no zone is defined. Overlapping
+// zones are counted twice, mirroring the backend's playback sequence.
+function synthSequenceLength(id) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return 0;
+    if (hi.zones.length === 0) return gridW * gridH;
+    let total = 0;
+    for (const z of hi.zones) {
+        const w = Math.min(z.w, gridW - z.x);
+        const h = Math.min(z.h, gridH - z.y);
+        if (w > 0 && h > 0) total += w * h;
+    }
+    return total;
+}
+
+// Compact duration: seconds below one minute, m:ss below one hour
+function formatDuration(seconds) {
+    if (seconds < 60) {
+        return `${Math.round(seconds * 10) / 10} s`;
+    }
+    const total = Math.round(seconds);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m < 60) return `${m}:${String(s).padStart(2, '0')}`;
+    const h = Math.floor(m / 60);
+    return `${h}:${String(m % 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// "zones-val" shows the number of selected pixels and, in parentheses,
+// the total playing time at the synth's own tempo (metronome BPM scaled
+// by its tempo ratio).
 function updateZonesLabel(id) {
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
-    const hi = synthHighlights.get(id);
-    el.querySelector('.zones-val').textContent = hi && hi.zones.length
-        ? hi.zones.length
-        : t('synth.zonesAll');
+    const zonesVal = el.querySelector('.zones-val');
+
+    if (!hasImage) {
+        zonesVal.textContent = '-';
+        return;
+    }
+
+    const pixelCount = synthSequenceLength(id);
+    const tempoRatio = Number(el.querySelector('.synth-tempo').value) || 1;
+    const bpm = clampBpm(Number(bpmInput.value));
+    const seconds = pixelCount * (60 / bpm) / tempoRatio;
+
+    zonesVal.textContent = `${pixelCount} px (${formatDuration(seconds)})`;
+}
+
+function updateAllSynthZonesLabels() {
+    synthListBody.querySelectorAll('.synth-block').forEach(el => {
+        updateZonesLabel(Number(el.dataset.synthId));
+    });
 }
 
 // Computes the render dimensions of the image in the viewer (object-fit: contain)
@@ -686,6 +733,7 @@ async function applyBpm(newBpm) {
     if (metronomeRunning) {
         await invoke('set_metronome_bpm', { bpm: clamped });
     }
+    updateAllSynthZonesLabels();
 }
 
 // Starts the Rust metronome if it's not already running
@@ -785,10 +833,10 @@ function createSynthElement(id) {
                 <div class="flex-filler"></div>
                 <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
                 <button class="synth-add-zone-btn" data-i18n-title="synth.addZone">
-                    <span class="material-symbols-outlined" aria-hidden="true">crop_free</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">select</span>
                 </button>
                 <button class="synth-clear-zones-btn" data-i18n-title="synth.clearZones">
-                    <span class="material-symbols-outlined" aria-hidden="true">layers_clear</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
                 </button>
             </div>
 
@@ -820,46 +868,51 @@ function createSynthElement(id) {
             <div class="synth-mode-row">
                     <button class="synth-mode-btn active" data-mode="monophonic"></button>
                     <button class="synth-mode-btn" data-mode="polyphonic"></button>
+                    <button class="synth-toggle-full-options" data-i18n-title="synth.toggleFullOptions">
+                        <span class="material-symbols-outlined" aria-hidden="true">expand_circle_down</span>
+                    </button>
             </div>
 
-            <div class="synth-mode-panel synth-mode-panel-mono">
+            <div class="synth-full-options">
+                <div class="synth-mode-panel synth-mode-panel-mono">
+                    <label class="synth-slider-label">
+                        <span><span data-i18n="synth.hueShift"></span> <em class="hue-shift-val">0°</em></span>
+                        <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
+                    </label>
+                </div>
+
+                <div class="synth-mode-panel synth-mode-panel-poly hidden">
+                    <span class="synth-mode-panel-label" data-i18n="synth.channelsPanelLabel"></span>
+                    <div class="synth-channel-toggles">
+                        <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
+                        <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
+                        <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
+                    </div>
+                </div>
+                
+                <div class="synth-range-wrapper">
+                    <div class="synth-range-labels">
+                        <span data-i18n="synth.brightnessThreshold"></span>
+                        <span class="synth-range-values">
+                            <em class="brightness-start-val">0</em> – <em class="brightness-end-val">127</em>
+                        </span>
+                    </div>
+                    <div class="synth-range-track">
+                        <div class="synth-range-fill"></div>
+                        <input type="range" class="synth-range-input brightness-start" min="0" max="127" value="0"   step="1" />
+                        <input type="range" class="synth-range-input brightness-end"   min="0" max="127" value="127" step="1" />
+                    </div>
+                </div>
                 <label class="synth-slider-label">
-                    <span><span data-i18n="synth.hueShift"></span> <em class="hue-shift-val">0°</em></span>
-                    <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
+                    <span><span data-i18n="synth.noteThreshold"></span> <em class="threshold-val">0</em></span>
+                    <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
                 </label>
+                <label class="synth-slider-label">
+                    <span><span data-i18n="synth.velocityMin"></span> <em class="velocity-min-val">0</em></span>
+                    <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
+                </label>
+                <p class="synth-pixel-info"></p>    
             </div>
-
-            <div class="synth-mode-panel synth-mode-panel-poly hidden">
-                <span class="synth-mode-panel-label" data-i18n="synth.channelsPanelLabel"></span>
-                <div class="synth-channel-toggles">
-                    <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
-                    <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
-                    <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
-                </div>
-            </div>
-            
-            <div class="synth-range-wrapper">
-                <div class="synth-range-labels">
-                    <span data-i18n="synth.brightnessThreshold"></span>
-                    <span class="synth-range-values">
-                        <em class="brightness-start-val">0</em> – <em class="brightness-end-val">127</em>
-                    </span>
-                </div>
-                <div class="synth-range-track">
-                    <div class="synth-range-fill"></div>
-                    <input type="range" class="synth-range-input brightness-start" min="0" max="127" value="0"   step="1" />
-                    <input type="range" class="synth-range-input brightness-end"   min="0" max="127" value="127" step="1" />
-                </div>
-            </div>
-            <label class="synth-slider-label">
-                <span><span data-i18n="synth.noteThreshold"></span> <em class="threshold-val">0</em></span>
-                <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
-            </label>
-            <label class="synth-slider-label">
-                <span><span data-i18n="synth.velocityMin"></span> <em class="velocity-min-val">0</em></span>
-                <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
-            </label>
-            <p class="synth-pixel-info"></p>
         </div>
     `;
 
@@ -921,6 +974,7 @@ function createSynthElement(id) {
     el.querySelector('.synth-tempo').addEventListener('change', (e) => {
         invoke('set_synth_tempo', { id, tempo: Number(e.target.value) })
             .catch(err => console.error('Error in set_synth_tempo:', err));
+        updateZonesLabel(id);
     });
 
     el.querySelector('.synth-loop-btn').addEventListener('click', (e) => {
@@ -929,6 +983,15 @@ function createSynthElement(id) {
         btn.classList.toggle('active', loopEnabled);
         invoke('set_synth_loop', { id, loopEnabled })
             .catch(err => console.error('Error in set_synth_loop:', err));
+    });
+
+    // ---- Collapse/expand the full options section ----
+    const fullOptions = el.querySelector('.synth-full-options');
+    const toggleFullOptionsBtn = el.querySelector('.synth-toggle-full-options');
+    toggleFullOptionsBtn.addEventListener('click', () => {
+        const collapsed = fullOptions.classList.toggle('hidden');
+        toggleFullOptionsBtn.querySelector('.material-symbols-outlined').textContent =
+            collapsed ? 'expand_circle_down' : 'expand_circle_up';
     });
 
     // ---- Monophonic / polyphonic mode ----

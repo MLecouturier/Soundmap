@@ -610,6 +610,34 @@ input[type=range].synth-range-input::-moz-range-track {
   color: #ccc;
   gap: 0.5rem;
 }
+.synth-block .synth-body .synth-toggle-full-options {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.synth-block .synth-body .synth-toggle-full-options .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+.synth-block .synth-body .synth-toggle-full-options:hover {
+  color: #e0e0e0;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.synth-block .synth-body .synth-full-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #333;
+  padding-top: 6px;
+}
+.synth-block .synth-body .synth-full-options.hidden {
+  display: none;
+}
 .synth-block .synth-body .synth-mode-btn {
   flex-grow: 1;
   font-size: 0.78rem;
