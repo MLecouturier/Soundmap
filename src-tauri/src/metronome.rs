@@ -2,9 +2,10 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
-use image::GenericImageView;
+use tauri::{AppHandle, Emitter, Manager, State};
+use image::{DynamicImage, GenericImageView};
 
+use crate::error::{err, AppError};
 use crate::midi::{send_note_off, send_note_on};
 use crate::state::{ImageState, PixelZone, Synth, SynthMode, SynthState, MidiState};
 
@@ -244,6 +245,111 @@ fn build_pixel_sequence(zones: &[PixelZone], width: usize, height: usize) -> Vec
     sequence
 }
 
+/// Plays the pixel at the synth's current playhead position, then advances
+/// the playhead by one pixel in its zone sequence (MIDI notes + UI payload),
+/// exactly like a metronome tick would. Used both by the metronome thread
+/// and by the manual step command; the synth does not need to be playing.
+fn step_synth_once(
+    app: &AppHandle,
+    synth: &mut Synth,
+    image: &DynamicImage,
+    conn: Option<&mut midir::MidiOutputConnection>,
+) {
+    let width = image.width() as usize;
+    let height = image.height() as usize;
+
+    // Flat sequence of pixels covered by the synth's zones (empty zone list
+    // = the whole image). The cursor is an index into this sequence; zones
+    // partially outside the image are clipped, and a zone list that covers
+    // nothing leaves the synth stalled.
+    let sequence = build_pixel_sequence(&synth.zones, width, height);
+    let seq_len = sequence.len();
+    if seq_len == 0 {
+        return;
+    }
+
+    let mut conn = conn;
+
+    // Deferred end of a non-looping sequence: end_pending means the last
+    // pixel was played on the previous tick and its note has now rung for
+    // a full step period — stop the synth.
+    if synth.end_pending && !synth.loop_enabled && synth.playing {
+        synth.playing = false;
+        synth.cursor = 0;
+        synth.last_played_note = None;
+        synth.tempo_accumulator = 0.0;
+        // Turn off the current mono note if it is still sounding
+        if synth.note_is_on {
+            if let Some(c) = conn.as_deref_mut() {
+                send_note_off(c, synth.channel, synth.note);
+            }
+            synth.note_is_on = false;
+        }
+        // Turn off any currently sounding polyphonic voices
+        for voice in synth.poly_voices.iter_mut() {
+            if voice.note_is_on {
+                if let Some(c) = conn.as_deref_mut() {
+                    send_note_off(c, synth.channel, voice.note);
+                }
+                voice.note_is_on = false;
+            }
+            voice.last_played_note = None;
+        }
+        let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
+        return;
+    }
+
+    let pos = synth.cursor % seq_len;
+
+    // Read the pixel at the current playhead position (the payload reports
+    // the absolute pixel index, not the sequence index)
+    let pixel_index = sequence[pos];
+    let px = pixel_index as u32;
+    let x = px % width as u32;
+    let y = px / width as u32;
+    let pixel = image.get_pixel(x, y);
+    let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
+    let luma = pixel_luma(r, g, b);
+    let brightness_level = luma_to_level(luma);
+    let saturation = pixel_saturation(r, g, b);
+    let velocity = saturation_to_velocity(saturation, synth.velocity_min);
+    synth.velocity = velocity;
+
+    let mut payload = serde_json::json!({
+        "id": synth.id,
+        "cursor": pixel_index,
+        "r": r, "g": g, "b": b, "a": a,
+        "brightness_level": brightness_level,
+        "velocity": velocity,
+        "mode": synth.mode,
+    });
+
+    match synth.mode {
+        SynthMode::Monophonic => {
+            process_monophonic(
+                synth, conn.as_deref_mut(), r, g, b,
+                brightness_level, velocity, &mut payload,
+            );
+        }
+        SynthMode::Polyphonic => {
+            process_polyphonic(
+                synth, conn.as_deref_mut(), r, g, b,
+                brightness_level, velocity, &mut payload,
+            );
+        }
+    }
+
+    let _ = app.emit("synth-pixel-tick", payload);
+
+    // Then advance the playhead for the next step. At the end of a
+    // non-looping sequence, wrap the playhead but raise end_pending: the
+    // next tick stops the synth, giving the final note a full step
+    // duration. A paused synth simply wraps around and clears the flag.
+    let next_pos = pos + 1;
+    synth.cursor = next_pos % seq_len;
+    synth.end_pending = next_pos >= seq_len && !synth.loop_enabled;
+}
+
 pub struct MetronomeState {
     pub running: Arc<AtomicBool>,
     pub bpm: Arc<AtomicU32>,
@@ -288,108 +394,25 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
             let midi_state = app.state::<MidiState>();
 
             if let Some(image) = image_state.processed.lock().unwrap().as_ref() {
-                let (width, height) = (image.width() as usize, image.height() as usize);
-                let total_pixels = width * height;
-
                 let mut synths = synth_state.synths.lock().unwrap();
                 let mut conn_guard = midi_state.connection.lock().unwrap();
 
                 for synth in synths.values_mut() {
-                    if synth.playing && total_pixels > 0 {
-                        // Tempo desynchronization: each metronome tick adds the
-                        // synth's tempo ratio to its accumulator; the synth only
-                        // advances when at least one full step has accumulated
-                        // (e.g. ratio 0.5 = one pixel every two ticks).
-                        synth.tempo_accumulator += synth.tempo_ratio;
-                        if synth.tempo_accumulator < 1.0 {
-                            continue;
-                        }
-                        synth.tempo_accumulator -= 1.0;
-
-                        // Flat sequence of pixels covered by the synth's zones
-                        // (empty zone list = the whole image). The cursor is an
-                        // index into this sequence; zones partially outside
-                        // the image are clipped, and a zone list that covers
-                        // nothing leaves the synth stalled.
-                        let sequence = build_pixel_sequence(&synth.zones, width, height);
-                        let seq_len = sequence.len();
-                        if seq_len == 0 {
-                            continue;
-                        }
-
-                        // Advance the cursor within the sequence
-                        let pos = synth.cursor % seq_len;
-                        let next_pos = pos + 1;
-
-                        if next_pos >= seq_len && !synth.loop_enabled {
-                            // End of sequence without looping: stop the synth
-                            synth.playing = false;
-                            synth.cursor = 0;
-                            synth.last_played_note = None;
-                            synth.tempo_accumulator = 0.0;
-                            // Turn off the current mono note if it is still sounding
-                            if synth.note_is_on {
-                                if let Some(conn) = conn_guard.as_mut() {
-                                    send_note_off(conn, synth.channel, synth.note);
-                                }
-                                synth.note_is_on = false;
-                            }
-                            // Turn off any currently sounding polyphonic voices
-                            for voice in synth.poly_voices.iter_mut() {
-                                if voice.note_is_on {
-                                    if let Some(conn) = conn_guard.as_mut() {
-                                        send_note_off(conn, synth.channel, voice.note);
-                                    }
-                                    voice.note_is_on = false;
-                                }
-                                voice.last_played_note = None;
-                            }
-                            let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
-                            continue;
-                        }
-
-                        synth.cursor = next_pos % seq_len;
-
-                        // Read the current pixel (the payload reports the
-                        // absolute pixel index, not the sequence index)
-                        let pixel_index = sequence[synth.cursor];
-                        let px = pixel_index as u32;
-                        let x = px % width as u32;
-                        let y = px / width as u32;
-                        let pixel = image.get_pixel(x, y);
-                        let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
-                        let luma = pixel_luma(r, g, b);
-                        let brightness_level = luma_to_level(luma);
-                        let saturation = pixel_saturation(r, g, b);
-                        let velocity = saturation_to_velocity(saturation, synth.velocity_min);
-                        synth.velocity = velocity;
-
-                        let mut payload = serde_json::json!({
-                            "id": synth.id,
-                            "cursor": pixel_index,
-                            "r": r, "g": g, "b": b, "a": a,
-                            "brightness_level": brightness_level,
-                            "velocity": velocity,
-                            "mode": synth.mode,
-                        });
-
-                        match synth.mode {
-                            SynthMode::Monophonic => {
-                                process_monophonic(
-                                    synth, conn_guard.as_mut(), r, g, b,
-                                    brightness_level, velocity, &mut payload,
-                                );
-                            }
-                            SynthMode::Polyphonic => {
-                                process_polyphonic(
-                                    synth, conn_guard.as_mut(), r, g, b,
-                                    brightness_level, velocity, &mut payload,
-                                );
-                            }
-                        }
-
-                        let _ = app.emit("synth-pixel-tick", payload);
+                    if !synth.playing {
+                        continue;
                     }
+
+                    // Tempo desynchronization: each metronome tick adds the
+                    // synth's tempo ratio to its accumulator; the synth only
+                    // advances when at least one full step has accumulated
+                    // (e.g. ratio 0.5 = one pixel every two ticks).
+                    synth.tempo_accumulator += synth.tempo_ratio;
+                    if synth.tempo_accumulator < 1.0 {
+                        continue;
+                    }
+                    synth.tempo_accumulator -= 1.0;
+
+                    step_synth_once(&app, synth, image, conn_guard.as_mut());
                 }
             }
 
@@ -407,4 +430,103 @@ pub fn stop_metronome(state: tauri::State<MetronomeState>) {
 #[tauri::command]
 pub fn is_metronome_running(state: tauri::State<MetronomeState>) -> bool {
     state.running.load(Ordering::Relaxed)
+}
+
+/// Manually advances a synth's playhead by one pixel in its zone sequence,
+/// playing the resulting pixel like a metronome tick would. Only usable
+/// while the synth is paused. The notes played by a manual step have a
+/// fixed duration, equal to the synth's own step period (metronome
+/// interval divided by its tempo ratio), after which a Note Off is sent.
+#[tauri::command]
+pub fn step_synth(
+    app: AppHandle,
+    id: u32,
+    image_state: State<'_, ImageState>,
+    synth_state: State<SynthState>,
+    midi_state: State<MidiState>,
+    metronome_state: State<'_, MetronomeState>,
+) -> Result<(), AppError> {
+    let bpm = metronome_state.bpm.load(Ordering::Relaxed).max(1) as u64;
+    let interval_ms = 60_000u64 / bpm;
+
+    let (channel, scheduled, step_duration) = {
+        let image_guard = image_state.processed.lock().unwrap();
+        let image = match image_guard.as_ref() {
+            Some(img) => img,
+            None => return Err(err("no_processed_image")),
+        };
+
+        let mut synths = synth_state.synths.lock().unwrap();
+        let synth = match synths.get_mut(&id) {
+            Some(s) => s,
+            None => return Err(err("synth_not_found").with_param("id", id)),
+        };
+
+        if synth.playing {
+            return Err(err("synth_is_playing").with_param("id", id));
+        }
+
+        let mut conn_guard = midi_state.connection.lock().unwrap();
+        step_synth_once(&app, synth, image, conn_guard.as_mut());
+
+        // Duration of one synth step: the metronome period scaled by the
+        // synth's tempo ratio (e.g. ratio 0.5 = twice the metronome period)
+        let ratio = if synth.tempo_ratio > 0.0 { synth.tempo_ratio } else { 1.0 };
+        let step_duration = ((interval_ms as f64) / ratio).round().max(1.0) as u64;
+
+        // Capture the notes that are now sounding, to schedule their Note Off
+        let mut scheduled = Vec::new();
+        if synth.note_is_on {
+            scheduled.push(synth.note);
+        }
+        for voice in &synth.poly_voices {
+            if voice.note_is_on {
+                scheduled.push(voice.note);
+            }
+        }
+        (synth.channel, scheduled, step_duration)
+    };
+
+    if scheduled.is_empty() {
+        return Ok(());
+    }
+
+    let app = app.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(step_duration));
+
+        // Turn the captured notes off only if the synth is still paused and
+        // still sounding those same notes: a newer manual step, a stop, or
+        // the metronome taking over in the meantime cancels the cutoff.
+        let synth_state = app.state::<SynthState>();
+        let midi_state = app.state::<MidiState>();
+
+        let mut synths = synth_state.synths.lock().unwrap();
+        let synth = match synths.get_mut(&id) {
+            Some(s) => s,
+            None => return,
+        };
+        if synth.playing || synth.channel != channel {
+            return;
+        }
+
+        let mut conn_guard = midi_state.connection.lock().unwrap();
+        let conn = match conn_guard.as_mut() {
+            Some(c) => c,
+            None => return,
+        };
+
+        if synth.note_is_on && scheduled.contains(&synth.note) {
+            send_note_off(conn, synth.channel, synth.note);
+            synth.note_is_on = false;
+        }
+        for voice in synth.poly_voices.iter_mut() {
+            if voice.note_is_on && scheduled.contains(&voice.note) {
+                send_note_off(conn, synth.channel, voice.note);
+                voice.note_is_on = false;
+            }
+        }
+    });
+
+    Ok(())
 }

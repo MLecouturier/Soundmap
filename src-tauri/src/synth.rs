@@ -29,11 +29,28 @@ pub fn remove_synth(id: u32, state: State<SynthState>) {
 }
 
 #[tauri::command]
+pub fn reset_synth_cursor(id: u32, state: State<SynthState>) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.cursor = 0;
+            synth.end_pending = false;
+            synth.tempo_accumulator = 0.0;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+#[tauri::command]
 pub fn start_synth(id: u32, state: State<SynthState>) -> Result<(), AppError> {
     let mut synths = state.synths.lock().unwrap();
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.playing = true;
+            // A fresh start always replays from the beginning of the sequence
+            // (e.g. after manually stepping to the end while paused)
+            synth.end_pending = false;
             Ok(())
         }
         None => Err(synth_not_found(id)),
@@ -51,6 +68,7 @@ pub fn stop_synth(
         Some(synth) => {
             synth.playing = false;
             synth.last_played_note = None;
+            synth.end_pending = false;
             synth.tempo_accumulator = 0.0;
             let mut conn_guard = midi_state.connection.lock().unwrap();
 

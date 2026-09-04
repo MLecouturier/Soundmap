@@ -616,7 +616,9 @@ $metronome-led-transition: 0.05s ease;
         }
 
         .synth-play,
-        .synth-loop-btn {
+        .synth-loop-btn,
+        .synth-rewind,
+        .synth-step-forward {
             display: flex;
             align-items: center;
             font-size: 0.82rem;
@@ -629,12 +631,21 @@ $metronome-led-transition: 0.05s ease;
             .material-symbols-outlined { font-size: 1.125rem; }
         }
 
-        .synth-loop-btn {
-            
+        .synth-loop-btn,
+        .synth-rewind,
+        .synth-step-forward {
+
             transition: background-color $transition-fast, color $transition-fast;
             background-color: #444;
             color: $color-text-muted;
 
+            &:hover {
+                background-color: #555;
+                color: $color-text-secondary;
+            }
+        }
+
+        .synth-loop-btn {
             .synth-loop-label {
                 display: none;
             }

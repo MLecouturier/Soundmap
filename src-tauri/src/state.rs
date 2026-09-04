@@ -64,6 +64,8 @@ pub struct Synth {
     pub channel: u8,        // MIDI channel 0-15
     pub zones: Vec<PixelZone>, // rectangular zones to play (empty = whole image)
     pub loop_enabled: bool,   // loop playback or stop at end of range
+    pub end_pending: bool,    // end of a non-looping sequence reached: stop on the next tick
+                              // (gives the final note a full step duration)
     pub tempo_ratio: f64,      // playback speed relative to the metronome (1.0 = metronome tempo)
     pub tempo_accumulator: f64, // fractional-tick accumulator: a synth with tempo < 1.0
                                // only advances once enough metronome ticks have accumulated
@@ -94,6 +96,7 @@ impl Synth {
             channel: 0,
             zones: Vec::new(),    // empty = whole image
             loop_enabled: true,   // loop enabled by default
+            end_pending: false,
             tempo_ratio: 1.0,
             tempo_accumulator: 0.0,
             brightness_min: 0,

@@ -202,9 +202,25 @@ function clearOverlay() {
 
 // ---------- Mouse-based rectangular zone selection ----------
 // Only one synth can be in zone-drawing mode at a time. While the mode is
-// active, each rectangle dragged on the image adds a zone to that synth.
+// active, each rectangle dragged on the image either adds a zone (drag
+// starting on a free pixel) or removes pixels from the existing zones
+// (drag starting on an already-selected pixel).
 let zonePickState = null; // { id, btn } while the drawing mode is armed
-let zoneDrag = null;      // { id, start: {col,row}, cur: {col,row} } while dragging
+let zoneDrag = null;      // { id, start, cur, mode: 'add'|'remove' } while dragging
+
+// A pixel is "selected" if it is covered by one of the synth's explicit
+// zones. With no zone defined yet, the whole image is the default selection
+// but the first drag always creates a zone (rather than removing from the
+// implicit whole-image selection).
+function isPixelSelected(id, col, row) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return false;
+    if (hi.zones.length === 0) return false;
+    return hi.zones.some(z =>
+        col >= z.x && col < z.x + z.w &&
+        row >= z.y && row < z.y + z.h
+    );
+}
 
 function cellFromClientPoint(clientX, clientY) {
     const layout = getImageLayout();
@@ -246,7 +262,10 @@ pixelOverlay.addEventListener('mousedown', (e) => {
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
     e.preventDefault(); // prevents image dragging during selection
-    zoneDrag = { id: zonePickState.id, start: cell, cur: cell };
+    const mode = isPixelSelected(zonePickState.id, cell.col, cell.row)
+        ? 'remove'
+        : 'add';
+    zoneDrag = { id: zonePickState.id, start: cell, cur: cell, mode };
 });
 
 pixelOverlay.addEventListener('mousemove', (e) => {
@@ -260,21 +279,24 @@ pixelOverlay.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', (e) => {
     if (!zoneDrag) return;
-    const { id, start, cur } = zoneDrag;
+    const { id, start, cur, mode } = zoneDrag;
     zoneDrag = null;
     const moved = start.col !== cur.col || start.row !== cur.row;
     if (moved) {
-        addSynthZone(id, {
+        const rect = {
             x: Math.min(start.col, cur.col),
             y: Math.min(start.row, cur.row),
             w: Math.abs(cur.col - start.col) + 1,
             h: Math.abs(cur.row - start.row) + 1,
-        });
+        };
+        if (mode === 'add') addSynthZone(id, rect);
+        else                removeSynthZoneRect(id, rect);
     }
     redrawAllHighlights();
 });
 
-// Live preview of the rectangle being dragged, drawn on top of the highlights
+// Live preview of the rectangle being dragged: filled with the synth's
+// color in add mode, "erasing" the highlights beneath it in remove mode.
 function drawZonePreview() {
     if (!zoneDrag) return;
     const layout = getImageLayout();
@@ -288,9 +310,14 @@ function drawZonePreview() {
 
     const ctx = pixelOverlay.getContext('2d');
     ctx.save();
-    ctx.fillStyle = synthColors.get(zoneDrag.id) || '#ffffff';
-    ctx.globalAlpha = 0.4;
-    ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, w * cellW, h * cellH);
+    if (zoneDrag.mode === 'remove') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, w * cellW, h * cellH);
+    } else {
+        ctx.fillStyle = synthColors.get(zoneDrag.id) || '#ffffff';
+        ctx.globalAlpha = 0.4;
+        ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, w * cellW, h * cellH);
+    }
     ctx.restore();
 }
 
@@ -300,6 +327,43 @@ function addSynthZone(id, zone) {
     hi.zones.push(zone);
     sendSynthZones(id);
     updateZonesLabel(id);
+}
+
+// Subtracts a rectangle from the synth's zones. Sub-zones that end up empty
+// are dropped; a zone split by the rectangle is cut into up to 4 bands.
+// With no zone defined (whole image selected), the whole image is first
+// materialized as a single zone so the subtraction has something to bite.
+function removeSynthZoneRect(id, rect) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return;
+    if (hi.zones.length === 0) {
+        hi.zones = [{ x: 0, y: 0, w: gridW, h: gridH }];
+    }
+    const next = [];
+    for (const z of hi.zones) {
+        for (const r of subtractRect(z, rect)) next.push(r);
+    }
+    hi.zones = next;
+    sendSynthZones(id);
+    updateZonesLabel(id);
+}
+
+// Computes zone `z` minus rectangle `r`: returns the 0–4 remaining
+// rectangles (top band, bottom band, left band, right band).
+function subtractRect(z, r) {
+    // Intersection bounds; no overlap → the zone is kept intact
+    const x1 = Math.max(z.x, r.x);
+    const y1 = Math.max(z.y, r.y);
+    const x2 = Math.min(z.x + z.w, r.x + r.w);
+    const y2 = Math.min(z.y + z.h, r.y + r.h);
+    if (x1 >= x2 || y1 >= y2) return [z];
+
+    const result = [];
+    if (z.y < y1) result.push({ x: z.x, y: z.y, w: z.w, h: y1 - z.y });
+    if (y2 < z.y + z.h) result.push({ x: z.x, y: y2, w: z.w, h: (z.y + z.h) - y2 });
+    if (z.x < x1) result.push({ x: z.x, y: y1, w: x1 - z.x, h: y2 - y1 });
+    if (x2 < z.x + z.w) result.push({ x: x2, y: y1, w: (z.x + z.w) - x2, h: y2 - y1 });
+    return result;
 }
 
 function sendSynthZones(id) {
@@ -737,15 +801,15 @@ function createSynthElement(id) {
                     <option value=0.33>1/3</option>
                     <option value=0.25>1/4</option>
                 </select>
-                <button class"synth-rewind">
-                    <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">fast_rewind</span>
+                <button class="synth-rewind" data-i18n-title="synth.rewind">
+                    <span class="material-symbols-outlined" aria-hidden="true">fast_rewind</span>
                 </button>
                 <button class="synth-play">
                     <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
                     <span class="synth-play-label"></span>
                 </button>
-                <button class"synth-step-forward">
-                    <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">step</span>
+                <button class="synth-step-forward" data-i18n-title="synth.stepForward">
+                    <span class="material-symbols-outlined" aria-hidden="true">step</span>
                 </button>                
                 <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
                     <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
@@ -811,6 +875,14 @@ function createSynthElement(id) {
     el.querySelector('.synth-pixel-info').textContent = t('synth.pixelInfoEmpty');
 
     el.querySelector('.synth-play').addEventListener('click', () => onSynthPlayClick(id, el));
+    el.querySelector('.synth-step-forward').addEventListener('click', () => {
+        invoke('step_synth', { id })
+            .catch(err => console.error('Error in step_synth:', err));
+    });
+    el.querySelector('.synth-rewind').addEventListener('click', () => {
+        invoke('reset_synth_cursor', { id })
+            .catch(err => console.error('Error in reset_synth_cursor:', err));
+    });
     el.querySelector('.synth-remove').addEventListener('click', () => onSynthRemoveClick(id, el));
 
     // Color band → toggle the picker
@@ -1065,6 +1137,7 @@ function setSynthControlsLocked(el, locked) {
     el.querySelectorAll('.synth-mode-btn').forEach(btn => { btn.disabled = locked; });
     el.querySelector('.synth-add-zone-btn').disabled = locked;
     el.querySelector('.synth-clear-zones-btn').disabled = locked;
+    el.querySelector('.synth-step-forward').disabled = locked;
 
     // If this synth was mid-selection when it started playing, cancel it.
     const id = Number(el.dataset.synthId);

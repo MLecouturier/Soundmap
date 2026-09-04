@@ -530,7 +530,9 @@ input[type=range].synth-range-input::-moz-range-track {
   color: #219a52;
 }
 .synth-block .synth-body .synth-play,
-.synth-block .synth-body .synth-loop-btn {
+.synth-block .synth-body .synth-loop-btn,
+.synth-block .synth-body .synth-rewind,
+.synth-block .synth-body .synth-step-forward {
   display: flex;
   align-items: center;
   font-size: 0.82rem;
@@ -541,13 +543,23 @@ input[type=range].synth-range-input::-moz-range-track {
   gap: 0.25rem;
 }
 .synth-block .synth-body .synth-play .material-symbols-outlined,
-.synth-block .synth-body .synth-loop-btn .material-symbols-outlined {
+.synth-block .synth-body .synth-loop-btn .material-symbols-outlined,
+.synth-block .synth-body .synth-rewind .material-symbols-outlined,
+.synth-block .synth-body .synth-step-forward .material-symbols-outlined {
   font-size: 1.125rem;
 }
-.synth-block .synth-body .synth-loop-btn {
+.synth-block .synth-body .synth-loop-btn,
+.synth-block .synth-body .synth-rewind,
+.synth-block .synth-body .synth-step-forward {
   transition: background-color 0.2s ease, color 0.2s ease;
   background-color: #444;
   color: #888;
+}
+.synth-block .synth-body .synth-loop-btn:hover,
+.synth-block .synth-body .synth-rewind:hover,
+.synth-block .synth-body .synth-step-forward:hover {
+  background-color: #555;
+  color: #ccc;
 }
 .synth-block .synth-body .synth-loop-btn .synth-loop-label {
   display: none;
