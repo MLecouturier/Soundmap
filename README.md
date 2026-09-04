@@ -25,12 +25,14 @@ You can create any number of independent synthesizers, each reading the pixel gr
   - **Polyphonic** — each color channel (Red, Green, Blue) is read independently and mapped to its own note, forming a 1-to-3-note chord. Each channel can be enabled or disabled individually. Hovering over the R/G/B toggle buttons displays that channel's intensity map directly over the image, to help you decide which channels to use.
 - **Rectangular zones** — select the pixels each synthesizer plays by drawing rectangles directly on the image. All pixels are selected by default; a rectangle dragged from a free pixel adds a zone, while one dragged from an already selected pixel removes those pixels instead. The zone row also displays the total number of selected pixels and the estimated playing time at the synth's own tempo.
 - **Per-synth tempo** — each synthesizer can play at a fraction of the main metronome tempo (1/1, 3/4, 2/3, 1/2, 1/3 or 1/4 of the global BPM), letting synths desynchronize from one another for more dynamic music.
-- **Note lengths** — checkboxes for sixteenth, eighth, quarter, half and whole notes let the pixel's brightness choose the note's duration among the enabled lengths (the 0–127 brightness range is split into as many equal bands). Each pixel is played for exactly its note's duration, so the image's brightness contrast translates directly into rhythm. A reverse button flips the brightness→length direction (dark = long instead of bright = long); the quarter-note box always stays checked.
+- **Custom name** — double-click a synthesizer's title to rename it; the name is saved in sessions.
+- **MIDI output port per synthesizer** — each synth can send its notes to a different MIDI interface. Connections are opened lazily on first use, and the first available port is connected automatically at startup.
+- **Reading direction** — a cycling button selects the order in which the pixel sequence is read: left to right, right to left, top to bottom, or bottom to top.
+- **Loop, back-and-forth, or one-shot playback** — a synthesizer can loop over its zones indefinitely, bounce back and forth between the sequence bounds (ping-pong), or play the sequence once and stop. Loop and back-and-forth are mutually exclusive and can both be off.
+- **Note lengths** — toggle buttons for sixteenth, eighth, quarter, half and whole notes let the pixel's brightness choose the note's duration among the enabled lengths (the 0–127 brightness range is split into as many equal bands). Each pixel is played for exactly its note's duration, so the image's brightness contrast translates directly into rhythm. A reverse button flips the brightness→length direction (dark = long instead of bright = long); the quarter-note button always stays active.
 - **MIDI note range filters** — bass (21–47), medium (48–71) and treble (72–108) toggles restrict the notes a synthesizer can play. Toggles are cumulative to extend the allowed range; with none active, the full 0–127 range is available. Notes that fall outside the allowed range are folded into it by octaves, preserving their pitch class. Monophonic mode has a single filter; each polyphonic R/G/B voice has its own.
 - **Playback controls** — play/stop, rewind (resets the playhead to the beginning of the sequence) and step forward (manually advances by one pixel while paused, playing it with its own note length).
-- **Loop or one-shot playback** — a synthesizer can either loop over its zones indefinitely or stop automatically once it reaches the end.
 - **Brightness threshold** — a dual-handle slider defines the brightness range a pixel must fall into to be audible; pixels outside that range are silently skipped.
-- **Note change threshold** — a minimum variation (in semitones) required between two consecutive pixels before a new note value is retained; below it, the last note is kept, avoiding nervous chromatic jitter.
 - **Minimum velocity** — sets the floor of the velocity range; pixel saturation is mapped between this floor and the maximum velocity (127). Vivid colors are played with a stronger attack, achromatic areas more delicately.
 - **MIDI channel selection** per synthesizer (16 channels available), locked while the synthesizer is playing.
 - **Color tagging** — each synthesizer is assigned a color (with a picker of predefined swatches), used to highlight its zones and its current playback position directly on the image.
@@ -41,8 +43,21 @@ You can create any number of independent synthesizers, each reading the pixel gr
 
 ### MIDI Output
 
-- Automatic connection to the first available MIDI output port on startup.
+- Automatic connection to the first available MIDI output port on startup; every synthesizer can be routed to its own port, with connections opened lazily on first use.
 - Real-time Note On / Note Off messages: each pixel is played as a note with its own duration, with clean note-offs when stopping a synthesizer or switching modes. The engine ticks at a quarter-beat resolution so eighth and sixteenth note lengths stay accurate.
+
+### Work Sessions
+
+- **Save the whole state** into a single self-contained `.soundmap` file (native save dialog): the original image (embedded as base64 PNG), the image processing settings, the metronome tempo, and every synthesizer with its full configuration (name, color, zones, tempo, mode, note lengths, note ranges, thresholds, velocity, MIDI channel and port, reading direction, loop/back-and-forth).
+- **Reopen a session** through a native open dialog: the image is re-derived from the original with the stored settings, and all the synthesizers are recreated exactly as they were left. Playback state (playhead positions, sounding notes) is deliberately not restored: everything restarts from the beginning.
+
+### Global Configuration
+
+A JSON configuration file (opened with a gear button in the application settings area) holds the app-wide options, hand-edited in a text editor and applied on the next start:
+
+- **`max_image_size`** — longest side allowed for imported images; larger originals are downscaled on import (0 = unlimited).
+- **`default_bpm`** — metronome tempo used at startup.
+- **`default_synth`** — template applied to every newly created synthesizer; any existing synth can be saved as the template with its bookmark button ("Use this synth as the default template").
 
 ## Tech Stack
 
@@ -95,9 +110,10 @@ cargo tauri build
 In the application:
 
 1. Load an image and adjust the grid size, saturation, contrast, brightness, and posterization settings. The preview updates live.
-2. Add one or more synthesizers, choose a MIDI channel and a color for each.
-3. Draw zones on the image to restrict what each synthesizer plays, pick a tempo per synth, and open the advanced options to configure the translation mode (monophonic/polyphonic), note lengths, note range filters, brightness threshold, note change threshold, and minimum velocity.
+2. Add one or more synthesizers, choose a MIDI port, a MIDI channel and a color for each, and rename them by double-clicking their title.
+3. Draw zones on the image to restrict what each synthesizer plays, pick a tempo per synth, and open the advanced options to configure the translation mode (monophonic/polyphonic), note lengths, note range filters, brightness threshold, and minimum velocity.
 4. Press Play on a synthesizer (or "play all") to start hearing your image.
+5. Save your work into a `.soundmap` session file (save button next to the image controls) and reopen it later to find everything back in place.
 
 ## Project Structure
 
@@ -125,13 +141,15 @@ soundmap/
         ├── lib.rs
         ├── state.rs
         ├── error.rs
+        ├── config.rs
+        ├── session.rs
         ├── image_processing.rs
         ├── synth.rs
         ├── metronome.rs
         └── midi.rs
 ```
 
-The backend exposes Tauri commands to load images, apply adjustments, retrieve pixel data, manage synthesizers (creation, playback, MIDI channel, mode, zones, tempo, note lengths, note ranges, thresholds, velocity), and drive the shared metronome.
+The backend exposes Tauri commands to load images, apply adjustments, retrieve pixel data, manage synthesizers (creation, playback, MIDI channel and port, mode, zones, tempo, note lengths, note ranges, reading direction, thresholds, velocity), drive the shared metronome, persist the global configuration, and save/load work sessions.
 
 ## License
 
