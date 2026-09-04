@@ -283,6 +283,35 @@ input[type="range"].synth-range-input {
             opacity: 0.4;
             pointer-events: none;
         }
+
+        // Session save / open icon buttons
+        .icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            padding: 0;
+            border: 1px solid $color-border;
+            border-radius: $border-radius-base;
+            background: none;
+            color: $color-text-secondary;
+            cursor: pointer;
+            transition: color $transition-fast, border-color $transition-fast;
+
+            .material-symbols-outlined { font-size: 1.05rem; }
+
+            &:hover {
+                color: $color-text-primary;
+                border-color: $color-text-muted;
+            }
+
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+        }
     }
 
     // Language switcher, pushed to the right of the controls row

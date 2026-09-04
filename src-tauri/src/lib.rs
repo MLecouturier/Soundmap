@@ -3,6 +3,7 @@ pub mod error;
 pub mod image_processing;
 pub mod metronome;
 pub mod midi;
+pub mod session;
 pub mod state;
 pub mod synth;
 
@@ -48,6 +49,8 @@ pub fn run() {
             image_processing::apply_image_adjustments,
             image_processing::get_pixel_data,
             midi::list_midi_ports,
+            session::save_session,
+            session::load_session,
             metronome::start_metronome,
             metronome::stop_metronome,
             metronome::set_metronome_bpm,

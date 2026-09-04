@@ -14,7 +14,7 @@ pub enum SynthMode {
 
 /// Rectangular zone of the image, in grid cells: (x, y) is the top-left
 /// cell, w and h are the extents in cells.
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct PixelZone {
     pub x: u32,
     pub y: u32,

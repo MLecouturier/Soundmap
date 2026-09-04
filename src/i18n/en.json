@@ -38,6 +38,10 @@
   "config": {
     "openFile": "Open the configuration file in a text editor (changes apply on restart)"
   },
+  "session": {
+    "save": "Save the work session…",
+    "load": "Open a work session…"
+  },
   "synth": {
     "title": "Synth #{id}",
     "renameHint": "Double-click to rename",
@@ -58,7 +62,7 @@
     "stepForward": "Advance the playhead by one pixel",
     "toggleHighlight": "Show/hide the zone highlight",
     "channelLabel": "MIDI channel",
-    "channelOption": "Channel {number}",
+    "channelOption": "CH {number}",
     "midiPort": "MIDI output port",
     "noMidiPort": "No MIDI port",
     "modeLabel": "Mode",
@@ -107,6 +111,9 @@
     "load_image_failed": "Error while loading the image.",
     "processing_failed": "Error while processing.",
     "config_unavailable": "Unable to determine the configuration file location.",
-    "open_config_failed": "Unable to open the configuration file: {details}"
+    "open_config_failed": "Unable to open the configuration file: {details}",
+    "session_read_error": "Unable to read the session file: {details}",
+    "session_parse_error": "Invalid session file: {details}",
+    "session_write_error": "Unable to write the session file: {details}"
   }
 }

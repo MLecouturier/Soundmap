@@ -38,6 +38,10 @@
   "config": {
     "openFile": "Ouvrir le fichier de configuration dans un éditeur de texte (les modifications s'appliquent au redémarrage)"
   },
+  "session": {
+    "save": "Enregistrer la session de travail…",
+    "load": "Ouvrir une session de travail…"
+  },
   "synth": {
     "title": "Synthé #{id}",
     "renameHint": "Double-cliquez pour renommer",
@@ -58,7 +62,7 @@
     "stepForward": "Avancer la lecture d'un pixel",
     "toggleHighlight": "Afficher/masquer le surlignage des zones",
     "channelLabel": "Canal MIDI",
-    "channelOption": "Canal {number}",
+    "channelOption": "CH {number}",
     "midiPort": "Port de sortie MIDI",
     "noMidiPort": "Aucun port MIDI",
     "modeLabel": "Mode",
@@ -107,6 +111,9 @@
     "load_image_failed": "Erreur lors du chargement de l'image.",
     "processing_failed": "Erreur lors du traitement.",
     "config_unavailable": "Impossible de déterminer l'emplacement du fichier de configuration.",
-    "open_config_failed": "Impossible d'ouvrir le fichier de configuration : {details}"
+    "open_config_failed": "Impossible d'ouvrir le fichier de configuration : {details}",
+    "session_read_error": "Impossible de lire le fichier de session : {details}",
+    "session_parse_error": "Fichier de session invalide : {details}",
+    "session_write_error": "Impossible d'écrire le fichier de session : {details}"
   }
 }

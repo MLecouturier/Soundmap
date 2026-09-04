@@ -238,6 +238,32 @@ input[type=range].synth-range-input::-moz-range-track {
   opacity: 0.4;
   pointer-events: none;
 }
+#controls .controls-row .icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid #333;
+  border-radius: 0.25rem;
+  background: none;
+  color: #ccc;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+#controls .controls-row .icon-btn .material-symbols-outlined {
+  font-size: 1.05rem;
+}
+#controls .controls-row .icon-btn:hover {
+  color: #e0e0e0;
+  border-color: #888;
+}
+#controls .controls-row .icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 #controls #language-switcher {
   margin-left: auto;
 }

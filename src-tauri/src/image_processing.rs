@@ -46,7 +46,7 @@ pub struct PixelData {
     pub pixels: Vec<u8>, // flat RGBA: r,g,b,a, r,g,b,a, ...
 }
 
-fn encode_to_base64_png(img: &DynamicImage) -> Result<String, AppError> {
+pub(crate) fn encode_to_base64_png(img: &DynamicImage) -> Result<String, AppError> {
     let mut buffer = Cursor::new(Vec::new());
     img.write_to(&mut buffer, ImageFormat::Png)
         .map_err(|e| err("png_encoding_error").with_param("details", e))?;

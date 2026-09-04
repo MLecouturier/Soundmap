@@ -749,6 +749,94 @@ resetBtn.addEventListener('click', () => {
   refresh();
 });
 
+// ---------- Session save / load ----------
+const saveSessionBtn = document.querySelector('#save-session-btn');
+const loadSessionBtn = document.querySelector('#load-session-btn');
+
+// Collects the frontend-owned state (metronome tempo, image sliders, synth
+// colors in display order); the backend owns the rest (image, synths).
+saveSessionBtn.addEventListener('click', async () => {
+    const levels = Number(posterize.value);
+    const ui = {
+        bpm: clampBpm(Number(bpmInput.value)),
+        grid_slider: Number(gridSlider.value),
+        contrast: Number(contrast.value),
+        brightness: Number(brightness.value),
+        saturation: Number(saturation.value),
+        posterize_levels: levels > 1 ? levels : null,
+        synth_colors: Array.from(synthListBody.querySelectorAll('.synth-block')).map(el => ({
+            id: Number(el.dataset.synthId),
+            color: synthColors.get(Number(el.dataset.synthId)),
+        })),
+    };
+    try {
+        await invoke('save_session', { ui });
+    } catch (err) {
+        console.error('Error while saving the session:', err);
+        alert(translateError(err));
+    }
+});
+
+loadSessionBtn.addEventListener('click', async () => {
+    let session;
+    try {
+        session = await invoke('load_session');
+    } catch (err) {
+        console.error('Error while loading the session:', err);
+        alert(translateError(err));
+        return;
+    }
+    if (!session) return; // dialog canceled
+
+    // Stop everything and clear the current synths
+    await invoke('stop_metronome');
+    metronomeRunning = false;
+    synthListBody.querySelectorAll('.synth-block').forEach(el => el.remove());
+    synthColors.clear();
+    synthCursors.clear();
+    synthHighlights.clear();
+    synthNames.clear();
+    placeholder.classList.remove('hidden');
+    cancelZonePicking();
+    syncPlayAllButton();
+    updateImageControlsLockState();
+
+    // Restore the image and its processing settings (the backend already
+    // holds the original: refresh re-derives the processed grid)
+    origWidth = session.orig_width;
+    origHeight = session.orig_height;
+    originalPng = session.image_base64;
+    hasImage = true;
+    gridSlider.value = session.image_settings.grid_slider;
+    contrast.value = session.image_settings.contrast;
+    brightness.value = session.image_settings.brightness;
+    saturation.value = session.image_settings.saturation;
+    posterize.value = session.image_settings.posterize_levels ?? 1;
+    showOriginal.checked = false;
+    viewerEmpty.classList.add('hidden');
+    preview.classList.remove('hidden');
+    syncLabels();
+    await refresh();
+
+    // Restore the tempo and the synths
+    bpmInput.value = clampBpm(session.bpm);
+    if (session.synths.length > 0) {
+        placeholder.classList.add('hidden');
+        for (const s of session.synths) {
+            // Pre-seed the name and color for createSynthElement to pick up
+            synthColors.set(s.id, s.color);
+            if (s.name) synthNames.set(s.id, s.name);
+            // The synth settings are flattened into the session-synth object
+            // (serde flatten), so `s` itself is the config to apply
+            synthListBody.appendChild(createSynthElement(s.id, s));
+            const hi = synthHighlights.get(s.id);
+            if (hi) hi.zones = s.zones || [];
+            updateZonesLabel(s.id);
+        }
+        redrawAllHighlights();
+    }
+});
+
 // ---------- Listeners ----------
 [gridSlider, contrast, brightness, saturation, posterize].forEach(el => {
   el.addEventListener('input', () => {
@@ -909,8 +997,10 @@ function createSynthElement(id, cfg = null) {
     el.className = 'synth-block';
     el.dataset.synthId = id;
 
-    // Default color: rotate through the palette
-    const defaultColor = SYNTH_COLORS[(synthColors.size) % SYNTH_COLORS.length];
+    // Color: reuse a pre-seeded entry (session load), or rotate through
+    // the palette
+    const seededColor = synthColors.get(id);
+    const defaultColor = seededColor || SYNTH_COLORS[(synthColors.size) % SYNTH_COLORS.length];
     synthColors.set(id, defaultColor);
 
     const channelOptions = Array.from({ length: 16 }, (_, i) =>
