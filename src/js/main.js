@@ -373,6 +373,15 @@ function sendSynthZones(id) {
         .catch(err => console.error('Error in set_synth_zones:', err));
 }
 
+// Sends the enabled note lengths ("whole", "half", "quarter", "eighth",
+// "sixteenth"). The UI always keeps at least one box checked.
+function sendSynthNoteLengths(id, el) {
+    const lengths = Array.from(el.querySelectorAll('.note-length-checkbox:checked'))
+        .map(box => box.dataset.length);
+    invoke('set_synth_note_lengths', { id, lengths })
+        .catch(err => console.error('Error in set_synth_note_lengths:', err));
+}
+
 // Number of pixels a synth will play: the sum of its zone areas (clipped
 // to the grid), or the whole image when no zone is defined. Overlapping
 // zones are counted twice, mirroring the backend's playback sequence.
@@ -889,8 +898,19 @@ function createSynthElement(id) {
                         <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
                     </div>
                 </div>
+
+                <div class="note-lengths">
+                    <label class="noto-music" data-i18n-title="synth.noteLengthSixteenth"><input type="checkbox" class="note-length-checkbox" data-length="sixteenth">𝅘𝅥𝅯</label>
+                    <label class="noto-music" data-i18n-title="synth.noteLengthEighth"><input type="checkbox" class="note-length-checkbox" data-length="eighth">𝅘𝅥𝅮</label>
+                    <label class="noto-music" data-i18n-title="synth.noteLengthQuarter"><input type="checkbox" class="note-length-checkbox" data-length="quarter" checked>𝅘𝅥</label>
+                    <label class="noto-music" data-i18n-title="synth.noteLengthHalf"><input type="checkbox" class="note-length-checkbox" data-length="half">𝅗𝅥</label>
+                    <label class="noto-music" data-i18n-title="synth.noteLengthWhole"><input type="checkbox" class="note-length-checkbox" data-length="whole">𝅗</label>
+                    <button class="synth-reverse-note-length" data-i18n-title="synth.reverseNoteLength">
+                        <span class="material-symbols-outlined" aria-hidden="true">music_history</span>
+                    </button>
+                </div>
                 
-                <div class="synth-range-wrapper">
+                <div class="brightness-threshold synth-range-wrapper">
                     <div class="synth-range-labels">
                         <span data-i18n="synth.brightnessThreshold"></span>
                         <span class="synth-range-values">
@@ -903,10 +923,12 @@ function createSynthElement(id) {
                         <input type="range" class="synth-range-input brightness-end"   min="0" max="127" value="127" step="1" />
                     </div>
                 </div>
+
                 <label class="synth-slider-label">
                     <span><span data-i18n="synth.noteThreshold"></span> <em class="threshold-val">0</em></span>
                     <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
                 </label>
+
                 <label class="synth-slider-label">
                     <span><span data-i18n="synth.velocityMin"></span> <em class="velocity-min-val">0</em></span>
                     <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
@@ -1022,6 +1044,28 @@ function createSynthElement(id) {
         hueShiftVal.textContent = `${hueShift}°`;
         invoke('set_synth_hue_shift', { id, hueShift })
             .catch(err => console.error('Error in set_synth_hue_shift:', err));
+    });
+
+    // ---- Note lengths: brightness → duration mapping ----
+    // At least one length must stay enabled: unchecking the last remaining
+    // box is reverted.
+    el.querySelectorAll('.note-length-checkbox').forEach(box => {
+        box.addEventListener('change', (e) => {
+            if (!el.querySelector('.note-length-checkbox:checked')) {
+                e.target.checked = true;
+                return;
+            }
+            sendSynthNoteLengths(id, el);
+        });
+    });
+    // Sync the default state (quarter checked) with the backend
+    sendSynthNoteLengths(id, el);
+    el.querySelector('.synth-reverse-note-length').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const reversed = !btn.classList.contains('active');
+        btn.classList.toggle('active', reversed);
+        invoke('set_synth_note_length_reversed', { id, reversed })
+            .catch(err => console.error('Error in set_synth_note_length_reversed:', err));
     });
 
     // ---- R/G/B channel toggles (polyphonic mode) ----

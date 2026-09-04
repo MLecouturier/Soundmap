@@ -7,7 +7,7 @@ use image::{DynamicImage, GenericImageView};
 
 use crate::error::{err, AppError};
 use crate::midi::{send_note_off, send_note_on};
-use crate::state::{ImageState, PixelZone, Synth, SynthMode, SynthState, MidiState};
+use crate::state::{ImageState, NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiState};
 
 /// Computes the perceived brightness of an RGBA pixel (Rec.601 formula), 0.0–255.0.
 fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
@@ -80,7 +80,9 @@ fn saturation_to_velocity(saturation: f32, velocity_min: u8) -> u8 {
 }
 
 /// Processes a pixel in monophonic mode: the hue (shifted by hue_shift)
-/// determines a single note.
+/// determines a single note. `retrigger` forces a note re-articulation on
+/// every pixel (used when note lengths are enabled, where each pixel is a
+/// distinct note of a fixed duration, disabling the legato sustain).
 fn process_monophonic(
     synth: &mut Synth,
     conn: Option<&mut midir::MidiOutputConnection>,
@@ -88,6 +90,7 @@ fn process_monophonic(
     brightness_level: u8,
     velocity: u8,
     payload: &mut serde_json::Value,
+    retrigger: bool,
 ) {
     let hue = pixel_hue(r, g, b);
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
@@ -114,7 +117,7 @@ fn process_monophonic(
     // We only (re)trigger MIDI if the note actually changes or if its
     // audible status (muted / not muted) changes. Otherwise we let the
     // current note keep sounding without interruption (legato).
-    let note_changed = effective_note != synth.note;
+    let note_changed = effective_note != synth.note || retrigger;
     let needs_off = synth.note_is_on && (note_changed || !in_range);
     let needs_on  = in_range && (!synth.note_is_on || note_changed);
 
@@ -137,6 +140,7 @@ fn process_monophonic(
             send_note_on(c, synth.channel, effective_note, velocity);
         }
         synth.note_is_on = true;
+        synth.note_generation = synth.note_generation.wrapping_add(1);
     }
 
     payload["note"] = serde_json::json!(effective_note);
@@ -146,7 +150,9 @@ fn process_monophonic(
 }
 
 /// Processes a pixel in polyphonic mode: each enabled R/G/B channel generates
-/// its own independent note, forming a chord of 1 to 3 notes.
+/// its own independent note, forming a chord of 1 to 3 notes. `retrigger`
+/// forces a re-articulation of every enabled voice on each pixel (used when
+/// note lengths are enabled, see process_monophonic).
 fn process_polyphonic(
     synth: &mut Synth,
     conn: Option<&mut midir::MidiOutputConnection>,
@@ -154,6 +160,7 @@ fn process_polyphonic(
     brightness_level: u8,
     velocity: u8,
     payload: &mut serde_json::Value,
+    retrigger: bool,
 ) {
     let channel_values = [r, g, b];
     let channel_midi = synth.channel;
@@ -183,7 +190,7 @@ fn process_polyphonic(
 
         let in_range = enabled && global_in_range;
 
-        let note_changed = effective_note != voice.note;
+        let note_changed = effective_note != voice.note || retrigger;
         let needs_off = voice.note_is_on && (note_changed || !in_range);
         let needs_on  = in_range && (!voice.note_is_on || note_changed);
 
@@ -204,6 +211,7 @@ fn process_polyphonic(
                 send_note_on(c, channel_midi, effective_note, velocity);
             }
             voice.note_is_on = true;
+            synth.note_generation = synth.note_generation.wrapping_add(1);
         }
 
         voices_payload.push(serde_json::json!({
@@ -249,12 +257,17 @@ fn build_pixel_sequence(zones: &[PixelZone], width: usize, height: usize) -> Vec
 /// the playhead by one pixel in its zone sequence (MIDI notes + UI payload),
 /// exactly like a metronome tick would. Used both by the metronome thread
 /// and by the manual step command; the synth does not need to be playing.
+///
+/// Returns `Some(length_beats)` when note lengths are enabled: the pixel
+/// occupies exactly that duration (in beats of the synth's own tempo),
+/// which the caller applies to the tempo accumulator. `None` means the
+/// historical behavior: quarter-note steps with legato sustain.
 fn step_synth_once(
     app: &AppHandle,
     synth: &mut Synth,
     image: &DynamicImage,
     conn: Option<&mut midir::MidiOutputConnection>,
-) {
+) -> Option<f64> {
     let width = image.width() as usize;
     let height = image.height() as usize;
 
@@ -265,7 +278,7 @@ fn step_synth_once(
     let sequence = build_pixel_sequence(&synth.zones, width, height);
     let seq_len = sequence.len();
     if seq_len == 0 {
-        return;
+        return None;
     }
 
     let mut conn = conn;
@@ -296,7 +309,7 @@ fn step_synth_once(
             voice.last_played_note = None;
         }
         let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
-        return;
+        return None;
     }
 
     let pos = synth.cursor % seq_len;
@@ -315,6 +328,18 @@ fn step_synth_once(
     let velocity = saturation_to_velocity(saturation, synth.velocity_min);
     synth.velocity = velocity;
 
+    // Note lengths: when enabled, the pixel's brightness picks a duration
+    // among the enabled lengths and each pixel is played as a distinct
+    // note of that fixed duration (no legato). Empty list = all quarter
+    // notes, i.e. the historical legato behavior. The duration applies
+    // even to muted pixels, so the rhythm structure stays consistent.
+    let note_length = if synth.note_lengths.is_empty() {
+        None
+    } else {
+        Some(pick_note_length(synth, brightness_level))
+    };
+    let retrigger = note_length.is_some();
+
     let mut payload = serde_json::json!({
         "id": synth.id,
         "cursor": pixel_index,
@@ -328,13 +353,13 @@ fn step_synth_once(
         SynthMode::Monophonic => {
             process_monophonic(
                 synth, conn.as_deref_mut(), r, g, b,
-                brightness_level, velocity, &mut payload,
+                brightness_level, velocity, &mut payload, retrigger,
             );
         }
         SynthMode::Polyphonic => {
             process_polyphonic(
                 synth, conn.as_deref_mut(), r, g, b,
-                brightness_level, velocity, &mut payload,
+                brightness_level, velocity, &mut payload, retrigger,
             );
         }
     }
@@ -348,6 +373,40 @@ fn step_synth_once(
     let next_pos = pos + 1;
     synth.cursor = next_pos % seq_len;
     synth.end_pending = next_pos >= seq_len && !synth.loop_enabled;
+
+    note_length
+}
+
+/// Duration of a note length, in beats of the synth's own tempo.
+fn length_beats(length: NoteLength) -> f64 {
+    match length {
+        NoteLength::Whole => 4.0,
+        NoteLength::Half => 2.0,
+        NoteLength::Quarter => 1.0,
+        NoteLength::Eighth => 0.5,
+        NoteLength::Sixteenth => 0.25,
+    }
+}
+
+/// Maps the pixel's brightness level (0–127) to a duration among the
+/// enabled note lengths: the level range is split into as many equal
+/// bands as enabled lengths. By default the darkest band gets the
+/// shortest length and the brightest the longest; `note_length_reversed`
+/// flips the direction.
+fn pick_note_length(synth: &Synth, brightness_level: u8) -> f64 {
+    let mut lengths: Vec<f64> = synth
+        .note_lengths
+        .iter()
+        .map(|&l| length_beats(l))
+        .collect();
+    if synth.note_length_reversed {
+        lengths.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    } else {
+        lengths.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    }
+    let n = lengths.len();
+    let idx = (brightness_level as usize * n / 128).min(n - 1);
+    lengths[idx]
 }
 
 pub struct MetronomeState {
@@ -382,11 +441,16 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
     thread::spawn(move || {
         let mut beat_index: u64 = 0;
+        let mut sub_beat: u32 = 0; // 0..3: each beat is split into 4 wakes,
+                                   // to give eighth/sixteenth note lengths
+                                   // enough time resolution
         while running.load(Ordering::Relaxed) {
             let current_bpm = bpm.load(Ordering::Relaxed).max(1);
-            let interval_ms = 60_000u64 / current_bpm as u64;
+            let beat_ms = 60_000u64 / current_bpm as u64;
 
-            let _ = app.emit("metronome-tick", beat_index);
+            if sub_beat == 0 {
+                let _ = app.emit("metronome-tick", beat_index);
+            }
 
             // --- Advancing active synths over the image ---
             let image_state = app.state::<ImageState>();
@@ -402,22 +466,33 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                         continue;
                     }
 
-                    // Tempo desynchronization: each metronome tick adds the
-                    // synth's tempo ratio to its accumulator; the synth only
-                    // advances when at least one full step has accumulated
-                    // (e.g. ratio 0.5 = one pixel every two ticks).
-                    synth.tempo_accumulator += synth.tempo_ratio;
+                    // Tempo desynchronization: each quarter-beat wake adds a
+                    // quarter of the synth's tempo ratio to its accumulator;
+                    // the synth advances when at least one full step has
+                    // accumulated (e.g. ratio 0.5 = one pixel every two beats).
+                    synth.tempo_accumulator += synth.tempo_ratio * 0.25;
                     if synth.tempo_accumulator < 1.0 {
                         continue;
                     }
                     synth.tempo_accumulator -= 1.0;
 
-                    step_synth_once(&app, synth, image, conn_guard.as_mut());
+                    let played_length = step_synth_once(&app, synth, image, conn_guard.as_mut());
+                    if let Some(length_beats) = played_length {
+                        // Note lengths enabled: the played pixel occupies
+                        // exactly its note's duration. Rewind the accumulator
+                        // so the next pixel is due after `length_beats` beats
+                        // of the synth's own tempo (i.e. length_beats / ratio
+                        // metronome beats).
+                        synth.tempo_accumulator = 1.0 - length_beats;
+                    }
                 }
             }
 
-            beat_index += 1;
-            thread::sleep(Duration::from_millis(interval_ms));
+            sub_beat = (sub_beat + 1) % 4;
+            if sub_beat == 0 {
+                beat_index += 1;
+            }
+            thread::sleep(Duration::from_millis(beat_ms / 4));
         }
     });
 }
@@ -435,8 +510,9 @@ pub fn is_metronome_running(state: tauri::State<MetronomeState>) -> bool {
 /// Manually advances a synth's playhead by one pixel in its zone sequence,
 /// playing the resulting pixel like a metronome tick would. Only usable
 /// while the synth is paused. The notes played by a manual step have a
-/// fixed duration, equal to the synth's own step period (metronome
-/// interval divided by its tempo ratio), after which a Note Off is sent.
+/// fixed duration — the pixel's note length when note lengths are enabled,
+/// otherwise the synth's own step period (metronome interval divided by
+/// its tempo ratio) — after which a Note Off is sent.
 #[tauri::command]
 pub fn step_synth(
     app: AppHandle,
@@ -449,7 +525,7 @@ pub fn step_synth(
     let bpm = metronome_state.bpm.load(Ordering::Relaxed).max(1) as u64;
     let interval_ms = 60_000u64 / bpm;
 
-    let (channel, scheduled, step_duration) = {
+    let (channel, scheduled, generation, step_duration) = {
         let image_guard = image_state.processed.lock().unwrap();
         let image = match image_guard.as_ref() {
             Some(img) => img,
@@ -467,12 +543,15 @@ pub fn step_synth(
         }
 
         let mut conn_guard = midi_state.connection.lock().unwrap();
-        step_synth_once(&app, synth, image, conn_guard.as_mut());
+        let played_length = step_synth_once(&app, synth, image, conn_guard.as_mut());
 
-        // Duration of one synth step: the metronome period scaled by the
-        // synth's tempo ratio (e.g. ratio 0.5 = twice the metronome period)
+        // Duration of the notes just played: the pixel's note length when
+        // note lengths are enabled, otherwise the synth's regular step
+        // period. Both are scaled by the tempo ratio (e.g. ratio 0.5 =
+        // twice the metronome period).
         let ratio = if synth.tempo_ratio > 0.0 { synth.tempo_ratio } else { 1.0 };
-        let step_duration = ((interval_ms as f64) / ratio).round().max(1.0) as u64;
+        let beats = played_length.unwrap_or(1.0);
+        let step_duration = ((interval_ms as f64) * beats / ratio).round().max(1.0) as u64;
 
         // Capture the notes that are now sounding, to schedule their Note Off
         let mut scheduled = Vec::new();
@@ -484,7 +563,7 @@ pub fn step_synth(
                 scheduled.push(voice.note);
             }
         }
-        (synth.channel, scheduled, step_duration)
+        (synth.channel, scheduled, synth.note_generation, step_duration)
     };
 
     if scheduled.is_empty() {
@@ -496,8 +575,9 @@ pub fn step_synth(
         thread::sleep(Duration::from_millis(step_duration));
 
         // Turn the captured notes off only if the synth is still paused and
-        // still sounding those same notes: a newer manual step, a stop, or
-        // the metronome taking over in the meantime cancels the cutoff.
+        // still sounding those same articulation: a newer manual step (a
+        // different note generation), a stop, or the metronome taking over
+        // in the meantime cancels the cutoff.
         let synth_state = app.state::<SynthState>();
         let midi_state = app.state::<MidiState>();
 
@@ -506,7 +586,7 @@ pub fn step_synth(
             Some(s) => s,
             None => return,
         };
-        if synth.playing || synth.channel != channel {
+        if synth.playing || synth.channel != channel || synth.note_generation != generation {
             return;
         }
 

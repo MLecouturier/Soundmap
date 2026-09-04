@@ -22,6 +22,18 @@ pub struct PixelZone {
     pub h: u32,
 }
 
+/// Musical note length a pixel can be played as, in the synth's own beats:
+/// Whole = 4 beats, Half = 2, Quarter = 1, Eighth = 0.5, Sixteenth = 0.25.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum NoteLength {
+    Whole,
+    Half,
+    Quarter,
+    Eighth,
+    Sixteenth,
+}
+
 /// State of an individual voice in polyphonic mode (one per R/G/B channel).
 #[derive(Clone, Copy, Debug)]
 pub struct ChannelVoice {
@@ -84,6 +96,12 @@ pub struct Synth {
     pub hue_shift: u16,             // hue shift in degrees (0–360), monophonic mode
     pub channel_enabled: [bool; 3], // R, G, B enabled/disabled, polyphonic mode
     pub poly_voices: [ChannelVoice; 3], // independent MIDI state per R, G, B channel
+
+    // --- Brightness-driven note lengths ---
+    pub note_lengths: Vec<NoteLength>, // enabled lengths; empty = all quarter notes
+    pub note_length_reversed: bool,    // flip the brightness→length mapping direction
+    pub note_generation: u32,          // bumped on each note articulation, so stale
+                                       // delayed Note Offs can cancel themselves
 }
 
 impl Synth {
@@ -112,6 +130,10 @@ impl Synth {
             hue_shift: 0,
             channel_enabled: [true, true, true],
             poly_voices: [ChannelVoice::new(), ChannelVoice::new(), ChannelVoice::new()],
+
+            note_lengths: vec![NoteLength::Quarter],
+            note_length_reversed: false,
+            note_generation: 0,
         }
     }
 }

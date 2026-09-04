@@ -1,7 +1,7 @@
 use tauri::State;
 use crate::error::{err, AppError};
 use crate::midi::send_note_off;
-use crate::state::{PixelZone, Synth, SynthMode, SynthState, MidiState};
+use crate::state::{NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
 // (unchanged, assumed to remain above or below in this file)
@@ -229,6 +229,38 @@ pub fn set_synth_mode(
             }
             synth.last_played_note = None;
             synth.mode = mode;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_note_lengths(
+    id: u32,
+    lengths: Vec<NoteLength>,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.note_lengths = lengths;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+#[tauri::command]
+pub fn set_synth_note_length_reversed(
+    id: u32,
+    reversed: bool,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.note_length_reversed = reversed;
             Ok(())
         }
         None => Err(synth_not_found(id)),

@@ -638,6 +638,43 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-full-options.hidden {
   display: none;
 }
+.synth-block .synth-body .note-lengths {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+.synth-block .synth-body .note-lengths label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.synth-block .synth-body .note-lengths label input[type=checkbox] {
+  accent-color: #3a7bd5;
+  cursor: pointer;
+}
+.synth-block .synth-body .note-lengths .synth-reverse-note-length {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.synth-block .synth-body .note-lengths .synth-reverse-note-length .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+.synth-block .synth-body .note-lengths .synth-reverse-note-length:hover {
+  color: #e0e0e0;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.synth-block .synth-body .note-lengths .synth-reverse-note-length.active {
+  color: #219a52;
+}
 .synth-block .synth-body .synth-mode-btn {
   flex-grow: 1;
   font-size: 0.78rem;
