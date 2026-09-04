@@ -6,7 +6,6 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use image::{DynamicImage, GenericImageView};
 
 use crate::error::{err, AppError};
-use crate::midi::{send_note_off, send_note_on};
 use crate::state::{ImageState, NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiState};
 
 /// Computes the perceived brightness of an RGBA pixel (Rec.601 formula), 0.0–255.0.
@@ -85,7 +84,7 @@ fn saturation_to_velocity(saturation: f32, velocity_min: u8) -> u8 {
 /// distinct note of a fixed duration, disabling the legato sustain).
 fn process_monophonic(
     synth: &mut Synth,
-    conn: Option<&mut midir::MidiOutputConnection>,
+    midi: &MidiState,
     r: u8, g: u8, b: u8,
     brightness_level: u8,
     velocity: u8,
@@ -123,11 +122,8 @@ fn process_monophonic(
     let needs_off = synth.note_is_on && (note_changed || !in_range);
     let needs_on  = in_range && (!synth.note_is_on || note_changed);
 
-    let mut conn = conn;
     if needs_off {
-        if let Some(c) = conn.as_mut() {
-            send_note_off(c, synth.channel, synth.note);
-        }
+        midi.note_off(synth.midi_port, synth.channel, synth.note);
         synth.note_is_on = false;
     }
 
@@ -138,9 +134,7 @@ fn process_monophonic(
     }
 
     if needs_on {
-        if let Some(c) = conn.as_mut() {
-            send_note_on(c, synth.channel, effective_note, velocity);
-        }
+        midi.note_on(synth.midi_port, synth.channel, effective_note, velocity);
         synth.note_is_on = true;
         synth.note_generation = synth.note_generation.wrapping_add(1);
     }
@@ -157,7 +151,7 @@ fn process_monophonic(
 /// note lengths are enabled, see process_monophonic).
 fn process_polyphonic(
     synth: &mut Synth,
-    conn: Option<&mut midir::MidiOutputConnection>,
+    midi: &MidiState,
     r: u8, g: u8, b: u8,
     brightness_level: u8,
     velocity: u8,
@@ -170,7 +164,6 @@ fn process_polyphonic(
         && brightness_level <= synth.brightness_max;
     let note_threshold = synth.note_threshold;
 
-    let mut conn = conn;
     let mut voices_payload = Vec::with_capacity(3);
 
     for i in 0..3 {
@@ -199,9 +192,7 @@ fn process_polyphonic(
         let needs_on  = in_range && (!voice.note_is_on || note_changed);
 
         if needs_off {
-            if let Some(c) = conn.as_mut() {
-                send_note_off(c, channel_midi, voice.note);
-            }
+            midi.note_off(synth.midi_port, channel_midi, voice.note);
             voice.note_is_on = false;
         }
 
@@ -211,9 +202,7 @@ fn process_polyphonic(
         }
 
         if needs_on {
-            if let Some(c) = conn.as_mut() {
-                send_note_on(c, channel_midi, effective_note, velocity);
-            }
+            midi.note_on(synth.midi_port, channel_midi, effective_note, velocity);
             voice.note_is_on = true;
             synth.note_generation = synth.note_generation.wrapping_add(1);
         }
@@ -270,7 +259,7 @@ fn step_synth_once(
     app: &AppHandle,
     synth: &mut Synth,
     image: &DynamicImage,
-    conn: Option<&mut midir::MidiOutputConnection>,
+    midi: &MidiState,
 ) -> Option<f64> {
     let width = image.width() as usize;
     let height = image.height() as usize;
@@ -285,8 +274,6 @@ fn step_synth_once(
         return None;
     }
 
-    let mut conn = conn;
-
     // Deferred end of a non-looping sequence: end_pending means the last
     // pixel was played on the previous tick and its note has now rung for
     // a full step period — stop the synth.
@@ -297,17 +284,13 @@ fn step_synth_once(
         synth.tempo_accumulator = 0.0;
         // Turn off the current mono note if it is still sounding
         if synth.note_is_on {
-            if let Some(c) = conn.as_deref_mut() {
-                send_note_off(c, synth.channel, synth.note);
-            }
+            midi.note_off(synth.midi_port, synth.channel, synth.note);
             synth.note_is_on = false;
         }
         // Turn off any currently sounding polyphonic voices
         for voice in synth.poly_voices.iter_mut() {
             if voice.note_is_on {
-                if let Some(c) = conn.as_deref_mut() {
-                    send_note_off(c, synth.channel, voice.note);
-                }
+                midi.note_off(synth.midi_port, synth.channel, voice.note);
                 voice.note_is_on = false;
             }
             voice.last_played_note = None;
@@ -356,13 +339,13 @@ fn step_synth_once(
     match synth.mode {
         SynthMode::Monophonic => {
             process_monophonic(
-                synth, conn.as_deref_mut(), r, g, b,
+                synth, midi, r, g, b,
                 brightness_level, velocity, &mut payload, retrigger,
             );
         }
         SynthMode::Polyphonic => {
             process_polyphonic(
-                synth, conn.as_deref_mut(), r, g, b,
+                synth, midi, r, g, b,
                 brightness_level, velocity, &mut payload, retrigger,
             );
         }
@@ -509,7 +492,6 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
             if let Some(image) = image_state.processed.lock().unwrap().as_ref() {
                 let mut synths = synth_state.synths.lock().unwrap();
-                let mut conn_guard = midi_state.connection.lock().unwrap();
 
                 for synth in synths.values_mut() {
                     if !synth.playing {
@@ -526,7 +508,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                     }
                     synth.tempo_accumulator -= 1.0;
 
-                    let played_length = step_synth_once(&app, synth, image, conn_guard.as_mut());
+                    let played_length = step_synth_once(&app, synth, image, &midi_state);
                     if let Some(length_beats) = played_length {
                         // Note lengths enabled: the played pixel occupies
                         // exactly its note's duration. Rewind the accumulator
@@ -575,7 +557,7 @@ pub fn step_synth(
     let bpm = metronome_state.bpm.load(Ordering::Relaxed).max(1) as u64;
     let interval_ms = 60_000u64 / bpm;
 
-    let (channel, scheduled, generation, step_duration) = {
+    let (port, channel, scheduled, generation, step_duration) = {
         let image_guard = image_state.processed.lock().unwrap();
         let image = match image_guard.as_ref() {
             Some(img) => img,
@@ -592,8 +574,7 @@ pub fn step_synth(
             return Err(err("synth_is_playing").with_param("id", id));
         }
 
-        let mut conn_guard = midi_state.connection.lock().unwrap();
-        let played_length = step_synth_once(&app, synth, image, conn_guard.as_mut());
+        let played_length = step_synth_once(&app, synth, image, &midi_state);
 
         // Duration of the notes just played: the pixel's note length when
         // note lengths are enabled, otherwise the synth's regular step
@@ -613,7 +594,7 @@ pub fn step_synth(
                 scheduled.push(voice.note);
             }
         }
-        (synth.channel, scheduled, synth.note_generation, step_duration)
+        (synth.midi_port, synth.channel, scheduled, synth.note_generation, step_duration)
     };
 
     if scheduled.is_empty() {
@@ -640,19 +621,15 @@ pub fn step_synth(
             return;
         }
 
-        let mut conn_guard = midi_state.connection.lock().unwrap();
-        let conn = match conn_guard.as_mut() {
-            Some(c) => c,
-            None => return,
-        };
-
+        // The notes were sent on the captured port: even if the synth has
+        // since changed ports, turn them off where they are sounding.
         if synth.note_is_on && scheduled.contains(&synth.note) {
-            send_note_off(conn, synth.channel, synth.note);
+            midi_state.note_off(port, channel, synth.note);
             synth.note_is_on = false;
         }
         for voice in synth.poly_voices.iter_mut() {
             if voice.note_is_on && scheduled.contains(&voice.note) {
-                send_note_off(conn, synth.channel, voice.note);
+                midi_state.note_off(port, channel, voice.note);
                 voice.note_is_on = false;
             }
         }

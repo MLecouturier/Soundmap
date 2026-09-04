@@ -48,6 +48,8 @@
     "toggleHighlight": "Afficher/masquer le surlignage des zones",
     "channelLabel": "Canal MIDI",
     "channelOption": "Canal {number}",
+    "midiPort": "Port de sortie MIDI",
+    "noMidiPort": "Aucun port MIDI",
     "modeLabel": "Mode",
     "modeMonophonic": "Monophonique",
     "modePolyphonic": "Polyphonique",

@@ -74,6 +74,7 @@ pub struct Synth {
     pub cursor: usize,      // index into the zone pixel sequence (0..sequence length)
     pub note: u8,           // fixed MIDI note for now: A4 = 69
     pub channel: u8,        // MIDI channel 0-15
+    pub midi_port: usize,   // MIDI output port index (see list_midi_ports)
     pub zones: Vec<PixelZone>, // rectangular zones to play (empty = whole image)
     pub loop_enabled: bool,   // loop playback or stop at end of range
     pub end_pending: bool,    // end of a non-looping sequence reached: stop on the next tick
@@ -117,6 +118,7 @@ impl Synth {
             cursor: 0,
             note: 69, // A4
             channel: 0,
+            midi_port: 0,
             zones: Vec::new(),    // empty = whole image
             loop_enabled: true,   // loop enabled by default
             end_pending: false,
@@ -161,16 +163,17 @@ impl Default for SynthState {
     }
 }
 
-/// Single MIDI connection, shared by all synths for now.
-/// Each synth may later be able to choose its own port.
+/// Open MIDI output connections, one per output port index. The first
+/// available port is opened automatically at startup; the other ports are
+/// opened lazily, on first use by a synthesizer.
 pub struct MidiState {
-    pub connection: Mutex<Option<MidiOutputConnection>>,
+    pub connections: Mutex<HashMap<usize, MidiOutputConnection>>,
 }
 
 impl Default for MidiState {
     fn default() -> Self {
         Self {
-            connection: Mutex::new(None),
+            connections: Mutex::new(HashMap::new()),
         }
     }
 }

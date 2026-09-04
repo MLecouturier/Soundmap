@@ -1,6 +1,5 @@
 use tauri::State;
 use crate::error::{err, AppError};
-use crate::midi::send_note_off;
 use crate::state::{NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
@@ -70,22 +69,17 @@ pub fn stop_synth(
             synth.last_played_note = None;
             synth.end_pending = false;
             synth.tempo_accumulator = 0.0;
-            let mut conn_guard = midi_state.connection.lock().unwrap();
 
             // Immediately turn off the current mono note, if it is still sounding
             if synth.note_is_on {
-                if let Some(conn) = conn_guard.as_mut() {
-                    send_note_off(conn, synth.channel, synth.note);
-                }
+                midi_state.note_off(synth.midi_port, synth.channel, synth.note);
                 synth.note_is_on = false;
             }
 
             // Turn off any currently sounding polyphonic voices
             for voice in synth.poly_voices.iter_mut() {
                 if voice.note_is_on {
-                    if let Some(conn) = conn_guard.as_mut() {
-                        send_note_off(conn, synth.channel, voice.note);
-                    }
+                    midi_state.note_off(synth.midi_port, synth.channel, voice.note);
                     voice.note_is_on = false;
                 }
                 voice.last_played_note = None;
@@ -114,6 +108,39 @@ pub fn set_synth_channel(id: u32, channel: u8, state: State<SynthState>) -> Resu
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.channel = clamped;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+/// Sets the MIDI output port a synthesizer sends its notes to (see
+/// `list_midi_ports`). The connection is opened lazily on first use.
+#[tauri::command]
+pub fn set_synth_midi_port(
+    id: u32,
+    port: usize,
+    state: State<SynthState>,
+    midi_state: State<MidiState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            if synth.midi_port != port {
+                // Turn off any sounding note on the old port first, to
+                // avoid a stuck note on the device it is connected to.
+                if synth.note_is_on {
+                    midi_state.note_off(synth.midi_port, synth.channel, synth.note);
+                    synth.note_is_on = false;
+                }
+                for voice in synth.poly_voices.iter_mut() {
+                    if voice.note_is_on {
+                        midi_state.note_off(synth.midi_port, synth.channel, voice.note);
+                        voice.note_is_on = false;
+                    }
+                }
+                synth.midi_port = port;
+            }
             Ok(())
         }
         None => Err(synth_not_found(id)),
@@ -211,18 +238,13 @@ pub fn set_synth_mode(
             }
             // Turn off all currently sounding notes before switching modes,
             // to avoid stuck notes when toggling.
-            let mut conn_guard = midi_state.connection.lock().unwrap();
             if synth.note_is_on {
-                if let Some(conn) = conn_guard.as_mut() {
-                    send_note_off(conn, synth.channel, synth.note);
-                }
+                midi_state.note_off(synth.midi_port, synth.channel, synth.note);
                 synth.note_is_on = false;
             }
             for voice in synth.poly_voices.iter_mut() {
                 if voice.note_is_on {
-                    if let Some(conn) = conn_guard.as_mut() {
-                        send_note_off(conn, synth.channel, voice.note);
-                    }
+                    midi_state.note_off(synth.midi_port, synth.channel, voice.note);
                     voice.note_is_on = false;
                 }
                 voice.last_played_note = None;
@@ -319,9 +341,7 @@ pub fn set_synth_channel_enabled(
             if !enabled {
                 let voice = &mut synth.poly_voices[channel_index];
                 if voice.note_is_on {
-                    if let Some(conn) = midi_state.connection.lock().unwrap().as_mut() {
-                        send_note_off(conn, synth.channel, voice.note);
-                    }
+                    midi_state.note_off(synth.midi_port, synth.channel, voice.note);
                     voice.note_is_on = false;
                 }
                 voice.last_played_note = None;

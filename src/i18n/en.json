@@ -48,6 +48,8 @@
     "toggleHighlight": "Show/hide the zone highlight",
     "channelLabel": "MIDI channel",
     "channelOption": "Channel {number}",
+    "midiPort": "MIDI output port",
+    "noMidiPort": "No MIDI port",
     "modeLabel": "Mode",
     "modeMonophonic": "Monophonic",
     "modePolyphonic": "Polyphonic",

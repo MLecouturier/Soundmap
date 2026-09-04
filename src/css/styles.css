@@ -427,6 +427,10 @@ input[type=range].synth-range-input::-moz-range-track {
   padding: 10px 10px 10px 0.875rem;
   overflow: visible;
 }
+.synth-block select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .synth-block .synth-color-band {
   position: absolute;
   left: -0.5rem;
@@ -474,12 +478,17 @@ input[type=range].synth-range-input::-moz-range-track {
 }
 .synth-block .synth-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
   color: #ccc;
+}
+.synth-block .synth-header .synth-header-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
 }
 .synth-block .synth-header .synth-remove {
   background: none;
@@ -952,6 +961,4 @@ input[type=range].synth-range-input::-moz-range-track {
 ::-webkit-scrollbar-thumb {
   background-color: #444;
   border-radius: 0.25rem;
-}
-
-/*# sourceMappingURL=styles.css.map */
+}/*# sourceMappingURL=styles.css.map */

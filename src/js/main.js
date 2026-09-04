@@ -838,10 +838,17 @@ function createSynthElement(id) {
             <div class="color-swatches">${colorSwatches}</div>
         </div>
         <div class="synth-header">
-            <span class="synth-title-label"></span>
-            <select class="synth-channel">${channelOptions}</select>
-            <div class="flex-filler"></div>
-            <button class="synth-remove" data-i18n-title="synth.remove"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+            <div class="synth-header-row">
+                <span class="synth-title-label"></span>
+                <div class="flex-filler"></div>
+                <button class="synth-remove" data-i18n-title="synth.remove">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+            </div>
+            <div class="synth-header-row">
+                <select class="synth-midi-port" data-i18n-title="synth.midiPort"></select>
+                <select class="synth-channel">${channelOptions}</select>
+            </div>
         </div>
         <div class="synth-body">
             <div class="synth-zones-row">
@@ -1026,6 +1033,19 @@ function createSynthElement(id) {
     el.querySelector('.synth-channel').addEventListener('change', (e) => {
         invoke('set_synth_channel', { id, channel: Number(e.target.value) })
             .catch(err => console.error('Error in set_synth_channel:', err));
+    });
+
+    // MIDI output port: one connection per port is opened lazily by the
+    // backend, so several synths can drive different MIDI interfaces.
+    const midiPortSelect = el.querySelector('.synth-midi-port');
+    invoke('list_midi_ports').then(ports => {
+        midiPortSelect.innerHTML = ports.length > 0
+            ? ports.map(p => `<option value="${p.index}">${p.name}</option>`).join('')
+            : `<option value="0">${t('synth.noMidiPort')}</option>`;
+    }).catch(err => console.error('Error in list_midi_ports:', err));
+    midiPortSelect.addEventListener('change', (e) => {
+        invoke('set_synth_midi_port', { id, port: Number(e.target.value) })
+            .catch(err => console.error('Error in set_synth_midi_port:', err));
     });
 
     // Tempo relative to the main metronome (e.g. 0.5 = one pixel every two ticks)
@@ -1287,6 +1307,7 @@ function syncPlayAllButton() {
 // remains editable on the fly while the synth is playing.
 function setSynthControlsLocked(el, locked) {
     el.querySelector('.synth-channel').disabled = locked;
+    el.querySelector('.synth-midi-port').disabled = locked;
     el.querySelectorAll('.synth-mode-btn').forEach(btn => { btn.disabled = locked; });
     el.querySelector('.synth-add-zone-btn').disabled = locked;
     el.querySelector('.synth-clear-zones-btn').disabled = locked;
