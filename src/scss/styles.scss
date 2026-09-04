@@ -593,7 +593,8 @@ $metronome-led-transition: 0.05s ease;
             outline: none;
         }
 
-        .synth-remove {
+        .synth-remove,
+        .synth-save-template {
             background: none;
             border: none;
             color: $color-text-muted;
@@ -605,6 +606,8 @@ $metronome-led-transition: 0.05s ease;
 
             &:hover { color: $color-text-primary; }
         }
+
+        .synth-save-template.active { color: $color-accent-alt; }
     }
 
     .synth-body {
@@ -1092,6 +1095,32 @@ $metronome-led-transition: 0.05s ease;
         margin-bottom: .5rem;
         font-size: 1rem;
         color: $color-text-secondary;
+    }
+}
+
+// Global configuration controls (footer)
+.config-controls {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+
+    #open-config-btn {
+        display: flex;
+        align-items: center;
+        padding: .25rem;
+        border: none;
+        border-radius: $border-radius-base;
+        background: none;
+        color: $color-text-muted;
+        cursor: pointer;
+        transition: color $transition-fast, background-color $transition-fast;
+
+        .material-symbols-outlined { font-size: 1.2rem; }
+
+        &:hover {
+            color: $color-text-primary;
+            background-color: rgba(255, 255, 255, 0.06);
+        }
     }
 }
 

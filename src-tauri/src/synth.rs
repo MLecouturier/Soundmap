@@ -1,4 +1,5 @@
 use tauri::State;
+use crate::config::ConfigState;
 use crate::error::{err, AppError};
 use crate::state::{NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, MidiState};
 
@@ -29,16 +30,25 @@ pub fn set_synth_name(
     }
 }
 
+/// Creates a synthesizer from the default-synth template of the global
+/// configuration, and returns its full initial state so the frontend can
+/// reflect it.
 #[tauri::command]
-pub fn add_synth(state: State<SynthState>) -> Result<u32, AppError> {
+pub fn add_synth(
+    config_state: State<ConfigState>,
+    state: State<SynthState>,
+) -> Result<Synth, AppError> {
+    let template = config_state.config.lock().unwrap().default_synth.clone();
+
     let mut next_id = state.next_id.lock().unwrap();
     let id = *next_id;
     *next_id += 1;
+    drop(next_id);
 
-    let synth = Synth::new(id);
-    state.synths.lock().unwrap().insert(id, synth);
+    let synth = template.to_synth(id);
+    state.synths.lock().unwrap().insert(id, synth.clone());
 
-    Ok(id)
+    Ok(synth)
 }
 
 #[tauri::command]

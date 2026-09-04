@@ -35,10 +35,14 @@
     "commonControlsTitle": "Software parameters",
     "commonControlsText": "Global settings applied to all synthesizers."
   },
+  "config": {
+    "openFile": "Open the configuration file in a text editor (changes apply on restart)"
+  },
   "synth": {
     "title": "Synth #{id}",
     "renameHint": "Double-click to rename",
     "remove": "Remove",
+    "saveAsTemplate": "Use this synth as the default template",
     "pickColor": "Choose a color",
     "play": "Play",
     "stop": "Stop",
@@ -101,6 +105,8 @@
     "png_encoding_error": "PNG encoding error: {details}",
     "add_synth_failed": "Error while adding the synthesizer.",
     "load_image_failed": "Error while loading the image.",
-    "processing_failed": "Error while processing."
+    "processing_failed": "Error while processing.",
+    "config_unavailable": "Unable to determine the configuration file location.",
+    "open_config_failed": "Unable to open the configuration file: {details}"
   }
 }

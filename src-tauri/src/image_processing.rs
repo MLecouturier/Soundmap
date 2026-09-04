@@ -1,3 +1,4 @@
+use crate::config::ConfigState;
 use crate::error::{err, AppError};
 use crate::state::ImageState;
 use base64::{engine::general_purpose, Engine as _};
@@ -56,6 +57,7 @@ fn encode_to_base64_png(img: &DynamicImage) -> Result<String, AppError> {
 pub async fn load_image(
     app_handle: tauri::AppHandle,
     state: State<'_, ImageState>,
+    config_state: State<'_, ConfigState>,
 ) -> Result<LoadedImageInfo, AppError> {
     use tauri_plugin_dialog::DialogExt;
 
@@ -71,8 +73,17 @@ pub async fn load_image(
         .as_path()
         .ok_or_else(|| err("invalid_file_path"))?;
 
-    let img = image::open(path_buf)
+    let mut img = image::open(path_buf)
         .map_err(|e| err("image_load_error").with_param("details", e))?;
+
+    // Downscale oversized originals so the app stays responsive
+    let max_size = config_state.config.lock().unwrap().max_image_size;
+    if max_size > 0 {
+        let (w, h) = img.dimensions();
+        if w.max(h) > max_size {
+            img = img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3);
+        }
+    }
 
     let (width, height) = img.dimensions();
     let base64_png = encode_to_base64_png(&img)?;

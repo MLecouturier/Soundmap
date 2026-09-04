@@ -35,10 +35,14 @@
     "commonControlsTitle": "Paramètres de l'application",
     "commonControlsText": "Paramètres globaux appliqués à tous les synthétiseurs."
   },
+  "config": {
+    "openFile": "Ouvrir le fichier de configuration dans un éditeur de texte (les modifications s'appliquent au redémarrage)"
+  },
   "synth": {
     "title": "Synthé #{id}",
     "renameHint": "Double-cliquez pour renommer",
     "remove": "Supprimer",
+    "saveAsTemplate": "Utiliser ce synthé comme modèle par défaut",
     "pickColor": "Choisir une couleur",
     "play": "Play",
     "stop": "Stop",
@@ -101,6 +105,8 @@
     "png_encoding_error": "Erreur d'encodage PNG : {details}",
     "add_synth_failed": "Erreur lors de l'ajout du synthétiseur.",
     "load_image_failed": "Erreur lors du chargement de l'image.",
-    "processing_failed": "Erreur lors du traitement."
+    "processing_failed": "Erreur lors du traitement.",
+    "config_unavailable": "Impossible de déterminer l'emplacement du fichier de configuration.",
+    "open_config_failed": "Impossible d'ouvrir le fichier de configuration : {details}"
   }
 }

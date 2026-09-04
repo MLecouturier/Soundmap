@@ -47,7 +47,7 @@ pub enum ReadingDirection {
 }
 
 /// State of an individual voice in polyphonic mode (one per R/G/B channel).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct ChannelVoice {
     pub note: u8,
     pub note_is_on: bool,
@@ -77,7 +77,7 @@ impl Default for ImageState {
 }
 
 /// State of an individual synthesizer.
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Synth {
     pub id: u32,
     pub name: Option<String>, // custom display name; None = default "Synth #id"

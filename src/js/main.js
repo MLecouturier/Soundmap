@@ -77,6 +77,19 @@ function retranslateSynthElement(el) {
     updateZonesLabel(Number(el.dataset.synthId));
 }
 
+// ---------- Global configuration ----------
+// The BPM input is initialized with the persisted default; the config
+// file itself is hand-edited via the gear button in the footer (edits
+// apply on the next application start).
+invoke('get_config').then(config => {
+    bpmInput.value = config.default_bpm;
+}).catch(err => console.error('Error in get_config:', err));
+
+document.querySelector('#open-config-btn').addEventListener('click', () => {
+    invoke('open_config_file')
+        .catch(err => console.error('Error in open_config_file:', err));
+});
+
 // Re-apply translations everywhere (static markup + dynamically created
 // synth cards) whenever the locale changes.
 window.addEventListener('locale-changed', () => {
@@ -835,7 +848,63 @@ const playAllBtn    = document.querySelector('#play-all-btn');
 const synthListBody = document.querySelector('.synth-list-body');
 const placeholder   = synthListBody.querySelector('.placeholder-text');
 
-function createSynthElement(id) {
+// Reflects a newly created synth's backend state (built from the
+// default-synth template) into its UI. No backend calls needed: the state
+// is already applied server-side.
+function applySynthConfig(el, cfg) {
+    // Tempo
+    el.querySelector('.synth-tempo').value = String(cfg.tempo_ratio);
+    // MIDI channel
+    el.querySelector('.synth-channel').value = String(cfg.channel);
+    // Mode (monophonic / polyphonic)
+    const mode = cfg.mode === 'polyphonic' ? 'polyphonic' : 'monophonic';
+    el.querySelectorAll('.synth-mode-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    el.querySelector('.synth-mode-panel-mono').classList.toggle('hidden', mode !== 'monophonic');
+    el.querySelector('.synth-mode-panel-poly').classList.toggle('hidden', mode !== 'polyphonic');
+    // Loop / back-and-forth (mutually exclusive)
+    el.querySelector('.synth-loop-btn').classList.toggle('active', !!cfg.loop_enabled && !cfg.back_and_forth);
+    el.querySelector('.synth-back-n-forth-btn').classList.toggle('active', !!cfg.back_and_forth);
+    // Reading direction
+    const dirBtn = el.querySelector('.synth-reading-direction-btn');
+    dirBtn.dataset.direction = cfg.reading_direction || 'leftToRight';
+    updateReadingDirectionBtn(dirBtn);
+    // Brightness threshold
+    el.querySelector('.brightness-start').value = cfg.brightness_min;
+    el.querySelector('.brightness-end').value = cfg.brightness_max;
+    el.querySelector('.brightness-start-val').textContent = cfg.brightness_min;
+    el.querySelector('.brightness-end-val').textContent = cfg.brightness_max;
+    // Minimum velocity
+    el.querySelector('.synth-velocity-min').value = cfg.velocity_min;
+    el.querySelector('.velocity-min-val').textContent = cfg.velocity_min;
+    // Hue shift (monophonic panel)
+    el.querySelector('.synth-hue-shift').value = cfg.hue_shift;
+    el.querySelector('.hue-shift-val').textContent = `${cfg.hue_shift}°`;
+    // R/G/B channel toggles (polyphonic panel)
+    el.querySelectorAll('.synth-channel-toggle').forEach(btn => {
+        const i = Number(btn.dataset.channel);
+        btn.classList.toggle('active', !cfg.channel_enabled || !!cfg.channel_enabled[i]);
+    });
+    // Note lengths (guarantee at least one active)
+    const lengths = Array.isArray(cfg.note_lengths) && cfg.note_lengths.length > 0
+        ? cfg.note_lengths
+        : ['quarter'];
+    el.querySelectorAll('.note-length-btn').forEach(btn => {
+        btn.classList.toggle('active', lengths.includes(btn.dataset.length));
+    });
+    el.querySelector('.synth-reverse-note-length').classList.toggle('active', !!cfg.note_length_reversed);
+    // Note ranges (mono + one per voice)
+    const setRange = (group, toggles) => ['bass', 'medium', 'treble'].forEach((kind, i) => {
+        group.querySelector(`.synth-${kind}`).classList.toggle('active', !!(toggles && toggles[i]));
+    });
+    setRange(el.querySelector('.synth-mode-panel-mono .synth-note-range'), cfg.mono_note_range);
+    el.querySelectorAll('.synth-mode-panel-poly .synth-note-range').forEach((group, i) => {
+        setRange(group, cfg.voice_note_ranges && cfg.voice_note_ranges[i]);
+    });
+}
+
+function createSynthElement(id, cfg = null) {
     const el = document.createElement('div');
     el.className = 'synth-block';
     el.dataset.synthId = id;
@@ -861,6 +930,9 @@ function createSynthElement(id) {
             <div class="synth-header-row">
                 <span class="synth-title-label" data-i18n-title="synth.renameHint"></span>
                 <div class="flex-filler"></div>
+                <button class="synth-save-template" data-i18n-title="synth.saveAsTemplate">
+                    <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
+                </button>
                 <button class="synth-remove" data-i18n-title="synth.remove">
                     <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
@@ -1011,7 +1083,21 @@ function createSynthElement(id) {
 
     el.querySelector('.synth-pixel-info').textContent = t('synth.pixelInfoEmpty');
 
+    // Reflect the backend-driven initial state (default-synth template)
+    if (cfg) applySynthConfig(el, cfg);
+
     el.querySelector('.synth-play').addEventListener('click', () => onSynthPlayClick(id, el));
+
+    // ---- Save this synth's settings as the default template ----
+    const saveTemplateBtn = el.querySelector('.synth-save-template');
+    saveTemplateBtn.addEventListener('click', () => {
+        invoke('set_default_synth_from', { id })
+            .then(() => {
+                saveTemplateBtn.classList.add('active');
+                setTimeout(() => saveTemplateBtn.classList.remove('active'), 800);
+            })
+            .catch(err => console.error('Error in set_default_synth_from:', err));
+    });
 
     // ---- Custom name: double-click the title to rename it ----
     const titleLabel = el.querySelector('.synth-title-label');
@@ -1108,6 +1194,15 @@ function createSynthElement(id) {
         midiPortSelect.innerHTML = ports.length > 0
             ? ports.map(p => `<option value="${p.index}">${p.name}</option>`).join('')
             : `<option value="0">${t('synth.noMidiPort')}</option>`;
+        // Reflect the template's port; if it no longer exists (interface
+        // unplugged), fall back to port 0 on both sides.
+        if (cfg && ports.some(p => p.index === cfg.midi_port)) {
+            midiPortSelect.value = String(cfg.midi_port);
+        } else if (cfg && cfg.midi_port > 0) {
+            midiPortSelect.value = '0';
+            invoke('set_synth_midi_port', { id, port: 0 })
+                .catch(err => console.error('Error in set_synth_midi_port:', err));
+        }
     }).catch(err => console.error('Error in list_midi_ports:', err));
     midiPortSelect.addEventListener('change', (e) => {
         invoke('set_synth_midi_port', { id, port: Number(e.target.value) })
@@ -1471,9 +1566,9 @@ async function onSynthRemoveClick(id, el) {
 
 addSynthBtn.addEventListener('click', async () => {
     try {
-        const id = await invoke('add_synth');
+        const synth = await invoke('add_synth');
         placeholder.classList.add('hidden');
-        synthListBody.appendChild(createSynthElement(id));
+        synthListBody.appendChild(createSynthElement(synth.id, synth));
     } catch (err) {
         console.error('Error while adding the synthesizer:', err);
         alert(translateError(err)); // or a more discreet display like a toast/error message in the UI

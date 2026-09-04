@@ -1,3 +1,4 @@
+pub mod config;
 pub mod error;
 pub mod image_processing;
 pub mod metronome;
@@ -6,22 +7,43 @@ pub mod state;
 pub mod synth;
 
 use tauri::Manager;
+use config::ConfigState;
 use metronome::MetronomeState;
 use state::{ImageState, SynthState, MidiState};
 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(ImageState::default())
         .manage(MetronomeState::default())
         .manage(SynthState::default())
         .manage(MidiState::default())
+        .manage(ConfigState {
+            config: std::sync::Mutex::new(config::AppConfig::default()),
+        })
         .setup(|app| {
             let midi_state = app.state::<MidiState>();
             midi::auto_connect(&midi_state);
+
+            // Load the persisted configuration and apply it
+            let loaded = config::load_config(app.handle());
+            {
+                let config_state = app.state::<ConfigState>();
+                *config_state.config.lock().unwrap() = loaded.clone();
+            }
+            app.state::<MetronomeState>()
+                .bpm
+                .store(loaded.default_bpm, std::sync::atomic::Ordering::Relaxed);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            config::get_config,
+            config::open_config_file,
+            config::set_max_image_size,
+            config::set_default_bpm,
+            config::set_default_synth_from,
             image_processing::load_image,
             image_processing::apply_image_adjustments,
             image_processing::get_pixel_data,

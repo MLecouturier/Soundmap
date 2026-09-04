@@ -503,7 +503,8 @@ input[type=range].synth-range-input::-moz-range-track {
   width: 8rem;
   outline: none;
 }
-.synth-block .synth-header .synth-remove {
+.synth-block .synth-header .synth-remove,
+.synth-block .synth-header .synth-save-template {
   background: none;
   border: none;
   color: #888;
@@ -511,11 +512,16 @@ input[type=range].synth-range-input::-moz-range-track {
   display: flex;
   align-items: center;
 }
-.synth-block .synth-header .synth-remove .material-symbols-outlined {
+.synth-block .synth-header .synth-remove .material-symbols-outlined,
+.synth-block .synth-header .synth-save-template .material-symbols-outlined {
   font-size: 1.125rem;
 }
-.synth-block .synth-header .synth-remove:hover {
+.synth-block .synth-header .synth-remove:hover,
+.synth-block .synth-header .synth-save-template:hover {
   color: #e0e0e0;
+}
+.synth-block .synth-header .synth-save-template.active {
+  color: #219a52;
 }
 .synth-block .synth-body {
   display: flex;
@@ -951,6 +957,30 @@ input[type=range].synth-range-input::-moz-range-track {
   margin-bottom: 0.5rem;
   font-size: 1rem;
   color: #ccc;
+}
+
+.config-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.config-controls #open-config-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.config-controls #open-config-btn .material-symbols-outlined {
+  font-size: 1.2rem;
+}
+.config-controls #open-config-btn:hover {
+  color: #e0e0e0;
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 ::-webkit-scrollbar {
