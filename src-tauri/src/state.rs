@@ -34,12 +34,23 @@ pub enum NoteLength {
     Sixteenth,
 }
 
+/// Direction in which the playhead travels over the pixel sequence. The
+/// sequence is built accordingly: line by line for the horizontal
+/// directions, column by column for the vertical ones.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum ReadingDirection {
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+    BottomToTop,
+}
+
 /// State of an individual voice in polyphonic mode (one per R/G/B channel).
 #[derive(Clone, Copy, Debug)]
 pub struct ChannelVoice {
     pub note: u8,
     pub note_is_on: bool,
-    pub last_played_note: Option<u8>,
 }
 
 impl ChannelVoice {
@@ -47,7 +58,6 @@ impl ChannelVoice {
         Self {
             note: 0,
             note_is_on: false,
-            last_played_note: None,
         }
     }
 }
@@ -70,6 +80,7 @@ impl Default for ImageState {
 #[derive(Clone)]
 pub struct Synth {
     pub id: u32,
+    pub name: Option<String>, // custom display name; None = default "Synth #id"
     pub playing: bool,
     pub cursor: usize,      // index into the zone pixel sequence (0..sequence length)
     pub note: u8,           // fixed MIDI note for now: A4 = 69
@@ -77,6 +88,11 @@ pub struct Synth {
     pub midi_port: usize,   // MIDI output port index (see list_midi_ports)
     pub zones: Vec<PixelZone>, // rectangular zones to play (empty = whole image)
     pub loop_enabled: bool,   // loop playback or stop at end of range
+    pub back_and_forth: bool, // bounce back and forth between the sequence
+                              // bounds (mutually exclusive with the loop)
+    pub reading_direction: ReadingDirection, // order in which the sequence is built
+    pub play_forward: bool,   // current travel direction through the sequence
+                              // (flipped by the back-and-forth mode)
     pub end_pending: bool,    // end of a non-looping sequence reached: stop on the next tick
                               // (gives the final note a full step duration)
     pub tempo_ratio: f64,      // playback speed relative to the metronome (1.0 = metronome tempo)
@@ -85,8 +101,6 @@ pub struct Synth {
     pub brightness_min: u8,   // minimum brightness threshold (0–127)
     pub brightness_max: u8,   // maximum brightness threshold (0–127)
     pub active_note: bool,     // false if the current pixel is out of range (muted)
-    pub note_threshold: u8,    // minimum note gap required to trigger a change (0 = always)
-    pub last_played_note: Option<u8>, // last note actually played
     pub note_is_on: bool,      // true if a MIDI note is currently sounding (sustain)
     pub velocity: u8,          // current MIDI velocity, derived from the pixel's brightness (1–127)
     pub velocity_min: u8,      // floor of the velocity range (0–126): brightness is
@@ -114,6 +128,7 @@ impl Synth {
     pub fn new(id: u32) -> Self {
         Self {
             id,
+            name: None,
             playing: false,
             cursor: 0,
             note: 69, // A4
@@ -121,14 +136,15 @@ impl Synth {
             midi_port: 0,
             zones: Vec::new(),    // empty = whole image
             loop_enabled: true,   // loop enabled by default
+            back_and_forth: false,
+            reading_direction: ReadingDirection::LeftToRight,
+            play_forward: true,
             end_pending: false,
             tempo_ratio: 1.0,
             tempo_accumulator: 0.0,
             brightness_min: 0,
             brightness_max: 127,
             active_note: true,
-            note_threshold: 0,
-            last_played_note: None,
             note_is_on: false,
             velocity: 100,
             velocity_min: 0,

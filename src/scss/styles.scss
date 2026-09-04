@@ -574,8 +574,23 @@ $metronome-led-transition: 0.05s ease;
         .synth-header-row {
             display: flex;
             justify-content: flex-start;
-            align-items: center;     
-            gap: .5rem;   
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .synth-title-label {
+            &.hidden { display: none; }
+        }
+
+        .synth-title-input {
+            background-color: $color-bg-light;
+            color: $color-text-primary;
+            border: 1px solid $color-accent;
+            border-radius: $border-radius-base;
+            padding: 2px .375rem;
+            font-size: 0.9rem;
+            width: 8rem;
+            outline: none;
         }
 
         .synth-remove {
@@ -627,7 +642,6 @@ $metronome-led-transition: 0.05s ease;
         }
 
         .synth-play,
-        .synth-loop-btn,
         .synth-rewind,
         .synth-step-forward {
             display: flex;
@@ -642,7 +656,6 @@ $metronome-led-transition: 0.05s ease;
             .material-symbols-outlined { font-size: 1.125rem; }
         }
 
-        .synth-loop-btn,
         .synth-rewind,
         .synth-step-forward {
 
@@ -651,23 +664,6 @@ $metronome-led-transition: 0.05s ease;
             color: $color-text-muted;
 
             &:hover {
-                background-color: #555;
-                color: $color-text-secondary;
-            }
-        }
-
-        .synth-loop-btn {
-            .synth-loop-label {
-                display: none;
-            }
-
-            &.active {
-                background-color: #27ae60;
-                color: #fff;
-                &:hover { background-color: #219a52; }
-            }
-
-            &:not(.active):hover {
                 background-color: #555;
                 color: $color-text-secondary;
             }
@@ -748,20 +744,8 @@ $metronome-led-transition: 0.05s ease;
         .note-lengths {
             display: flex;
             align-items: center;
-            gap: .5rem;
+            gap: .25rem;
             padding: .25rem 0;
-
-            label {
-                display: flex;
-                align-items: center;
-                gap: .25rem;
-                cursor: pointer;
-
-                input[type="checkbox"] {
-                    accent-color: $color-accent;
-                    cursor: pointer;
-                }
-            }
 
             .synth-reverse-note-length {
                 display: flex;
@@ -782,6 +766,27 @@ $metronome-led-transition: 0.05s ease;
                 }
 
                 &.active { color: $color-accent-alt; }
+            }
+        }
+
+        // Shared look for the note-length and note-range glyph buttons
+        .note-lengths button,
+        .synth-note-range button {
+            padding: .125rem .375rem;
+            border: 1px solid $color-disactivated;
+            border-radius: $border-radius-base;
+            background: none;
+            color: $color-text-muted;
+            font-size: .9rem;
+            cursor: pointer;
+            transition: color $transition-fast, border-color $transition-fast, background-color $transition-fast;
+
+            &:hover { color: $color-text-primary; border-color: $color-text-muted; }
+
+            &.active {
+                background-color: $color-accent;
+                border-color: $color-accent;
+                color: #fff;
             }
         }
 
@@ -855,30 +860,12 @@ $metronome-led-transition: 0.05s ease;
             }
         }
 
-        // Bass / medium / treble range filter (mono panel + each poly voice)
+        // Bass / medium / treble range filter (mono panel + each poly voice).
+        // The button look is shared with the note-length buttons, above.
         .synth-note-range {
             display: flex;
             align-items: center;
             gap: .25rem;
-
-            button {
-                padding: .125rem .375rem;
-                border: 1px solid $color-disactivated;
-                border-radius: $border-radius-base;
-                background: none;
-                color: $color-text-muted;
-                font-size: .9rem;
-                cursor: pointer;
-                transition: color $transition-fast, border-color $transition-fast, background-color $transition-fast;
-
-                &:hover { color: $color-text-primary; border-color: $color-text-muted; }
-
-                &.active {
-                    background-color: $color-accent;
-                    border-color: $color-accent;
-                    color: #fff;
-                }
-            }
         }
 
         .synth-channel-toggle {
@@ -970,7 +957,10 @@ $metronome-led-transition: 0.05s ease;
         }
 
         .synth-add-zone-btn,
-        .synth-clear-zones-btn {
+        .synth-clear-zones-btn,
+        .synth-reading-direction-btn,
+        .synth-loop-btn,
+        .synth-back-n-forth-btn {
             flex: 0 0 auto;
             display: flex;
             align-items: center;

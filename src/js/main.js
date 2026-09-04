@@ -4,6 +4,14 @@ const { invoke } = window.__TAURI__.core;
 
 await initI18n();
 
+// Map id → custom name
+const synthNames = new Map();
+
+// Display name of a synth: its custom name, or the translated default
+function synthDisplayName(id) {
+    return synthNames.get(id) || t('synth.title', { id });
+}
+
 // ---------- Language switcher ----------
 function renderLanguageSwitcher() {
     const container = document.querySelector('#language-switcher');
@@ -42,27 +50,19 @@ function setPlayButtonState(btn, playing) {
 }
 
 // Re-translates an existing synth card: static parts via data-i18n*, plus
-// the few labels whose text depends on dynamic state (play/stop, mode,
-// threshold "off" state) that data-i18n alone can't express.
+// the few labels whose text depends on dynamic state (play/stop, mode)
+// that data-i18n alone can't express.
 function retranslateSynthElement(el) {
     applyTranslations(el);
 
     const id = Number(el.dataset.synthId);
-    el.querySelector('.synth-title-label').textContent = t('synth.title', { id });
+    el.querySelector('.synth-title-label').textContent = synthDisplayName(id);
 
     const playBtn = el.querySelector('.synth-play');
     setPlayButtonState(playBtn, playBtn.classList.contains('active'));
 
-    el.querySelector('.synth-loop-label').textContent = t('synth.loop');
-
     el.querySelector('.synth-mode-btn[data-mode="monophonic"]').textContent = t('synth.modeMonophonic');
     el.querySelector('.synth-mode-btn[data-mode="polyphonic"]').textContent = t('synth.modePolyphonic');
-
-    const thresholdInput = el.querySelector('.synth-threshold');
-    const thresholdVal = el.querySelector('.threshold-val');
-    thresholdVal.textContent = Number(thresholdInput.value) === 0
-        ? t('synth.noteThresholdOff')
-        : thresholdInput.value;
 
     // Pixel info: only reset to the empty placeholder if no tick has been
     // received yet (i.e. it still shows the untranslated empty state).
@@ -70,6 +70,9 @@ function retranslateSynthElement(el) {
     if (!pixelInfo.dataset.hasTick) {
         pixelInfo.textContent = t('synth.pixelInfoEmpty');
     }
+
+    const directionBtn = el.querySelector('.synth-reading-direction-btn');
+    if (directionBtn) updateReadingDirectionBtn(directionBtn);
 
     updateZonesLabel(Number(el.dataset.synthId));
 }
@@ -83,6 +86,21 @@ window.addEventListener('locale-changed', () => {
     if (lastDimensionsInfo) dimensionsInfo.textContent = t('controls.dimensionsInfo', lastDimensionsInfo);
     if (typeof syncPlayAllButton === 'function') syncPlayAllButton();
 });
+
+// Icon and localized title of each reading direction, applied to the
+// cycling button of a synth.
+const READING_DIRECTION_ICONS = {
+    leftToRight: 'arrow_forward',
+    rightToLeft: 'arrow_back',
+    topToBottom: 'arrow_downward',
+    bottomToTop: 'arrow_upward',
+};
+function updateReadingDirectionBtn(btn) {
+    const direction = btn.dataset.direction || 'leftToRight';
+    btn.querySelector('.material-symbols-outlined').textContent =
+        READING_DIRECTION_ICONS[direction];
+    btn.title = t(`synth.readingDirection.${direction}`);
+}
 
 // ---------- Elements ----------
 const loadBtn         = document.querySelector('#load-btn');
@@ -385,9 +403,11 @@ function sendSynthNoteRanges(id, el) {
     invoke('set_synth_note_ranges', { id, mono, voices })
         .catch(err => console.error('Error in set_synth_note_ranges:', err));
 }
+// Sends the enabled note lengths ("whole", "half", "quarter", "eighth",
+// "sixteenth"). The UI always keeps at least one button active.
 function sendSynthNoteLengths(id, el) {
-    const lengths = Array.from(el.querySelectorAll('.note-length-checkbox:checked'))
-        .map(box => box.dataset.length);
+    const lengths = Array.from(el.querySelectorAll('.note-length-btn.active'))
+        .map(btn => btn.dataset.length);
     invoke('set_synth_note_lengths', { id, lengths })
         .catch(err => console.error('Error in set_synth_note_lengths:', err));
 }
@@ -839,7 +859,7 @@ function createSynthElement(id) {
         </div>
         <div class="synth-header">
             <div class="synth-header-row">
-                <span class="synth-title-label"></span>
+                <span class="synth-title-label" data-i18n-title="synth.renameHint"></span>
                 <div class="flex-filler"></div>
                 <button class="synth-remove" data-i18n-title="synth.remove">
                     <span class="material-symbols-outlined" aria-hidden="true">close</span>
@@ -864,6 +884,15 @@ function createSynthElement(id) {
                 <button class="synth-clear-zones-btn" data-i18n-title="synth.clearZones">
                     <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
                 </button>
+                <button class="synth-reading-direction-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                </button>
+                <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
+                    <span class="material-symbols-outlined" aria-hidden="true">laps</span>
+                </button>
+                <button class="synth-back-n-forth-btn" data-i18n-title="synth.toggleBackAndForth">
+                    <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
+                </button>
             </div>
 
             <div class="synth-controls-row">
@@ -884,12 +913,8 @@ function createSynthElement(id) {
                 </button>
                 <button class="synth-step-forward" data-i18n-title="synth.stepForward">
                     <span class="material-symbols-outlined" aria-hidden="true">step</span>
-                </button>                
-                <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
-                    <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
-                    <span class="synth-loop-label"></span>
-                </button>                
-            </div>      
+                </button>
+            </div>
 
             <div class="synth-mode-row">
                     <button class="synth-mode-btn active" data-mode="monophonic"></button>
@@ -943,13 +968,13 @@ function createSynthElement(id) {
                 </div>
 
                 <div class="note-lengths">
-                    <label class="noto-music" data-i18n-title="synth.noteLengthSixteenth"><input type="checkbox" class="note-length-checkbox" data-length="sixteenth">𝅘𝅥𝅯</label>
-                    <label class="noto-music" data-i18n-title="synth.noteLengthEighth"><input type="checkbox" class="note-length-checkbox" data-length="eighth">𝅘𝅥𝅮</label>
-                    <label class="noto-music" data-i18n-title="synth.noteLengthQuarter"><input type="checkbox" class="note-length-checkbox" data-length="quarter" checked>𝅘𝅥</label>
-                    <label class="noto-music" data-i18n-title="synth.noteLengthHalf"><input type="checkbox" class="note-length-checkbox" data-length="half">𝅗𝅥</label>
-                    <label class="noto-music" data-i18n-title="synth.noteLengthWhole"><input type="checkbox" class="note-length-checkbox" data-length="whole">𝅗</label>
+                    <button class="note-length-btn noto-music" data-length="sixteenth" data-i18n-title="synth.noteLengthSixteenth">𝅘𝅥𝅯</button>
+                    <button class="note-length-btn noto-music" data-length="eighth" data-i18n-title="synth.noteLengthEighth">𝅘𝅥𝅮</button>
+                    <button class="note-length-btn noto-music active" data-length="quarter" data-i18n-title="synth.noteLengthQuarter">𝅘𝅥</button>
+                    <button class="note-length-btn noto-music" data-length="half" data-i18n-title="synth.noteLengthHalf">𝅗𝅥</button>
+                    <button class="note-length-btn noto-music" data-length="whole" data-i18n-title="synth.noteLengthWhole">𝅝</button>
                     <button class="synth-reverse-note-length" data-i18n-title="synth.reverseNoteLength">
-                        <span class="material-symbols-outlined" aria-hidden="true">music_history</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">reset_exposure</span>
                     </button>
                 </div>
                 
@@ -968,11 +993,6 @@ function createSynthElement(id) {
                 </div>
 
                 <label class="synth-slider-label">
-                    <span><span data-i18n="synth.noteThreshold"></span> <em class="threshold-val">0</em></span>
-                    <input type="range" class="slider synth-threshold" min="0" max="24" value="0" step="1" />
-                </label>
-
-                <label class="synth-slider-label">
                     <span><span data-i18n="synth.velocityMin"></span> <em class="velocity-min-val">0</em></span>
                     <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
                 </label>
@@ -984,15 +1004,61 @@ function createSynthElement(id) {
     // Translate everything marked with data-i18n* above, plus the elements
     // whose text depends on dynamic state (title, play button, pixel info).
     applyTranslations(el);
-    el.querySelector('.synth-title-label').textContent = t('synth.title', { id });
+    el.querySelector('.synth-title-label').textContent = synthDisplayName(id);
     setPlayButtonState(el.querySelector('.synth-play'), false);
-    el.querySelector('.synth-loop-label').textContent = t('synth.loop');
     el.querySelector('.synth-mode-btn[data-mode="monophonic"]').textContent = t('synth.modeMonophonic');
     el.querySelector('.synth-mode-btn[data-mode="polyphonic"]').textContent = t('synth.modePolyphonic');
-    el.querySelector('.threshold-val').textContent = t('synth.noteThresholdOff');
+
     el.querySelector('.synth-pixel-info').textContent = t('synth.pixelInfoEmpty');
 
     el.querySelector('.synth-play').addEventListener('click', () => onSynthPlayClick(id, el));
+
+    // ---- Custom name: double-click the title to rename it ----
+    const titleLabel = el.querySelector('.synth-title-label');
+    titleLabel.addEventListener('dblclick', () => {
+        if (el.querySelector('.synth-title-input')) return; // already editing
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'synth-title-input';
+        input.maxLength = 32;
+        input.value = synthNames.get(id) ?? '';
+
+        titleLabel.classList.add('hidden');
+        titleLabel.after(input);
+        input.focus();
+        input.select();
+
+        let closed = false;
+        const close = () => {
+            if (closed) return;
+            closed = true;
+            input.remove();
+            titleLabel.classList.remove('hidden');
+        };
+        const commit = () => {
+            if (closed) return;
+            const name = input.value.trim();
+            if (name) synthNames.set(id, name);
+            else synthNames.delete(id);
+            invoke('set_synth_name', { id, name: input.value })
+                .catch(err => console.error('Error in set_synth_name:', err));
+            titleLabel.textContent = synthDisplayName(id);
+            close();
+        };
+        const cancel = () => {
+            close();
+        };
+
+        input.addEventListener('keydown', (e) => {
+            // Enter commits, Escape cancels; stopPropagation prevents the
+            // global Escape handler (zone picking) from firing as well
+            e.stopPropagation();
+            if (e.key === 'Enter') commit();
+            else if (e.key === 'Escape') cancel();
+        });
+        input.addEventListener('blur', commit);
+    });
     el.querySelector('.synth-step-forward').addEventListener('click', () => {
         invoke('step_synth', { id })
             .catch(err => console.error('Error in step_synth:', err));
@@ -1055,13 +1121,37 @@ function createSynthElement(id) {
         updateZonesLabel(id);
     });
 
-    el.querySelector('.synth-loop-btn').addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        const loopEnabled = !btn.classList.contains('active');
-        btn.classList.toggle('active', loopEnabled);
+    // ---- Loop / back-and-forth (mutually exclusive) ----
+    const loopBtn = el.querySelector('.synth-loop-btn');
+    const backNForthBtn = el.querySelector('.synth-back-n-forth-btn');
+    loopBtn.addEventListener('click', () => {
+        const loopEnabled = !loopBtn.classList.contains('active');
+        loopBtn.classList.toggle('active', loopEnabled);
+        if (loopEnabled) backNForthBtn.classList.remove('active');
         invoke('set_synth_loop', { id, loopEnabled })
             .catch(err => console.error('Error in set_synth_loop:', err));
     });
+    backNForthBtn.addEventListener('click', () => {
+        const enabled = !backNForthBtn.classList.contains('active');
+        backNForthBtn.classList.toggle('active', enabled);
+        if (enabled) loopBtn.classList.remove('active');
+        invoke('set_synth_back_n_forth', { id, enabled })
+            .catch(err => console.error('Error in set_synth_back_n_forth:', err));
+    });
+
+    // ---- Reading direction: cycles left→right / right→left / top→bottom
+    // / bottom→top ----
+    const directionBtn = el.querySelector('.synth-reading-direction-btn');
+    directionBtn.addEventListener('click', () => {
+        const order = Object.keys(READING_DIRECTION_ICONS);
+        const current = order.indexOf(directionBtn.dataset.direction);
+        const direction = order[(current + 1) % order.length];
+        directionBtn.dataset.direction = direction;
+        updateReadingDirectionBtn(directionBtn);
+        invoke('set_synth_reading_direction', { id, direction })
+            .catch(err => console.error('Error in set_synth_reading_direction:', err));
+    });
+    updateReadingDirectionBtn(directionBtn);
 
     // ---- Collapse/expand the full options section ----
     const fullOptions = el.querySelector('.synth-full-options');
@@ -1113,14 +1203,15 @@ function createSynthElement(id) {
     });
 
     // ---- Note lengths: brightness → duration mapping ----
-    // At least one length must stay enabled: unchecking the last remaining
-    // box is reverted.
-    el.querySelectorAll('.note-length-checkbox').forEach(box => {
-        box.addEventListener('change', (e) => {
-            if (!el.querySelector('.note-length-checkbox:checked')) {
-                e.target.checked = true;
+    // At least one length must stay enabled: clicking the last remaining
+    // active button does nothing.
+    el.querySelectorAll('.note-length-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const wasActive = btn.classList.contains('active');
+            if (wasActive && el.querySelectorAll('.note-length-btn.active').length === 1) {
                 return;
             }
+            btn.classList.toggle('active');
             sendSynthNoteLengths(id, el);
         });
     });
@@ -1166,16 +1257,6 @@ function createSynthElement(id) {
         btn.classList.toggle('active', hi.visible);
         if (hi.visible) drawRangeHighlight(id);
         else            clearRangeHighlight(id);
-    });
-
-    // Note change threshold slider
-    const thresholdInput = el.querySelector('.synth-threshold');
-    const thresholdVal   = el.querySelector('.threshold-val');
-    thresholdInput.addEventListener('input', () => {
-        const threshold = Number(thresholdInput.value);
-        thresholdVal.textContent = threshold === 0 ? t('synth.noteThresholdOff') : threshold;
-        invoke('set_synth_threshold', { id, threshold })
-            .catch(err => console.error('Error in set_synth_threshold:', err));
     });
 
     // Minimum velocity slider: floor of the velocity range (brightness is
@@ -1303,7 +1384,7 @@ function syncPlayAllButton() {
 
 // Locks/unlocks the controls specific to a synth while it is playing
 // (MIDI channel, mono/poly mode, and the pixel range). Everything else
-// (hue shift, R/G/B toggles, thresholds, velocity, loop, highlight...)
+// (hue shift, R/G/B toggles, velocity, loop, highlight...)
 // remains editable on the fly while the synth is playing.
 function setSynthControlsLocked(el, locked) {
     el.querySelector('.synth-channel').disabled = locked;
@@ -1376,6 +1457,7 @@ async function onSynthRemoveClick(id, el) {
     synthColors.delete(id);
     synthCursors.delete(id);
     synthHighlights.delete(id);
+    synthNames.delete(id);
     el.remove();
     redrawAllHighlights();
 

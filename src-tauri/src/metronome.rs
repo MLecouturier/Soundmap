@@ -6,7 +6,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use image::{DynamicImage, GenericImageView};
 
 use crate::error::{err, AppError};
-use crate::state::{ImageState, NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiState};
+use crate::state::{
+    ImageState, NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, MidiState,
+};
 
 /// Computes the perceived brightness of an RGBA pixel (Rec.601 formula), 0.0–255.0.
 fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
@@ -95,22 +97,7 @@ fn process_monophonic(
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
     let raw_note = hue_to_midi_note(shifted_hue);
     // Fold the hue-derived note into the enabled MIDI range filters
-    let range_note = fold_note_into_range(raw_note, &synth.mono_note_range);
-
-    // Apply the note change threshold: if the gap with the last retained
-    // note is insufficient, keep that last note (the current note is
-    // therefore sustained, not retriggered).
-    let effective_note = if synth.note_threshold == 0 {
-        range_note
-    } else {
-        match synth.last_played_note {
-            None => range_note,
-            Some(last) => {
-                let diff = (range_note as i16 - last as i16).unsigned_abs() as u8;
-                if diff >= synth.note_threshold { range_note } else { last }
-            }
-        }
-    };
+    let effective_note = fold_note_into_range(raw_note, &synth.mono_note_range);
 
     let in_range = brightness_level >= synth.brightness_min
         && brightness_level <= synth.brightness_max;
@@ -129,9 +116,6 @@ fn process_monophonic(
 
     synth.note = effective_note;
     synth.active_note = in_range;
-    if in_range {
-        synth.last_played_note = Some(effective_note);
-    }
 
     if needs_on {
         midi.note_on(synth.midi_port, synth.channel, effective_note, velocity);
@@ -162,7 +146,6 @@ fn process_polyphonic(
     let channel_midi = synth.channel;
     let global_in_range = brightness_level >= synth.brightness_min
         && brightness_level <= synth.brightness_max;
-    let note_threshold = synth.note_threshold;
 
     let mut voices_payload = Vec::with_capacity(3);
 
@@ -170,20 +153,8 @@ fn process_polyphonic(
         let enabled = synth.channel_enabled[i];
         let raw_note = channel_to_midi_note(channel_values[i]);
         // Fold the channel-derived note into this voice's enabled range filters
-        let range_note = fold_note_into_range(raw_note, &synth.voice_note_ranges[i]);
+        let effective_note = fold_note_into_range(raw_note, &synth.voice_note_ranges[i]);
         let voice = &mut synth.poly_voices[i];
-
-        let effective_note = if note_threshold == 0 {
-            range_note
-        } else {
-            match voice.last_played_note {
-                None => range_note,
-                Some(last) => {
-                    let diff = (range_note as i16 - last as i16).unsigned_abs() as u8;
-                    if diff >= note_threshold { range_note } else { last }
-                }
-            }
-        };
 
         let in_range = enabled && global_in_range;
 
@@ -197,9 +168,6 @@ fn process_polyphonic(
         }
 
         voice.note = effective_note;
-        if in_range {
-            voice.last_played_note = Some(effective_note);
-        }
 
         if needs_on {
             midi.note_on(synth.midi_port, channel_midi, effective_note, velocity);
@@ -223,13 +191,17 @@ fn process_polyphonic(
 }
 
 /// Builds the flat, ordered list of pixel indices covered by the synth's
-/// zones, row by row, zone by zone (in the order they were added). An empty
-/// zone list covers the whole image; zones are clipped to the image bounds.
-fn build_pixel_sequence(zones: &[PixelZone], width: usize, height: usize) -> Vec<usize> {
-    let total = width * height;
-    if zones.is_empty() {
-        return (0..total).collect();
-    }
+/// zones, following the reading direction: line by line for the horizontal
+/// directions, column by column for the vertical ones. An empty zone list
+/// covers the whole image; zones are clipped to the image bounds.
+fn build_pixel_sequence(
+    zones: &[PixelZone],
+    width: usize,
+    height: usize,
+    direction: ReadingDirection,
+) -> Vec<usize> {
+    let full_zone = [PixelZone { x: 0, y: 0, w: width as u32, h: height as u32 }];
+    let zones = if zones.is_empty() { &full_zone[..] } else { zones };
 
     let mut sequence = Vec::new();
     for zone in zones {
@@ -237,9 +209,35 @@ fn build_pixel_sequence(zones: &[PixelZone], width: usize, height: usize) -> Vec
         let y0 = (zone.y as usize).min(height);
         let x1 = (x0 + zone.w as usize).min(width);
         let y1 = (y0 + zone.h as usize).min(height);
-        for y in y0..y1 {
-            for x in x0..x1 {
-                sequence.push(y * width + x);
+
+        match direction {
+            ReadingDirection::LeftToRight => {
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        sequence.push(y * width + x);
+                    }
+                }
+            }
+            ReadingDirection::RightToLeft => {
+                for y in y0..y1 {
+                    for x in (x0..x1).rev() {
+                        sequence.push(y * width + x);
+                    }
+                }
+            }
+            ReadingDirection::TopToBottom => {
+                for x in x0..x1 {
+                    for y in y0..y1 {
+                        sequence.push(y * width + x);
+                    }
+                }
+            }
+            ReadingDirection::BottomToTop => {
+                for x in x0..x1 {
+                    for y in (y0..y1).rev() {
+                        sequence.push(y * width + x);
+                    }
+                }
             }
         }
     }
@@ -265,10 +263,10 @@ fn step_synth_once(
     let height = image.height() as usize;
 
     // Flat sequence of pixels covered by the synth's zones (empty zone list
-    // = the whole image). The cursor is an index into this sequence; zones
-    // partially outside the image are clipped, and a zone list that covers
-    // nothing leaves the synth stalled.
-    let sequence = build_pixel_sequence(&synth.zones, width, height);
+    // = the whole image), in the synth's reading direction. The cursor is
+    // an index into this sequence; zones partially outside the image are
+    // clipped, and a zone list that covers nothing leaves the synth stalled.
+    let sequence = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction);
     let seq_len = sequence.len();
     if seq_len == 0 {
         return None;
@@ -280,7 +278,6 @@ fn step_synth_once(
     if synth.end_pending && !synth.loop_enabled && synth.playing {
         synth.playing = false;
         synth.cursor = 0;
-        synth.last_played_note = None;
         synth.tempo_accumulator = 0.0;
         // Turn off the current mono note if it is still sounding
         if synth.note_is_on {
@@ -293,7 +290,6 @@ fn step_synth_once(
                 midi.note_off(synth.midi_port, synth.channel, voice.note);
                 voice.note_is_on = false;
             }
-            voice.last_played_note = None;
         }
         let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
         return None;
@@ -353,13 +349,37 @@ fn step_synth_once(
 
     let _ = app.emit("synth-pixel-tick", payload);
 
-    // Then advance the playhead for the next step. At the end of a
-    // non-looping sequence, wrap the playhead but raise end_pending: the
-    // next tick stops the synth, giving the final note a full step
-    // duration. A paused synth simply wraps around and clears the flag.
-    let next_pos = pos + 1;
-    synth.cursor = next_pos % seq_len;
-    synth.end_pending = next_pos >= seq_len && !synth.loop_enabled;
+    // Then advance the playhead for the next step, following the current
+    // travel direction: back-and-forth reverses it at the sequence bounds,
+    // loop wraps around (in the travel direction), and a one-shot sequence
+    // raises end_pending so the next tick stops the synth after the final
+    // note has rung for a full step.
+    let mut forward = synth.play_forward;
+    let at_end = forward && pos + 1 >= seq_len;
+    let at_start = !forward && pos == 0;
+
+    let next = if at_end || at_start {
+        if synth.loop_enabled {
+            if at_end { 0 } else { seq_len - 1 }
+        } else if synth.back_and_forth {
+            forward = !forward;
+            if at_end {
+                if seq_len > 1 { pos - 1 } else { pos }
+            } else {
+                if seq_len > 1 { pos + 1 } else { pos }
+            }
+        } else {
+            pos // end of a one-shot sequence: end_pending stops on the next tick
+        }
+    } else if forward {
+        pos + 1
+    } else {
+        pos - 1
+    };
+
+    synth.play_forward = forward;
+    synth.cursor = next;
+    synth.end_pending = (at_end || at_start) && !synth.loop_enabled && !synth.back_and_forth;
 
     note_length
 }

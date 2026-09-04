@@ -1,6 +1,6 @@
 use tauri::State;
 use crate::error::{err, AppError};
-use crate::state::{NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiState};
+use crate::state::{NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
 // (unchanged, assumed to remain above or below in this file)
@@ -8,6 +8,25 @@ use crate::state::{NoteLength, PixelZone, Synth, SynthMode, SynthState, MidiStat
 /// Builds the standard "synth not found" error, with the id as a parameter.
 fn synth_not_found(id: u32) -> AppError {
     err("synth_not_found").with_param("id", id)
+}
+
+/// Sets a custom display name for a synthesizer. An empty (or
+/// whitespace-only) name clears it, falling back to the default name.
+#[tauri::command]
+pub fn set_synth_name(
+    id: u32,
+    name: String,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let trimmed = name.trim().to_string();
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.name = if trimmed.is_empty() { None } else { Some(trimmed) };
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
 }
 
 #[tauri::command]
@@ -66,7 +85,6 @@ pub fn stop_synth(
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.playing = false;
-            synth.last_played_note = None;
             synth.end_pending = false;
             synth.tempo_accumulator = 0.0;
 
@@ -82,7 +100,6 @@ pub fn stop_synth(
                     midi_state.note_off(synth.midi_port, synth.channel, voice.note);
                     voice.note_is_on = false;
                 }
-                voice.last_played_note = None;
             }
             Ok(())
         }
@@ -148,24 +165,6 @@ pub fn set_synth_midi_port(
 }
 
 #[tauri::command]
-pub fn set_synth_threshold(
-    id: u32,
-    threshold: u8,
-    state: State<SynthState>,
-) -> Result<(), AppError> {
-    let mut synths = state.synths.lock().unwrap();
-    match synths.get_mut(&id) {
-        Some(synth) => {
-            synth.note_threshold = threshold.min(12);
-            // The current note is not cut off: the next tick will evaluate
-            // normally whether a note change is needed.
-            Ok(())
-        }
-        None => Err(synth_not_found(id)),
-    }
-}
-
-#[tauri::command]
 pub fn set_synth_velocity_min(
     id: u32,
     velocity_min: u8,
@@ -217,6 +216,56 @@ pub fn set_synth_loop(id: u32, loop_enabled: bool, state: State<SynthState>) -> 
     match synths.get_mut(&id) {
         Some(synth) => {
             synth.loop_enabled = loop_enabled;
+            // Loop and back-and-forth are mutually exclusive
+            if loop_enabled {
+                synth.back_and_forth = false;
+                synth.end_pending = false;
+            }
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+/// Enables the back-and-forth (ping-pong) playback: the playhead bounces
+/// between the bounds of the pixel sequence. Mutually exclusive with the
+/// loop.
+#[tauri::command]
+pub fn set_synth_back_n_forth(
+    id: u32,
+    enabled: bool,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.back_and_forth = enabled;
+            if enabled {
+                synth.loop_enabled = false;
+                synth.end_pending = false;
+            }
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+/// Sets the direction in which the pixel sequence is read. The playhead
+/// restarts from the beginning of the newly ordered sequence.
+#[tauri::command]
+pub fn set_synth_reading_direction(
+    id: u32,
+    direction: ReadingDirection,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.reading_direction = direction;
+            synth.cursor = 0;
+            synth.play_forward = true;
+            synth.end_pending = false;
+            synth.tempo_accumulator = 0.0;
             Ok(())
         }
         None => Err(synth_not_found(id)),
@@ -247,9 +296,7 @@ pub fn set_synth_mode(
                     midi_state.note_off(synth.midi_port, synth.channel, voice.note);
                     voice.note_is_on = false;
                 }
-                voice.last_played_note = None;
             }
-            synth.last_played_note = None;
             synth.mode = mode;
             Ok(())
         }
@@ -344,7 +391,6 @@ pub fn set_synth_channel_enabled(
                     midi_state.note_off(synth.midi_port, synth.channel, voice.note);
                     voice.note_is_on = false;
                 }
-                voice.last_played_note = None;
             }
             Ok(())
         }
