@@ -12,32 +12,37 @@ SoundMap est une application desktop Tauri qui transforme une image en musique. 
 - Aperçu de l'image originale et de l'image traitée, avec un bouton pour basculer entre les deux.
 - Redimensionnement en grille de pixels, où chaque cellule devient une étape de la séquence.
 - Ajustement du nombre de colonnes via un slider à échelle logarithmique (la hauteur est déduite automatiquement pour préserver le ratio d'aspect).
-- Ajustements de niveaux de gris, contraste, luminosité et postérisation (réduction du nombre de niveaux de couleur/luminosité).
+- Ajustements de saturation, contraste, luminosité et postérisation (réduction du nombre de niveaux de couleur/luminosité).
 - Réinitialisation de tous les paramètres de traitement.
 - Les contrôles d'image sont automatiquement verrouillés pendant qu'un synthétiseur joue, afin de garder la grille de pixels stable pendant la lecture (le bouton « Voir l'original » reste disponible).
 
 ### Synthétiseurs
 
-Vous pouvez créer autant de synthétiseurs indépendants que vous le souhaitez, chacun lisant la grille de pixels de façon autonome et envoyant des notes MIDI en temps réel, cadencés par un métronome commun (tempo en BPM).
+Vous pouvez créer autant de synthétiseurs indépendants que vous le souhaitez, chacun lisant la grille de pixels de façon autonome et envoyant des notes MIDI en temps réel, cadencés par un métronome commun (tempo en BPM). Chaque synthétiseur peut jouer à sa propre fraction du tempo principal, si bien que plusieurs synthés peuvent se désynchroniser et créer des polyrythmies.
 
 - **Deux modes de traduction pixel → note, interchangeables pour chaque synthétiseur :**
   - **Monophonique** — la teinte du pixel (cercle chromatique TSL/HSL) détermine une note unique. Un curseur de décalage de teinte (0–360°) permet de faire tourner le cercle chromatique pour ajuster la tonalité dominante du morceau.
   - **Polyphonique** — chaque canal de couleur (Rouge, Vert, Bleu) est lu indépendamment et traduit en sa propre note, formant un accord de 1 à 3 notes. Chaque canal peut être activé ou désactivé individuellement. Survoler les boutons R/V/B affiche la carte d'intensité du canal correspondant directement sur l'image, pour vous aider à choisir les canaux à utiliser.
-- **Plage de pixels** — définissez, via un double slider ou en cliquant directement sur deux points de l'image, le pixel de départ et de fin qu'un synthétiseur doit lire.
-- **Lecture en boucle ou ponctuelle** — un synthétiseur peut soit boucler indéfiniment sur sa plage de pixels, soit s'arrêter automatiquement une fois la fin atteinte.
+- **Zones rectangulaires** — sélectionnez les pixels que chaque synthétiseur doit jouer en traçant des rectangles directement sur l'image. Tous les pixels sont sélectionnés par défaut ; un rectangle tracé depuis un pixel libre ajoute une zone, tandis qu'un rectangle tracé depuis un pixel déjà sélectionné retire ces pixels. La ligne affiche également le nombre total de pixels sélectionnés et le temps de lecture estimé au tempo propre du synthé.
+- **Tempo par synthé** — chaque synthétiseur peut jouer à une fraction du tempo du métronome commun (1/1, 3/4, 2/3, 1/2, 1/3 ou 1/4 du BPM global), permettant aux synthés de se désynchroniser pour dynamiser la musique.
+- **Longueurs de note** — des cases à cocher (double croche, croche, noire, blanche, ronde) font correspondre la luminosité du pixel à une durée parmi les longueurs activées (les niveaux de luminosité 0–127 sont découpés en autant de bandes égales). Chaque pixel est joué pendant exactement la durée de sa note : le contraste de luminosité de l'image se traduit ainsi directement en rythme. Un bouton inverse le sens luminosité → longueur (sombre = long au lieu de clair = long) ; la case noire reste toujours cochée.
+- **Filtres de plage MIDI** — les boutons basses (21–47), médiums (48–71) et aigus (72–108) restreignent les notes qu'un synthétiseur peut jouer. Les filtres se cumulent pour étendre la plage autorisée ; aucun bouton actif = plage complète 0–127. Les notes hors plage sont rabattues dedans par octaves, en préservant leur classe de hauteur. Le mode monophonique possède un filtre unique ; chaque voix R/V/B du mode polyphonique possède le sien.
+- **Contrôles de lecture** — lecture/arrêt, rembobinage (replace la tête de lecture au début de la séquence) et pas en avant (avance manuellement d'un pixel pendant une pause, en le jouant sur sa longueur de note).
+- **Lecture en boucle ou ponctuelle** — un synthétiseur peut soit boucler indéfiniment sur ses zones, soit s'arrêter automatiquement une fois la fin atteinte.
 - **Seuil de luminosité** — un double slider définit la plage de luminosité qu'un pixel doit respecter pour être audible ; les pixels hors de cette plage sont silencieusement ignorés.
-- **Seuil de variation de note** — un écart minimum de teinte/couleur (0 à 12/24 demi-tons) requis entre deux pixels consécutifs pour déclencher une nouvelle note ; sinon, la note en cours est simplement prolongée (legato) plutôt que rejouée.
-- **Vélocité minimum** — définit le plancher de la plage de vélocité ; la luminosité du pixel est transposée entre ce plancher et la vélocité maximale (127). Les pixels sombres sont joués plus fort, les pixels clairs plus délicatement.
+- **Seuil de variation de note** — un écart minimum (en demi-tons) requis entre deux pixels consécutifs pour retenir une nouvelle valeur de note ; en dessous, la dernière note est conservée, évitant le tremblement chromatique nerveux.
+- **Vélocité minimum** — définit le plancher de la plage de vélocité ; la saturation du pixel est transposée entre ce plancher et la vélocité maximale (127). Les couleurs vives sont jouées avec une attaque plus forte, les zones achromatiques plus délicatement.
 - **Choix du canal MIDI** par synthétiseur (16 canaux disponibles), verrouillé pendant la lecture.
-- **Attribution d'une couleur** à chaque synthétiseur (via un sélecteur de couleurs prédéfinies), utilisée pour surligner sa plage de pixels et sa position de lecture courante directement sur l'image.
-- **Bascule de visibilité** du surlignage de plage de pixels, automatiquement masqué pendant la lecture pour n'afficher que le curseur de lecture courant.
+- **Attribution d'une couleur** à chaque synthétiseur (via un sélecteur de couleurs prédéfinies), utilisée pour surligner ses zones et sa position de lecture courante directement sur l'image.
+- **Bascule de visibilité** du surlignage des zones, automatiquement masqué pendant la lecture pour n'afficher que le curseur de lecture courant.
+- **Options avancées dépliables** — les réglages avancés de chaque synthétiseur (panneaux propres au mode, longueurs de note, filtres de plage, seuils, vélocité) sont regroupés dans une section dépliable, afin que la liste reste compacte même avec de nombreux synthétiseurs.
 - Lecture/arrêt individuel par synthétiseur, ainsi qu'un bouton « tout jouer / tout arrêter » pour l'ensemble de la liste.
 - Le métronome commun démarre automatiquement dès qu'un synthétiseur commence à jouer, et s'arrête automatiquement une fois tous les synthétiseurs inactifs.
 
 ### Sortie MIDI
 
 - Connexion automatique au premier port de sortie MIDI disponible au démarrage.
-- Messages Note On / Note Off en temps réel, avec une gestion propre du legato/sustain (les notes ne sont redéclenchées que lorsqu'elles changent réellement) et une extinction propre des notes à l'arrêt d'un synthétiseur ou lors d'un changement de mode.
+- Messages Note On / Note Off en temps réel : chaque pixel est joué comme une note possédant sa propre durée, avec extinction propre des notes à l'arrêt d'un synthétiseur ou lors d'un changement de mode. Le moteur bat au quart de temps afin que croches et doubles croches restent précises.
 
 ## Stack technique
 
@@ -89,9 +94,9 @@ cargo tauri build
 
 Dans l'application :
 
-1. Chargez une image et ajustez la taille de la grille, les niveaux de gris, le contraste, la luminosité et la postérisation. L'aperçu se met à jour en direct.
+1. Chargez une image et ajustez la taille de la grille, la saturation, le contraste, la luminosité et la postérisation. L'aperçu se met à jour en direct.
 2. Ajoutez un ou plusieurs synthétiseurs, choisissez un canal MIDI et une couleur pour chacun.
-3. Configurez pour chaque synthétiseur sa plage de pixels, son mode de traduction (monophonique/polyphonique), son seuil de luminosité, son seuil de variation de note et sa vélocité minimum.
+3. Tracez des zones sur l'image pour restreindre ce que chaque synthétiseur doit lire, choisissez un tempo par synthé, puis ouvrez les options avancées pour configurer le mode de traduction (monophonique/polyphonique), les longueurs de note, les filtres de plage MIDI, le seuil de luminosité, le seuil de variation de note et la vélocité minimum.
 4. Appuyez sur Play sur un synthétiseur (ou « tout jouer ») pour commencer à entendre votre image.
 
 ## Structure du projet
@@ -107,6 +112,7 @@ soundmap/
 │   ├── index.html
 │   ├── css/
 │   │   └── styles.css
+│   ├── i18n/
 │   ├── scss/
 │   │   └── styles.scss
 │   └── js/
@@ -118,13 +124,14 @@ soundmap/
         ├── main.rs
         ├── lib.rs
         ├── state.rs
+        ├── error.rs
         ├── image_processing.rs
         ├── synth.rs
         ├── metronome.rs
         └── midi.rs
 ```
 
-Le backend expose des commandes Tauri pour charger les images, appliquer les ajustements, récupérer les données de pixels, gérer les synthétiseurs (création, lecture, canal MIDI, mode, plages, seuils, vélocité) et piloter le métronome commun.
+Le backend expose des commandes Tauri pour charger les images, appliquer les ajustements, récupérer les données de pixels, gérer les synthétiseurs (création, lecture, canal MIDI, mode, zones, tempo, longueurs de note, plages MIDI, seuils, vélocité) et piloter le métronome commun.
 
 ## Licence
 
