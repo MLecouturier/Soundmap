@@ -700,9 +700,21 @@ input[type=range].synth-range-input::-moz-range-track {
   pointer-events: none;
 }
 .synth-block .synth-body .synth-mode-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.synth-block .synth-body .synth-mode-panel.synth-mode-panel-mono {
+  flex-direction: row;
+}
+.synth-block .synth-body .synth-mode-panel.synth-mode-panel-mono .hue-shift {
+  flex-grow: 1;
+}
+.synth-block .synth-body .synth-mode-panel.synth-mode-panel-mono button {
+  height: 1.5rem;
+  font-size: 1rem;
+  aspect-ratio: 1/1;
 }
 .synth-block .synth-body .synth-mode-panel.hidden {
   display: none;
@@ -714,6 +726,36 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-channel-toggles {
   display: flex;
   gap: 0.5rem;
+}
+.synth-block .synth-body .synth-channel-toggles .synth-channel-toggle-group {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.synth-block .synth-body .synth-note-range {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.synth-block .synth-body .synth-note-range button {
+  padding: 0.125rem 0.375rem;
+  border: 1px solid #555;
+  border-radius: 0.25rem;
+  background: none;
+  color: #888;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.synth-block .synth-body .synth-note-range button:hover {
+  color: #e0e0e0;
+  border-color: #888;
+}
+.synth-block .synth-body .synth-note-range button.active {
+  background-color: #3a7bd5;
+  border-color: #3a7bd5;
+  color: #fff;
 }
 .synth-block .synth-body .synth-channel-toggle {
   flex: 1 1 0;

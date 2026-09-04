@@ -102,6 +102,11 @@ pub struct Synth {
     pub note_length_reversed: bool,    // flip the brightness→length mapping direction
     pub note_generation: u32,          // bumped on each note articulation, so stale
                                        // delayed Note Offs can cancel themselves
+
+    // --- MIDI note range filters ---
+    pub mono_note_range: [bool; 3],       // bass, medium, treble enabled for the
+                                          // monophonic note (all off = full 0–127)
+    pub voice_note_ranges: [[bool; 3]; 3], // same, per R/G/B voice, polyphonic mode
 }
 
 impl Synth {
@@ -134,6 +139,9 @@ impl Synth {
             note_lengths: vec![NoteLength::Quarter],
             note_length_reversed: false,
             note_generation: 0,
+
+            mono_note_range: [false, false, false],
+            voice_note_ranges: [[false, false, false]; 3],
         }
     }
 }

@@ -373,8 +373,18 @@ function sendSynthZones(id) {
         .catch(err => console.error('Error in set_synth_zones:', err));
 }
 
-// Sends the enabled note lengths ("whole", "half", "quarter", "eighth",
-// "sixteenth"). The UI always keeps at least one box checked.
+// Sends the note-range filter states: one triplet (bass, medium, treble)
+// for the monophonic note, and one per R/G/B voice in polyphonic mode.
+function sendSynthNoteRanges(id, el) {
+    const read = group => ['bass', 'medium', 'treble'].map(kind =>
+        group.querySelector(`.synth-${kind}`).classList.contains('active')
+    );
+    const mono = read(el.querySelector('.synth-mode-panel-mono .synth-note-range'));
+    const voices = Array.from(el.querySelectorAll('.synth-mode-panel-poly .synth-note-range'))
+        .map(read);
+    invoke('set_synth_note_ranges', { id, mono, voices })
+        .catch(err => console.error('Error in set_synth_note_ranges:', err));
+}
 function sendSynthNoteLengths(id, el) {
     const lengths = Array.from(el.querySelectorAll('.note-length-checkbox:checked'))
         .map(box => box.dataset.length);
@@ -878,13 +888,18 @@ function createSynthElement(id) {
                     <button class="synth-mode-btn active" data-mode="monophonic"></button>
                     <button class="synth-mode-btn" data-mode="polyphonic"></button>
                     <button class="synth-toggle-full-options" data-i18n-title="synth.toggleFullOptions">
-                        <span class="material-symbols-outlined" aria-hidden="true">expand_circle_down</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">expand_circle_up</span>
                     </button>
             </div>
 
             <div class="synth-full-options">
                 <div class="synth-mode-panel synth-mode-panel-mono">
-                    <label class="synth-slider-label">
+                    <div class="synth-note-range">
+                        <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
+                        <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
+                        <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                    </div>
+                    <label class="hue-shift synth-slider-label">
                         <span><span data-i18n="synth.hueShift"></span> <em class="hue-shift-val">0°</em></span>
                         <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
                     </label>
@@ -893,9 +908,30 @@ function createSynthElement(id) {
                 <div class="synth-mode-panel synth-mode-panel-poly hidden">
                     <span class="synth-mode-panel-label" data-i18n="synth.channelsPanelLabel"></span>
                     <div class="synth-channel-toggles">
-                        <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
-                        <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
-                        <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
+                        <div class="synth-channel-toggle-group">
+                            <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
+                            <div class="synth-note-range">
+                                <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
+                                <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
+                                <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                            </div>
+                        </div>
+                        <div class="synth-channel-toggle-group">
+                            <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
+                            <div class="synth-note-range">
+                                <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
+                                <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
+                                <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                            </div>
+                        </div>
+                        <div class="synth-channel-toggle-group">
+                            <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
+                            <div class="synth-note-range">
+                                <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
+                                <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
+                                <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1044,6 +1080,16 @@ function createSynthElement(id) {
         hueShiftVal.textContent = `${hueShift}°`;
         invoke('set_synth_hue_shift', { id, hueShift })
             .catch(err => console.error('Error in set_synth_hue_shift:', err));
+    });
+
+    // ---- Note range filters (bass / medium / treble) ----
+    // Mono panel has one filter for the single note; each polyphonic voice
+    // has its own. Toggles are cumulative and all-off means full 0–127.
+    el.querySelectorAll('.synth-note-range button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.classList.toggle('active');
+            sendSynthNoteRanges(id, el);
+        });
     });
 
     // ---- Note lengths: brightness → duration mapping ----

@@ -804,9 +804,24 @@ $metronome-led-transition: 0.05s ease;
 
         // Conditional panels depending on the active mode
         .synth-mode-panel {
+            position: relative;
             display: flex;
             flex-direction: column;
             gap: 6px;
+
+            &.synth-mode-panel-mono {
+                flex-direction: row;
+
+                .hue-shift {
+                    flex-grow: 1;
+                }
+
+                button {
+                    height: 1.5rem;
+                    font-size: 1rem;
+                    aspect-ratio: 1/1;
+                }
+            }
 
             &.hidden { display: none; }
 
@@ -819,6 +834,40 @@ $metronome-led-transition: 0.05s ease;
         .synth-channel-toggles {
             display: flex;
             gap: .5rem;
+
+            // Wrapper of one voice: its toggle button + its note-range filter
+            .synth-channel-toggle-group {
+                flex: 1 1 0;
+                display: flex;
+                flex-direction: column;
+                gap: .25rem;
+            }
+        }
+
+        // Bass / medium / treble range filter (mono panel + each poly voice)
+        .synth-note-range {
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+
+            button {
+                padding: .125rem .375rem;
+                border: 1px solid $color-disactivated;
+                border-radius: $border-radius-base;
+                background: none;
+                color: $color-text-muted;
+                font-size: .9rem;
+                cursor: pointer;
+                transition: color $transition-fast, border-color $transition-fast, background-color $transition-fast;
+
+                &:hover { color: $color-text-primary; border-color: $color-text-muted; }
+
+                &.active {
+                    background-color: $color-accent;
+                    border-color: $color-accent;
+                    color: #fff;
+                }
+            }
         }
 
         .synth-channel-toggle {

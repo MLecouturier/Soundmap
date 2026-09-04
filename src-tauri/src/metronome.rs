@@ -95,18 +95,20 @@ fn process_monophonic(
     let hue = pixel_hue(r, g, b);
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
     let raw_note = hue_to_midi_note(shifted_hue);
+    // Fold the hue-derived note into the enabled MIDI range filters
+    let range_note = fold_note_into_range(raw_note, &synth.mono_note_range);
 
     // Apply the note change threshold: if the gap with the last retained
     // note is insufficient, keep that last note (the current note is
     // therefore sustained, not retriggered).
     let effective_note = if synth.note_threshold == 0 {
-        raw_note
+        range_note
     } else {
         match synth.last_played_note {
-            None => raw_note,
+            None => range_note,
             Some(last) => {
-                let diff = (raw_note as i16 - last as i16).unsigned_abs() as u8;
-                if diff >= synth.note_threshold { raw_note } else { last }
+                let diff = (range_note as i16 - last as i16).unsigned_abs() as u8;
+                if diff >= synth.note_threshold { range_note } else { last }
             }
         }
     };
@@ -174,16 +176,18 @@ fn process_polyphonic(
     for i in 0..3 {
         let enabled = synth.channel_enabled[i];
         let raw_note = channel_to_midi_note(channel_values[i]);
+        // Fold the channel-derived note into this voice's enabled range filters
+        let range_note = fold_note_into_range(raw_note, &synth.voice_note_ranges[i]);
         let voice = &mut synth.poly_voices[i];
 
         let effective_note = if note_threshold == 0 {
-            raw_note
+            range_note
         } else {
             match voice.last_played_note {
-                None => raw_note,
+                None => range_note,
                 Some(last) => {
-                    let diff = (raw_note as i16 - last as i16).unsigned_abs() as u8;
-                    if diff >= note_threshold { raw_note } else { last }
+                    let diff = (range_note as i16 - last as i16).unsigned_abs() as u8;
+                    if diff >= note_threshold { range_note } else { last }
                 }
             }
         };
@@ -407,6 +411,52 @@ fn pick_note_length(synth: &Synth, brightness_level: u8) -> f64 {
     let n = lengths.len();
     let idx = (brightness_level as usize * n / 128).min(n - 1);
     lengths[idx]
+}
+
+/// Bounds of the three note-range filters (bass, medium, treble), in MIDI
+/// note numbers. Toggles are cumulative: the allowed range is the union of
+/// the enabled sub-ranges.
+const NOTE_RANGE_BOUNDS: [(u8, u8); 3] = [(21, 47), (48, 71), (72, 108)];
+
+/// Collects the (low, high) bounds of the enabled sub-ranges.
+fn active_note_ranges(toggles: &[bool; 3]) -> Vec<(u8, u8)> {
+    NOTE_RANGE_BOUNDS
+        .iter()
+        .zip(toggles.iter())
+        .filter(|(_, &on)| on)
+        .map(|(&(lo, hi), _)| (lo, hi))
+        .collect()
+}
+
+/// Folds a note into the allowed sub-ranges by octaves (a note outside the
+/// allowed range is transposed up or down by whole octaves until it lands
+/// in one of them, preserving its pitch class). With no sub-range enabled
+/// the full MIDI range (0–127) is allowed and the note is unchanged.
+fn fold_note_into_range(note: u8, toggles: &[bool; 3]) -> u8 {
+    let allowed = active_note_ranges(toggles);
+    if allowed.is_empty() {
+        return note;
+    }
+    if allowed.iter().any(|&(lo, hi)| note >= lo && note <= hi) {
+        return note;
+    }
+
+    // Each active sub-range spans more than one octave (27, 24 and 37
+    // semitones), so a valid fold always exists; try both directions by
+    // increasing octave distance, folding down first.
+    for octave in 1..=10i32 {
+        for &sign in &[-1i32, 1] {
+            let candidate = note as i32 + sign * 12 * octave;
+            if (0..=127).contains(&candidate)
+                && allowed
+                    .iter()
+                    .any(|&(lo, hi)| candidate >= lo as i32 && candidate <= hi as i32)
+            {
+                return candidate as u8;
+            }
+        }
+    }
+    note
 }
 
 pub struct MetronomeState {

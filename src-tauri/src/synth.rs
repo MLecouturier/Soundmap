@@ -267,6 +267,27 @@ pub fn set_synth_note_length_reversed(
     }
 }
 
+/// Sets the MIDI note range filters: one triplet of toggles (bass, medium,
+/// treble) for the monophonic note, and one per R/G/B voice in polyphonic
+/// mode. All toggles off = full 0–127 range.
+#[tauri::command]
+pub fn set_synth_note_ranges(
+    id: u32,
+    mono: [bool; 3],
+    voices: [[bool; 3]; 3],
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.mono_note_range = mono;
+            synth.voice_note_ranges = voices;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
 #[tauri::command]
 pub fn set_synth_hue_shift(id: u32, hue_shift: u16, state: State<SynthState>) -> Result<(), AppError> {
     let mut synths = state.synths.lock().unwrap();
