@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use image::GenericImageView;
 
 use crate::midi::{send_note_off, send_note_on};
-use crate::state::{ImageState, Synth, SynthMode, SynthState, MidiState};
+use crate::state::{ImageState, PixelZone, Synth, SynthMode, SynthState, MidiState};
 
 /// Computes the perceived brightness of an RGBA pixel (Rec.601 formula), 0.0–255.0.
 fn pixel_luma(r: u8, g: u8, b: u8) -> f32 {
@@ -220,6 +220,30 @@ fn process_polyphonic(
     payload["muted"] = serde_json::json!(!global_in_range);
 }
 
+/// Builds the flat, ordered list of pixel indices covered by the synth's
+/// zones, row by row, zone by zone (in the order they were added). An empty
+/// zone list covers the whole image; zones are clipped to the image bounds.
+fn build_pixel_sequence(zones: &[PixelZone], width: usize, height: usize) -> Vec<usize> {
+    let total = width * height;
+    if zones.is_empty() {
+        return (0..total).collect();
+    }
+
+    let mut sequence = Vec::new();
+    for zone in zones {
+        let x0 = (zone.x as usize).min(width);
+        let y0 = (zone.y as usize).min(height);
+        let x1 = (x0 + zone.w as usize).min(width);
+        let y1 = (y0 + zone.h as usize).min(height);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                sequence.push(y * width + x);
+            }
+        }
+    }
+    sequence
+}
+
 pub struct MetronomeState {
     pub running: Arc<AtomicBool>,
     pub bpm: Arc<AtomicU32>,
@@ -272,32 +296,37 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
                 for synth in synths.values_mut() {
                     if synth.playing && total_pixels > 0 {
-                        // Determine the effective bounds of the range
-                        let range_start = synth.pixel_start.min(total_pixels - 1);
-                        let range_end = if synth.pixel_end == 0 || synth.pixel_end >= total_pixels {
-                            total_pixels - 1
-                        } else {
-                            synth.pixel_end
-                        };
-                        let range_len = if range_end >= range_start {
-                            range_end - range_start + 1
-                        } else {
-                            1
-                        };
+                        // Tempo desynchronization: each metronome tick adds the
+                        // synth's tempo ratio to its accumulator; the synth only
+                        // advances when at least one full step has accumulated
+                        // (e.g. ratio 0.5 = one pixel every two ticks).
+                        synth.tempo_accumulator += synth.tempo_ratio;
+                        if synth.tempo_accumulator < 1.0 {
+                            continue;
+                        }
+                        synth.tempo_accumulator -= 1.0;
 
-                        // Advance the cursor within the range
-                        let pos_in_range = if synth.cursor >= range_start && synth.cursor <= range_end {
-                            synth.cursor - range_start
-                        } else {
-                            0
-                        };
-                        let next_pos = pos_in_range + 1;
+                        // Flat sequence of pixels covered by the synth's zones
+                        // (empty zone list = the whole image). The cursor is an
+                        // index into this sequence; zones partially outside
+                        // the image are clipped, and a zone list that covers
+                        // nothing leaves the synth stalled.
+                        let sequence = build_pixel_sequence(&synth.zones, width, height);
+                        let seq_len = sequence.len();
+                        if seq_len == 0 {
+                            continue;
+                        }
 
-                        if next_pos >= range_len && !synth.loop_enabled {
+                        // Advance the cursor within the sequence
+                        let pos = synth.cursor % seq_len;
+                        let next_pos = pos + 1;
+
+                        if next_pos >= seq_len && !synth.loop_enabled {
                             // End of sequence without looping: stop the synth
                             synth.playing = false;
-                            synth.cursor = range_start;
+                            synth.cursor = 0;
                             synth.last_played_note = None;
+                            synth.tempo_accumulator = 0.0;
                             // Turn off the current mono note if it is still sounding
                             if synth.note_is_on {
                                 if let Some(conn) = conn_guard.as_mut() {
@@ -319,10 +348,12 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
                             continue;
                         }
 
-                        synth.cursor = range_start + next_pos % range_len;
+                        synth.cursor = next_pos % seq_len;
 
-                        // Read the current pixel
-                        let px = synth.cursor as u32;
+                        // Read the current pixel (the payload reports the
+                        // absolute pixel index, not the sequence index)
+                        let pixel_index = sequence[synth.cursor];
+                        let px = pixel_index as u32;
                         let x = px % width as u32;
                         let y = px / width as u32;
                         let pixel = image.get_pixel(x, y);
@@ -335,7 +366,7 @@ pub fn start_metronome(app: AppHandle, state: tauri::State<MetronomeState>) {
 
                         let mut payload = serde_json::json!({
                             "id": synth.id,
-                            "cursor": synth.cursor,
+                            "cursor": pixel_index,
                             "r": r, "g": g, "b": b, "a": a,
                             "brightness_level": brightness_level,
                             "velocity": velocity,

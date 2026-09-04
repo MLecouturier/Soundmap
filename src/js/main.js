@@ -70,6 +70,8 @@ function retranslateSynthElement(el) {
     if (!pixelInfo.dataset.hasTick) {
         pixelInfo.textContent = t('synth.pixelInfoEmpty');
     }
+
+    updateZonesLabel(Number(el.dataset.synthId));
 }
 
 // Re-apply translations everywhere (static markup + dynamically created
@@ -198,78 +200,122 @@ function clearOverlay() {
     synthCursors.clear();
 }
 
-// ---------- Mouse-based pixel range selection ----------
-// Only one synth can be in selection mode at a time.
-let rangePickState = null; // { id, btn, firstPixel: number|null }
+// ---------- Mouse-based rectangular zone selection ----------
+// Only one synth can be in zone-drawing mode at a time. While the mode is
+// active, each rectangle dragged on the image adds a zone to that synth.
+let zonePickState = null; // { id, btn } while the drawing mode is armed
+let zoneDrag = null;      // { id, start: {col,row}, cur: {col,row} } while dragging
 
-function cursorFromClientPoint(clientX, clientY) {
+function cellFromClientPoint(clientX, clientY) {
     const layout = getImageLayout();
     if (!layout) return null;
     const rect = pixelOverlay.getBoundingClientRect();
-    const px = clientX - rect.left;
-    const py = clientY - rect.top;
-    const { offsetX, offsetY, cellW, cellH } = layout;
-
-    const col = Math.floor((px - offsetX) / cellW);
-    const row = Math.floor((py - offsetY) / cellH);
+    const col = Math.floor((clientX - rect.left - layout.offsetX) / layout.cellW);
+    const row = Math.floor((clientY - rect.top - layout.offsetY) / layout.cellH);
     if (col < 0 || row < 0 || col >= gridW || row >= gridH) return null;
-
-    return row * gridW + col;
+    return { col, row };
 }
 
-function startRangePicking(id, btn) {
-    // Cancel any selection mode already active on another synth
-    if (rangePickState && rangePickState.id !== id) {
-        cancelRangePicking();
+function startZonePicking(id, btn) {
+    // Cancel any drawing mode already active on another synth
+    if (zonePickState && zonePickState.id !== id) {
+        cancelZonePicking();
     }
-    rangePickState = { id, btn, firstPixel: null };
+    zonePickState = { id, btn };
     btn.classList.add('active');
     pixelOverlay.classList.add('picking');
 }
 
-function cancelRangePicking() {
-    if (!rangePickState) return;
-    rangePickState.btn.classList.remove('active');
+function cancelZonePicking() {
+    if (!zonePickState) return;
+    zonePickState.btn.classList.remove('active');
     pixelOverlay.classList.remove('picking');
-    rangePickState = null;
+    zonePickState = null;
+    if (zoneDrag) {
+        zoneDrag = null;
+        redrawAllHighlights();
+    }
 }
 
-pixelOverlay.addEventListener('click', (e) => {
-    if (!rangePickState || !hasImage) return;
-    const cursor = cursorFromClientPoint(e.clientX, e.clientY);
-    if (cursor === null) return;
-
-    const { id, firstPixel } = rangePickState;
-
-    if (firstPixel === null) {
-        // First click: remember the start pixel
-        rangePickState.firstPixel = cursor;
-        return;
-    }
-
-    // Second click: define the range (with inversion if necessary)
-    const start = Math.min(firstPixel, cursor);
-    const end   = Math.max(firstPixel, cursor);
-    applySynthRangeFromPicker(id, start, end);
-    cancelRangePicking();
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') cancelZonePicking();
 });
 
-function applySynthRangeFromPicker(id, start, end) {
+pixelOverlay.addEventListener('mousedown', (e) => {
+    if (!zonePickState || !hasImage) return;
+    const cell = cellFromClientPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    e.preventDefault(); // prevents image dragging during selection
+    zoneDrag = { id: zonePickState.id, start: cell, cur: cell };
+});
+
+pixelOverlay.addEventListener('mousemove', (e) => {
+    if (!zoneDrag) return;
+    const cell = cellFromClientPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    zoneDrag.cur = cell;
+    redrawAllHighlights();
+    drawZonePreview();
+});
+
+window.addEventListener('mouseup', (e) => {
+    if (!zoneDrag) return;
+    const { id, start, cur } = zoneDrag;
+    zoneDrag = null;
+    const moved = start.col !== cur.col || start.row !== cur.row;
+    if (moved) {
+        addSynthZone(id, {
+            x: Math.min(start.col, cur.col),
+            y: Math.min(start.row, cur.row),
+            w: Math.abs(cur.col - start.col) + 1,
+            h: Math.abs(cur.row - start.row) + 1,
+        });
+    }
+    redrawAllHighlights();
+});
+
+// Live preview of the rectangle being dragged, drawn on top of the highlights
+function drawZonePreview() {
+    if (!zoneDrag) return;
+    const layout = getImageLayout();
+    if (!layout) return;
+    const { offsetX, offsetY, cellW, cellH } = layout;
+    const { start, cur } = zoneDrag;
+    const x = Math.min(start.col, cur.col);
+    const y = Math.min(start.row, cur.row);
+    const w = Math.abs(cur.col - start.col) + 1;
+    const h = Math.abs(cur.row - start.row) + 1;
+
+    const ctx = pixelOverlay.getContext('2d');
+    ctx.save();
+    ctx.fillStyle = synthColors.get(zoneDrag.id) || '#ffffff';
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, w * cellW, h * cellH);
+    ctx.restore();
+}
+
+function addSynthZone(id, zone) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return;
+    hi.zones.push(zone);
+    sendSynthZones(id);
+    updateZonesLabel(id);
+}
+
+function sendSynthZones(id) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return;
+    invoke('set_synth_zones', { id, zones: hi.zones })
+        .catch(err => console.error('Error in set_synth_zones:', err));
+}
+
+function updateZonesLabel(id) {
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
-    const startInput = el.querySelector('.range-start');
-    const endInput   = el.querySelector('.range-end');
-    const startVal   = el.querySelector('.range-start-val');
-    const endVal     = el.querySelector('.range-end-val');
-
-    startInput.value = start;
-    endInput.value   = end;
-    startVal.textContent = start;
-    endVal.textContent   = end;
-
-    // Triggers the fill update, the highlight update, and the Rust call
-    startInput.dispatchEvent(new Event('input'));
-    endInput.dispatchEvent(new Event('input'));
+    const hi = synthHighlights.get(id);
+    el.querySelector('.zones-val').textContent = hi && hi.zones.length
+        ? hi.zones.length
+        : t('synth.zonesAll');
 }
 
 // Computes the render dimensions of the image in the viewer (object-fit: contain)
@@ -300,17 +346,15 @@ function drawRangeHighlight(synthId) {
     const color = synthColors.get(synthId);
     if (!color) return;
 
-    const ctx = pixelOverlay.getContext('2d');
-    const start = hi.start;
-    const end   = hi.end > 0 ? hi.end : totalPixels - 1;
+    // No zone = the whole image is selected
+    const zones = hi.zones.length > 0 ? hi.zones : [{ x: 0, y: 0, w: gridW, h: gridH }];
 
+    const ctx = pixelOverlay.getContext('2d');
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle   = color;
-    for (let i = start; i <= end; i++) {
-        const col = i % gridW;
-        const row = Math.floor(i / gridW);
-        ctx.fillRect(offsetX + col * cellW, offsetY + row * cellH, cellW, cellH);
+    for (const z of zones) {
+        ctx.fillRect(offsetX + z.x * cellW, offsetY + z.y * cellH, z.w * cellW, z.h * cellH);
     }
     ctx.restore();
 }
@@ -481,8 +525,8 @@ async function refresh() {
     gridW = result.width;
     gridH = result.height;
     clearOverlay();
-    cancelRangePicking();
-    updateAllSynthRangeMax(totalPixels);
+    cancelZonePicking();
+    updateAllSynthZones();
     await refreshPixelDataCache();
 
     lastDimensionsInfo = {
@@ -653,8 +697,6 @@ function createSynthElement(id) {
         `<option value="${i}">${t('synth.channelOption', { number: i + 1 })}</option>`
     ).join('');
 
-    const maxPx = totalPixels > 0 ? totalPixels - 1 : 0;
-
     const colorSwatches = SYNTH_COLORS.map(c =>
         `<button class="color-swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`
     ).join('');
@@ -671,31 +713,40 @@ function createSynthElement(id) {
             <button class="synth-remove" data-i18n-title="synth.remove"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
         </div>
         <div class="synth-body">
-            <div class="synth-range-wrapper">
-                <div class="synth-range-labels">
-                    <span data-i18n="synth.pixelsLabel"></span>
-                    <span class="synth-range-values">
-                        <em class="range-start-val">0</em> – <em class="range-end-val">${maxPx}</em>
-                    </span>
-                </div>
-                <div class="synth-range-track-row">
-                  <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
-                    <div class="synth-range-track">
-                        <div class="synth-range-fill"></div>
-                        <input type="range" class="synth-range-input range-start" min="0" max="${maxPx}" value="0" step="1" />
-                        <input type="range" class="synth-range-input range-end"   min="0" max="${maxPx}" value="${maxPx}" step="1" />
-                    </div>
-                    <button class="synth-pick-range-btn" data-i18n-title="synth.pickRange">
-                        <span class="material-symbols-outlined" aria-hidden="true">crop_free</span>
-                    </button>
-                </div>
+            <div class="synth-zones-row">
+                <span class="synth-zones-label">
+                    <span data-i18n="synth.zonesLabel"></span>
+                    <em class="zones-val"></em>
+                </span>
+                <div class="flex-filler"></div>
+                <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
+                <button class="synth-add-zone-btn" data-i18n-title="synth.addZone">
+                    <span class="material-symbols-outlined" aria-hidden="true">crop_free</span>
+                </button>
+                <button class="synth-clear-zones-btn" data-i18n-title="synth.clearZones">
+                    <span class="material-symbols-outlined" aria-hidden="true">layers_clear</span>
+                </button>
             </div>
 
             <div class="synth-controls-row">
+                <select class="synth-tempo">
+                    <option value=1>1/1</option>
+                    <option value=0.75>3/4</option>
+                    <option value=0.66>2/3</option>
+                    <option value=0.5>1/2</option>
+                    <option value=0.33>1/3</option>
+                    <option value=0.25>1/4</option>
+                </select>
+                <button class"synth-rewind">
+                    <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">fast_rewind</span>
+                </button>
                 <button class="synth-play">
                     <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
                     <span class="synth-play-label"></span>
                 </button>
+                <button class"synth-step-forward">
+                    <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">step</span>
+                </button>                
                 <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
                     <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
                     <span class="synth-loop-label"></span>
@@ -794,6 +845,12 @@ function createSynthElement(id) {
             .catch(err => console.error('Error in set_synth_channel:', err));
     });
 
+    // Tempo relative to the main metronome (e.g. 0.5 = one pixel every two ticks)
+    el.querySelector('.synth-tempo').addEventListener('change', (e) => {
+        invoke('set_synth_tempo', { id, tempo: Number(e.target.value) })
+            .catch(err => console.error('Error in set_synth_tempo:', err));
+    });
+
     el.querySelector('.synth-loop-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
         const loopEnabled = !btn.classList.contains('active');
@@ -852,8 +909,9 @@ function createSynthElement(id) {
         });
     });
 
-    // Initialize the highlight state (hidden by default)
-    synthHighlights.set(id, { visible: false, start: 0, end: maxPx });
+    // Initialize the highlight state (hidden by default, whole image selected)
+    synthHighlights.set(id, { visible: false, zones: [] });
+    updateZonesLabel(id);
 
     // Eye button
     el.querySelector('.synth-eye-btn').addEventListener('click', (e) => {
@@ -886,73 +944,52 @@ function createSynthElement(id) {
             .catch(err => console.error('Error in set_synth_velocity_min:', err));
     });
 
-    // Range selection button on the image
-    el.querySelector('.synth-pick-range-btn').addEventListener('click', (e) => {
+    // Zone drawing: arm/cancel the rectangle-drawing mode on the image
+    el.querySelector('.synth-add-zone-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
-        if (rangePickState && rangePickState.id === id) {
-            cancelRangePicking();
+        if (zonePickState && zonePickState.id === id) {
+            cancelZonePicking();
         } else {
-            startRangePicking(id, btn);
+            startZonePicking(id, btn);
         }
     });
 
-    initSynthRange(id, el);
+    // Clear all zones: back to the whole image
+    el.querySelector('.synth-clear-zones-btn').addEventListener('click', () => {
+        const hi = synthHighlights.get(id);
+        if (!hi) return;
+        hi.zones = [];
+        sendSynthZones(id);
+        updateZonesLabel(id);
+        redrawAllHighlights();
+    });
+
     initBrightnessRange(id, el);
 
     return el;
 }
 
-function initSynthRange(id, el) {
-    const startInput = el.querySelector('.range-start');
-    const endInput   = el.querySelector('.range-end');
-    const startVal   = el.querySelector('.range-start-val');
-    const endVal     = el.querySelector('.range-end-val');
-    const fill       = el.querySelector('.synth-range-fill');
+function updateAllSynthZones() {
+    synthListBody.querySelectorAll('.synth-block').forEach(el => {
+        const synthId = Number(el.dataset.synthId);
+        const hi = synthHighlights.get(synthId);
+        if (!hi) return;
 
-    function updateFill() {
-        const max = Number(startInput.max) || 1;
-        const s = Number(startInput.value) / max * 100;
-        const e = Number(endInput.value)   / max * 100;
-        fill.style.left  = `${s}%`;
-        fill.style.width = `${e - s}%`;
+        // Clip the zones to the new grid and drop the ones
+        // that no longer intersect the image
+        hi.zones = hi.zones
+            .map(z => ({
+                x: z.x,
+                y: z.y,
+                w: Math.min(z.w, gridW - z.x),
+                h: Math.min(z.h, gridH - z.y),
+            }))
+            .filter(z => z.w > 0 && z.h > 0);
 
-        // The left thumb must always stay clickable: bring it to the front
-        // when it is close to or equal to the right thumb
-        const atEnd = Number(startInput.value) >= Number(endInput.value);
-        startInput.style.zIndex = atEnd ? '3' : '2';
-        endInput.style.zIndex   = atEnd ? '1' : '2';
-    }
-
-    function sendRange() {
-        const pixelStart = Number(startInput.value);
-        const pixelEnd   = Number(endInput.value);
-        invoke('set_synth_range', { id, pixelStart, pixelEnd })
-            .catch(err => console.error('Error in set_synth_range:', err));
-        // Update the highlight if visible
-        const hi = synthHighlights.get(id);
-        if (hi) { hi.start = pixelStart; hi.end = pixelEnd; }
-        redrawAllHighlights();
-    }
-
-    startInput.addEventListener('input', () => {
-        if (Number(startInput.value) > Number(endInput.value)) {
-            startInput.value = endInput.value;
-        }
-        startVal.textContent = startInput.value;
-        updateFill();
-        sendRange();
+        sendSynthZones(synthId);
+        updateZonesLabel(synthId);
     });
-
-    endInput.addEventListener('input', () => {
-        if (Number(endInput.value) < Number(startInput.value)) {
-            endInput.value = startInput.value;
-        }
-        endVal.textContent = endInput.value;
-        updateFill();
-        sendRange();
-    });
-
-    updateFill();
+    redrawAllHighlights();
 }
 
 function initBrightnessRange(id, el) {
@@ -999,42 +1036,6 @@ function initBrightnessRange(id, el) {
     updateFill();
 }
 
-function updateAllSynthRangeMax(newTotal) {
-    const maxPx = newTotal > 0 ? newTotal - 1 : 0;
-    synthListBody.querySelectorAll('.synth-block').forEach(el => {
-        const startInput = el.querySelector('.range-start');
-        const endInput   = el.querySelector('.range-end');
-        const endVal     = el.querySelector('.range-end-val');
-
-        startInput.max = maxPx;
-        endInput.max   = maxPx;
-
-        // Reclamp the values if they exceed the new max
-        if (Number(startInput.value) > maxPx) startInput.value = maxPx;
-        if (Number(endInput.value)   > maxPx || Number(endInput.value) === 0) endInput.value = maxPx;
-
-        endVal.textContent = endInput.value;
-        el.querySelector('.synth-range-fill') && initFillUpdate(el);
-
-        // Recalibrate the highlight bounds
-        const synthId = Number(el.dataset.synthId);
-        const hi = synthHighlights.get(synthId);
-        if (hi) { hi.start = Number(el.querySelector('.range-start').value); hi.end = Number(endInput.value); }
-    });
-    redrawAllHighlights();
-}
-
-function initFillUpdate(el) {
-    const startInput = el.querySelector('.range-start');
-    const endInput   = el.querySelector('.range-end');
-    const fill       = el.querySelector('.synth-range-fill');
-    const max = Number(startInput.max) || 1;
-    const s = Number(startInput.value) / max * 100;
-    const e = Number(endInput.value)   / max * 100;
-    fill.style.left  = `${s}%`;
-    fill.style.width = `${e - s}%`;
-}
-
 async function onSynthPlayClick(id, el) {
     const isPlaying = await invoke('is_synth_playing', { id });
     if (!isPlaying) {
@@ -1062,14 +1063,13 @@ function syncPlayAllButton() {
 function setSynthControlsLocked(el, locked) {
     el.querySelector('.synth-channel').disabled = locked;
     el.querySelectorAll('.synth-mode-btn').forEach(btn => { btn.disabled = locked; });
-    el.querySelector('.range-start').disabled = locked;
-    el.querySelector('.range-end').disabled = locked;
-    el.querySelector('.synth-pick-range-btn').disabled = locked;
+    el.querySelector('.synth-add-zone-btn').disabled = locked;
+    el.querySelector('.synth-clear-zones-btn').disabled = locked;
 
     // If this synth was mid-selection when it started playing, cancel it.
     const id = Number(el.dataset.synthId);
-    if (locked && rangePickState && rangePickState.id === id) {
-        cancelRangePicking();
+    if (locked && zonePickState && zonePickState.id === id) {
+        cancelZonePicking();
     }
 }
 
@@ -1124,7 +1124,7 @@ async function onSynthRemoveClick(id, el) {
     await invoke('stop_synth', { id }).catch(() => {});
     await invoke('remove_synth', { id });
 
-    if (rangePickState && rangePickState.id === id) cancelRangePicking();
+    if (zonePickState && zonePickState.id === id) cancelZonePicking();
 
     synthColors.delete(id);
     synthCursors.delete(id);

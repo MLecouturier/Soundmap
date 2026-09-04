@@ -12,6 +12,16 @@ pub enum SynthMode {
     Polyphonic,
 }
 
+/// Rectangular zone of the image, in grid cells: (x, y) is the top-left
+/// cell, w and h are the extents in cells.
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub struct PixelZone {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
 /// State of an individual voice in polyphonic mode (one per R/G/B channel).
 #[derive(Clone, Copy, Debug)]
 pub struct ChannelVoice {
@@ -49,12 +59,14 @@ impl Default for ImageState {
 pub struct Synth {
     pub id: u32,
     pub playing: bool,
-    pub cursor: usize,      // index of the current pixel (0..width*height)
+    pub cursor: usize,      // index into the zone pixel sequence (0..sequence length)
     pub note: u8,           // fixed MIDI note for now: A4 = 69
     pub channel: u8,        // MIDI channel 0-15
-    pub pixel_start: usize,   // entry pixel (inclusive)
-    pub pixel_end: usize,     // exit pixel (inclusive, 0 = end of image)
+    pub zones: Vec<PixelZone>, // rectangular zones to play (empty = whole image)
     pub loop_enabled: bool,   // loop playback or stop at end of range
+    pub tempo_ratio: f64,      // playback speed relative to the metronome (1.0 = metronome tempo)
+    pub tempo_accumulator: f64, // fractional-tick accumulator: a synth with tempo < 1.0
+                               // only advances once enough metronome ticks have accumulated
     pub brightness_min: u8,   // minimum brightness threshold (0–127)
     pub brightness_max: u8,   // maximum brightness threshold (0–127)
     pub active_note: bool,     // false if the current pixel is out of range (muted)
@@ -80,9 +92,10 @@ impl Synth {
             cursor: 0,
             note: 69, // A4
             channel: 0,
-            pixel_start: 0,
-            pixel_end: 0,         // 0 means "end of the image"
+            zones: Vec::new(),    // empty = whole image
             loop_enabled: true,   // loop enabled by default
+            tempo_ratio: 1.0,
+            tempo_accumulator: 0.0,
             brightness_min: 0,
             brightness_max: 127,
             active_note: true,

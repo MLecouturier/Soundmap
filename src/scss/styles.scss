@@ -805,39 +805,29 @@ $metronome-led-transition: 0.05s ease;
         }
     }
 
-    // Pixel range dual slider
-    .synth-range-wrapper {
+    // Rectangular zone selection row
+    .synth-zones-row {
         display: flex;
-        flex-direction: column;
-        gap: .25rem;
+        align-items: center;
+        gap: .5rem;
+        margin: 0 0 .5rem 0;
 
-        .synth-range-labels {
+        .synth-zones-label {
             display: flex;
-            justify-content: space-between;
+            align-items: baseline;
+            gap: .4rem;
             font-size: 0.78rem;
             color: $color-text-secondary;
 
-            .synth-range-values {
+            em {
+                font-style: normal;
                 color: $color-text-muted;
                 font-variant-numeric: tabular-nums;
-
-                em {
-                    font-style: normal;
-                }
             }
         }
 
-        .synth-range-track-row {
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-
-            .synth-range-track {
-                flex: 1 1 auto;
-            }
-        }
-
-        .synth-pick-range-btn {
+        .synth-add-zone-btn,
+        .synth-clear-zones-btn {
             flex: 0 0 auto;
             display: flex;
             align-items: center;
@@ -870,6 +860,29 @@ $metronome-led-transition: 0.05s ease;
                 opacity: 0.4;
                 cursor: not-allowed;
                 pointer-events: none;
+            }
+        }
+    }
+
+    // Brightness threshold dual slider
+    .synth-range-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: .25rem;
+
+        .synth-range-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: $color-text-secondary;
+
+            .synth-range-values {
+                color: $color-text-muted;
+                font-variant-numeric: tabular-nums;
+
+                em {
+                    font-style: normal;
+                }
             }
         }
 
@@ -914,12 +927,9 @@ $metronome-led-transition: 0.05s ease;
                 &::-moz-range-track              { background: transparent; border: none; }
 
                 pointer-events: none;
-                &::-webkit-slider-thumb { 
+                &::-webkit-slider-thumb {
                     pointer-events: all; }
                 &::-moz-range-thumb     { pointer-events: all; }
-
-                &.range-start { z-index: 2; }
-                &.range-end   { z-index: 1; }
             }
         }
     }

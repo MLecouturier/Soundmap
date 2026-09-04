@@ -1,7 +1,7 @@
 use tauri::State;
 use crate::error::{err, AppError};
 use crate::midi::send_note_off;
-use crate::state::{ImageState, Synth, SynthMode, SynthState, MidiState};
+use crate::state::{PixelZone, Synth, SynthMode, SynthState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
 // (unchanged, assumed to remain above or below in this file)
@@ -12,15 +12,7 @@ fn synth_not_found(id: u32) -> AppError {
 }
 
 #[tauri::command]
-pub fn add_synth(
-    image_state: State<ImageState>,
-    state: State<SynthState>,
-) -> Result<u32, AppError> {
-    let has_image = image_state.original.lock().unwrap().is_some();
-    if !has_image {
-        return Err(err("no_image_loaded_for_synth"));
-    }
-
+pub fn add_synth(state: State<SynthState>) -> Result<u32, AppError> {
     let mut next_id = state.next_id.lock().unwrap();
     let id = *next_id;
     *next_id += 1;
@@ -59,6 +51,7 @@ pub fn stop_synth(
         Some(synth) => {
             synth.playing = false;
             synth.last_played_note = None;
+            synth.tempo_accumulator = 0.0;
             let mut conn_guard = midi_state.connection.lock().unwrap();
 
             // Immediately turn off the current mono note, if it is still sounding
@@ -162,6 +155,18 @@ pub fn set_synth_brightness_range(
 }
 
 #[tauri::command]
+pub fn set_synth_tempo(id: u32, tempo: f64, state: State<SynthState>) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.tempo_ratio = tempo.clamp(0.05, 4.0);
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+#[tauri::command]
 pub fn set_synth_loop(id: u32, loop_enabled: bool, state: State<SynthState>) -> Result<(), AppError> {
     let mut synths = state.synths.lock().unwrap();
     match synths.get_mut(&id) {
@@ -257,23 +262,15 @@ pub fn set_synth_channel_enabled(
 }
 
 #[tauri::command]
-pub fn set_synth_range(
+pub fn set_synth_zones(
     id: u32,
-    pixel_start: usize,
-    pixel_end: usize,
+    zones: Vec<PixelZone>,
     state: State<SynthState>,
 ) -> Result<(), AppError> {
     let mut synths = state.synths.lock().unwrap();
     match synths.get_mut(&id) {
         Some(synth) => {
-            synth.pixel_start = pixel_start;
-            synth.pixel_end = pixel_end;
-            // Move the cursor back into the range if necessary
-            if synth.cursor < pixel_start {
-                synth.cursor = pixel_start;
-            } else if pixel_end > 0 && synth.cursor > pixel_end {
-                synth.cursor = pixel_start;
-            }
+            synth.zones = zones;
             Ok(())
         }
         None => Err(synth_not_found(id)),
