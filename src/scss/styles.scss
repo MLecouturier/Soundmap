@@ -188,7 +188,11 @@ h2 {
             }
         }
 
-        img {
+        // The original image (<img>) and the processed image (canvas painted
+        // from raw pixels) share the same layout: fill the viewer and scale
+        // down with contain behavior
+        img,
+        #processed-preview {
             width: 100%;
             height: 100%;
             object-fit: contain;
@@ -199,8 +203,8 @@ h2 {
                 image-rendering: crisp-edges;
             }
 
-            &.hidden { 
-                display: none; 
+            &.hidden {
+                display: none;
             }
         }
 
@@ -337,6 +341,40 @@ input[type="range"].synth-range-input {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 10px 1.125rem;
+    }
+
+    // Action bar of an interactive mode (crop, transform...)
+    .mode-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: .75rem;
+
+        &.hidden { display: none; }
+
+        .mode-bar-hint {
+            font-size: 0.8rem;
+            color: $color-text-muted;
+        }
+
+        button {
+            padding: 4px .75rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    // Fine rotation + perspective adjustment panel
+    #transform-panel {
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
+        margin-bottom: .75rem;
+        padding: .625rem .75rem;
+        border: 1px solid $color-border;
+        border-radius: $border-radius-base;
+        background-color: #1a1a1a;
+
+        &.hidden { display: none; }
     }
 
     // Controls locked while a synthesizer is playing

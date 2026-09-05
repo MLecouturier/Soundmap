@@ -118,8 +118,12 @@ function updateReadingDirectionBtn(btn) {
 // ---------- Elements ----------
 const loadBtn         = document.querySelector('#load-btn');
 const resetBtn        = document.querySelector('#reset-btn');
+const rotateBtn       = document.querySelector('#rotate-img-btn');
+const cropBtn         = document.querySelector('#crop-img-btn');
+const transformBtn    = document.querySelector('#transform-img-btn');
 const showOriginal    = document.querySelector('#show-original');
 const preview         = document.querySelector('#preview');
+const previewCanvas   = document.querySelector('#processed-preview');
 const viewerEmpty     = document.querySelector('#viewer-empty');
 const pixelOverlay    = document.querySelector('#pixel-overlay');
 
@@ -139,11 +143,15 @@ const dimensionsInfo  = document.querySelector('#dimensions-info');
 
 // Image controls to lock while a synthesizer is playing
 // (the "Show original" button is intentionally excluded)
-const imageLockControls = [loadBtn, resetBtn, gridSlider, contrast, brightness, saturation, posterize];
+const imageLockControls = [loadBtn, resetBtn, rotateBtn, cropBtn, transformBtn, gridSlider, contrast, brightness, saturation, posterize];
 
 // Locks/unlocks image controls depending on whether a synth is playing
 function updateImageControlsLockState() {
     const anyPlaying = synthListBody.querySelectorAll('.synth-play.active').length > 0;
+    if (anyPlaying) {
+        exitCropMode();
+        closeTransformPanel();
+    }
     imageLockControls.forEach(el => { el.disabled = anyPlaying; });
     document.querySelector('#controls').classList.toggle('locked', anyPlaying);
 }
@@ -285,10 +293,23 @@ function cancelZonePicking() {
 }
 
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') cancelZonePicking();
+    if (e.key === 'Escape') {
+        exitCropMode();
+        closeTransformPanel();
+        cancelZonePicking();
+    }
 });
 
 pixelOverlay.addEventListener('mousedown', (e) => {
+    if (cropMode) {
+        if (!hasImage) return;
+        e.preventDefault(); // prevents image dragging during selection
+        const rect = pixelOverlay.getBoundingClientRect();
+        cropDrag = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        cropRect = { x: cropDrag.x, y: cropDrag.y, w: 0, h: 0 };
+        drawCropOverlay();
+        return;
+    }
     if (!zonePickState || !hasImage) return;
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
@@ -300,6 +321,19 @@ pixelOverlay.addEventListener('mousedown', (e) => {
 });
 
 pixelOverlay.addEventListener('mousemove', (e) => {
+    if (cropDrag) {
+        const rect = pixelOverlay.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        cropRect = {
+            x: Math.min(cropDrag.x, cx),
+            y: Math.min(cropDrag.y, cy),
+            w: Math.abs(cx - cropDrag.x),
+            h: Math.abs(cy - cropDrag.y),
+        };
+        drawCropOverlay();
+        return;
+    }
     if (!zoneDrag) return;
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
@@ -309,6 +343,14 @@ pixelOverlay.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', (e) => {
+    if (cropDrag) {
+        cropDrag = null;
+        // A degenerate rect (simple click, no real drag) is discarded
+        if (cropRect && cropRect.w < 3 && cropRect.h < 3) cropRect = null;
+        cropApplyBtn.disabled = !cropRect;
+        drawCropOverlay();
+        return;
+    }
     if (!zoneDrag) return;
     const { id, start, cur, mode } = zoneDrag;
     zoneDrag = null;
@@ -543,11 +585,11 @@ const CHANNEL_TINTS = [
 ];
 
 function drawChannelOverlay(channelIndex) {
-    if (!hasImage || !cachedPixelData) return;
+    if (!hasImage || !processedPixels) return;
     const layout = getImageLayout();
     if (!layout) return;
     const { offsetX, offsetY, renderW, renderH } = layout;
-    const { width, height, pixels } = cachedPixelData;
+    const { width, height, rgba } = processedPixels;
     if (!width || !height) return;
 
     // Build an offscreen canvas at the grid's resolution, where each pixel
@@ -560,7 +602,7 @@ function drawChannelOverlay(channelIndex) {
     const [tr, tg, tb] = CHANNEL_TINTS[channelIndex];
 
     for (let i = 0; i < width * height; i++) {
-        const value = pixels[i * 4 + channelIndex];
+        const value = rgba[i * 4 + channelIndex];
         const o = i * 4;
         imageData.data[o]     = (tr * value) / 255;
         imageData.data[o + 1] = (tg * value) / 255;
@@ -584,26 +626,16 @@ function hideChannelOverlay() {
 new ResizeObserver(() => {
     resizeOverlay();
     clearOverlay();
+    if (cropMode) drawCropOverlay();
 }).observe(pixelOverlay);
 
 // ---------- State ----------
 let hasImage      = false;
 let origWidth     = 0;
 let origHeight    = 0;
-let originalPng   = null;   // base64 of the original preview
-let processedPng  = null;   // base64 of the last processed render
-let totalPixels   = 0;      // total number of pixels in the current grid
-
-// Cache of the processed image's raw pixels (flat RGBA), for the channel preview
-let cachedPixelData = null; // { width, height, pixels: Uint8ClampedArray-like }
-
-async function refreshPixelDataCache() {
-    try {
-        cachedPixelData = await invoke('get_pixel_data');
-    } catch (err) {
-        cachedPixelData = null;
-    }
-}
+let originalPng   = null;       // base64 PNG of the original image
+let processedPixels = null;     // { width, height, rgba } of the last processed render
+let totalPixels   = 0;          // total number of pixels in the current grid
 
 // Predefined colors for the synths
 const SYNTH_COLORS = [
@@ -650,12 +682,49 @@ function buildParams() {
 }
 
 // ---------- Display ----------
+// Decodes the raw IPC format sent by the backend: 8-byte header
+// (width and height as little-endian u32) followed by flat RGBA bytes.
+function decodePixelResponse(buf) {
+    const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const width = view.getUint32(0, true);
+    const height = view.getUint32(4, true);
+    return {
+        width,
+        height,
+        rgba: new Uint8ClampedArray(bytes.buffer, bytes.byteOffset + 8, width * height * 4),
+    };
+}
+
+function paintPreviewCanvas(pixels) {
+    if (previewCanvas.width !== pixels.width) previewCanvas.width = pixels.width;
+    if (previewCanvas.height !== pixels.height) previewCanvas.height = pixels.height;
+    previewCanvas.getContext('2d').putImageData(
+        new ImageData(pixels.rgba, pixels.width, pixels.height), 0, 0);
+}
+
+// Shows the right surface: the <img> for the original ("Show original"
+// checkbox), the canvas for everything that comes as raw pixels (processed
+// image, transform live preview — the latter taking precedence).
 function updatePreviewSrc() {
-  const showOrig = showOriginal.checked;
-  const data = showOrig ? originalPng : processedPng;
-  if (!data) return;
-  preview.src = `data:image/png;base64,${data}`;
-  preview.classList.toggle('pixelated', !showOrig);
+    const showOrig = showOriginal.checked;
+    const pixels = transformPreviewPixels ?? (showOrig ? null : processedPixels);
+
+    if (pixels) {
+        paintPreviewCanvas(pixels);
+        previewCanvas.classList.remove('hidden');
+        preview.classList.add('hidden');
+    } else if (showOrig && originalPng) {
+        preview.src = `data:image/png;base64,${originalPng}`;
+        preview.classList.remove('hidden');
+        previewCanvas.classList.add('hidden');
+    } else {
+        preview.classList.add('hidden');
+        previewCanvas.classList.add('hidden');
+    }
+
+    // The processed view is the grid render: show cells as crisp blocks
+    previewCanvas.classList.toggle('pixelated', !showOrig && transformPreviewPixels === null);
 }
 
 function syncLabels() {
@@ -677,25 +746,25 @@ async function refresh() {
   pending = true;
 
   try {
-    const result = await invoke('apply_image_adjustments', {
+    const buf = await invoke('apply_image_adjustments', {
       params: buildParams(),
     });
+    const decoded = decodePixelResponse(buf);
 
-    processedPng = result.base64_png;
+    processedPixels = decoded;
     updatePreviewSrc();
 
-    totalPixels = result.cell_count;
-    gridW = result.width;
-    gridH = result.height;
+    totalPixels = decoded.width * decoded.height;
+    gridW = decoded.width;
+    gridH = decoded.height;
     clearOverlay();
     cancelZonePicking();
     updateAllSynthZones();
-    await refreshPixelDataCache();
 
     lastDimensionsInfo = {
       origWidth, origHeight,
-      width: result.width, height: result.height,
-      cellCount: result.cell_count,
+      width: decoded.width, height: decoded.height,
+      cellCount: totalPixels,
     };
     dimensionsInfo.textContent = t('controls.dimensionsInfo', lastDimensionsInfo);
   } catch (err) {
@@ -718,6 +787,9 @@ loadBtn.addEventListener('click', async () => {
     const result = await invoke('load_image');
     if (!result) return;
 
+    exitCropMode();
+    closeTransformPanel();
+
     origWidth   = result.orig_width;
     origHeight  = result.orig_height;
     originalPng = result.base64_png;
@@ -727,7 +799,6 @@ loadBtn.addEventListener('click', async () => {
     showOriginal.checked  = false;
 
     viewerEmpty.classList.add('hidden');
-    preview.classList.remove('hidden');
 
     syncLabels();
     await refresh();
@@ -735,6 +806,240 @@ loadBtn.addEventListener('click', async () => {
     console.error('Error while loading the image:', err);
     dimensionsInfo.textContent = translateError(err);
   }
+});
+
+// ---------- Image shape tools (rotate / crop / transform) ----------
+// Every reshape operation resets the synth zones: they are grid
+// coordinates and would no longer match the manipulated image.
+function resetAllSynthZones() {
+    synthHighlights.forEach(hi => { hi.zones = []; });
+    synthListBody.querySelectorAll('.synth-block').forEach(el => {
+        const id = Number(el.dataset.synthId);
+        sendSynthZones(id);
+        updateZonesLabel(id);
+    });
+    redrawAllHighlights();
+}
+
+// Applies a backend reshape result (new original) to the frontend state
+async function applyReshapedImage(result) {
+    origWidth   = result.orig_width;
+    origHeight  = result.orig_height;
+    originalPng = result.base64_png;
+
+    resetAllSynthZones();
+    syncLabels();
+    updatePreviewSrc();
+    await refresh();
+}
+
+// ---------- Rotation (90° steps) ----------
+rotateBtn.addEventListener('click', async () => {
+    if (!hasImage) return;
+    try {
+        const result = await invoke('rotate_image');
+
+        exitCropMode();
+        closeTransformPanel();
+        await applyReshapedImage(result);
+    } catch (err) {
+        console.error('Error while rotating the image:', err);
+        dimensionsInfo.textContent = translateError(err);
+    }
+});
+
+// ---------- Crop ----------
+const cropBar          = document.querySelector('#crop-bar');
+const cropApplyBtn     = document.querySelector('#crop-apply-btn');
+const cropCancelBtn    = document.querySelector('#crop-cancel-btn');
+
+let cropMode = false;
+let cropRect = null; // { x, y, w, h } in overlay canvas pixels
+let cropDrag = null;  // start point while dragging
+
+function drawCropOverlay() {
+    const ctx = pixelOverlay.getContext('2d');
+    ctx.clearRect(0, 0, pixelOverlay.width, pixelOverlay.height);
+    if (!cropRect) return;
+    const { x, y, w, h } = cropRect;
+    const vw = pixelOverlay.width;
+    const vh = pixelOverlay.height;
+
+    ctx.save();
+    // Dim everything outside the selection
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, vw, y);
+    ctx.fillRect(0, y + h, vw, vh - y - h);
+    ctx.fillRect(0, y, x, h);
+    ctx.fillRect(x + w, y, vw - x - w, h);
+    // Selection outline
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+}
+
+function enterCropMode() {
+    if (!hasImage || cropMode) return;
+    cancelZonePicking();
+    closeTransformPanel();
+    cropMode = true;
+    cropRect = null;
+    cropDrag = null;
+    cropBtn.classList.add('active');
+    pixelOverlay.classList.add('picking');
+    cropBar.classList.remove('hidden');
+    cropApplyBtn.disabled = true;
+    drawCropOverlay();
+}
+
+function exitCropMode() {
+    if (!cropMode) return;
+    cropMode = false;
+    cropRect = null;
+    cropDrag = null;
+    cropBtn.classList.remove('active');
+    pixelOverlay.classList.remove('picking');
+    cropBar.classList.add('hidden');
+    redrawAllHighlights();
+}
+
+cropBtn.addEventListener('click', () => cropMode ? exitCropMode() : enterCropMode());
+cropCancelBtn.addEventListener('click', exitCropMode);
+
+cropApplyBtn.addEventListener('click', async () => {
+    if (!cropMode || !cropRect || !hasImage) return;
+    const layout = getImageLayout();
+    if (!layout) return;
+
+    // Overlay canvas pixels → original image pixels
+    const x = Math.max(0, Math.round((cropRect.x - layout.offsetX) / layout.renderW * origWidth));
+    const y = Math.max(0, Math.round((cropRect.y - layout.offsetY) / layout.renderH * origHeight));
+    const w = Math.max(1, Math.min(origWidth - x, Math.round(cropRect.w / layout.renderW * origWidth)));
+    const h = Math.max(1, Math.min(origHeight - y, Math.round(cropRect.h / layout.renderH * origHeight)));
+
+    try {
+        const result = await invoke('crop_image', { x, y, width: w, height: h });
+        exitCropMode();
+        await applyReshapedImage(result);
+    } catch (err) {
+        console.error('Error while cropping the image:', err);
+        dimensionsInfo.textContent = translateError(err);
+    }
+});
+
+// ---------- Transform (fine rotation + perspective) ----------
+const transformPanel          = document.querySelector('#transform-panel');
+const transformApplyBtn       = document.querySelector('#transform-apply-btn');
+const transformCancelBtn      = document.querySelector('#transform-cancel-btn');
+const transformRotation       = document.querySelector('#transform-rotation');
+const transformRotationValue  = document.querySelector('#transform-rotation-value');
+const transformPerspV         = document.querySelector('#transform-persp-v');
+const transformPerspVValue    = document.querySelector('#transform-persp-v-value');
+const transformPerspH         = document.querySelector('#transform-persp-h');
+const transformPerspHValue     = document.querySelector('#transform-persp-h-value');
+
+let transformActive = false;
+let transformPreviewPixels = null; // live preview { width, height, rgba }, shown instead of the normal image
+let transformDebounceId = null;
+let transformRequestToken = 0;     // discards stale preview responses
+
+function transformParams() {
+    return {
+        rotation: Number(transformRotation.value),
+        perspective_v: Number(transformPerspV.value) / 100,
+        perspective_h: Number(transformPerspH.value) / 100,
+    };
+}
+
+function isTransformPending() {
+    const p = transformParams();
+    return p.rotation !== 0 || p.perspective_v !== 0 || p.perspective_h !== 0;
+}
+
+function syncTransformLabels() {
+    transformRotationValue.textContent = `${Number(transformRotation.value).toFixed(1)}°`;
+    transformPerspVValue.textContent = Number(transformPerspV.value);
+    transformPerspHValue.textContent = Number(transformPerspH.value);
+    transformApplyBtn.disabled = !isTransformPending();
+}
+
+function scheduleTransformPreview(delay = 150) {
+    clearTimeout(transformDebounceId);
+    transformDebounceId = setTimeout(requestTransformPreview, delay);
+}
+
+async function requestTransformPreview() {
+    if (!transformActive) return;
+    // No adjustment: show the original as-is (no backend round trip)
+    if (!isTransformPending()) {
+        transformRequestToken++;
+        transformPreviewPixels = null;
+        updatePreviewSrc();
+        return;
+    }
+    const params = transformParams();
+    const token = ++transformRequestToken;
+    try {
+        const buf = await invoke('preview_image_transform', { params });
+        if (!transformActive || token !== transformRequestToken) return;
+        transformPreviewPixels = decodePixelResponse(buf);
+        updatePreviewSrc();
+    } catch (err) {
+        console.error('Error in preview_image_transform:', err);
+    }
+}
+
+function openTransformPanel() {
+    if (!hasImage || transformActive) return;
+    cancelZonePicking();
+    exitCropMode();
+    transformActive = true;
+    transformBtn.classList.add('active');
+    transformPanel.classList.remove('hidden');
+    // The sliders start from zero: any previous adjustment was consumed
+    // into the original when applied
+    transformRotation.value = 0;
+    transformPerspV.value = 0;
+    transformPerspH.value = 0;
+    syncTransformLabels();
+    transformPreviewPixels = null;
+    updatePreviewSrc();
+}
+
+function closeTransformPanel() {
+    if (!transformActive) return;
+    transformActive = false;
+    clearTimeout(transformDebounceId);
+    transformRequestToken++;
+    transformPreviewPixels = null;
+    transformBtn.classList.remove('active');
+    transformPanel.classList.add('hidden');
+    updatePreviewSrc();
+}
+
+transformBtn.addEventListener('click', () => transformActive ? closeTransformPanel() : openTransformPanel());
+transformCancelBtn.addEventListener('click', closeTransformPanel);
+
+[transformRotation, transformPerspV, transformPerspH].forEach(el => {
+    el.addEventListener('input', () => {
+        syncTransformLabels();
+        scheduleTransformPreview();
+    });
+});
+
+transformApplyBtn.addEventListener('click', async () => {
+    if (!transformActive || !hasImage || !isTransformPending()) return;
+    const params = transformParams();
+    try {
+        const result = await invoke('apply_image_transform', { params });
+        closeTransformPanel(); // restores the normal preview
+        await applyReshapedImage(result);
+    } catch (err) {
+        console.error('Error while transforming the image:', err);
+        dimensionsInfo.textContent = translateError(err);
+    }
 });
 
 // ---------- Reset ----------
@@ -790,6 +1095,8 @@ loadSessionBtn.addEventListener('click', async () => {
 
     // Stop everything and clear the current synths
     await invoke('stop_metronome');
+    exitCropMode();
+    closeTransformPanel();
     metronomeRunning = false;
     synthListBody.querySelectorAll('.synth-block').forEach(el => el.remove());
     synthColors.clear();
@@ -814,7 +1121,6 @@ loadSessionBtn.addEventListener('click', async () => {
     posterize.value = session.image_settings.posterize_levels ?? 1;
     showOriginal.checked = false;
     viewerEmpty.classList.add('hidden');
-    preview.classList.remove('hidden');
     syncLabels();
     await refresh();
 

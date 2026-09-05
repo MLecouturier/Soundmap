@@ -13,6 +13,7 @@
         <div class="column column-left">
             <div class="content-area" id="image-viewer-container">
                 <div id="image-viewer">
+                    <canvas id="processed-preview" class="hidden"></canvas>
                     <img id="preview" data-i18n-alt="viewer.previewAlt" class="hidden" />
                     <canvas id="pixel-overlay"></canvas>
                     <p class="viewer-empty" id="viewer-empty" data-i18n="viewer.noImage"></p>
@@ -22,16 +23,48 @@
                     <div class="controls-row">
                         <button id="load-btn" data-i18n="controls.load"></button>
                         <button id="reset-btn" class="secondary" data-i18n="controls.reset"></button>
-                        <button id="save-session-btn" class="icon-btn" data-i18n-title="session.save">
-                            <span class="material-symbols-outlined" aria-hidden="true">save</span>
+                        <button id="rotate-img-btn" class="icon-btn" data-i18n-title="controls.rotate">
+                            <span class="material-symbols-outlined">rotate_90_degrees_cw</span>
                         </button>
-                        <button id="load-session-btn" class="icon-btn" data-i18n-title="session.load">
-                            <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+                        <button id="crop-img-btn" class="icon-btn" data-i18n-title="controls.crop">
+                            <span class="material-symbols-outlined">crop</span>
+                        </button>
+                        <button id="transform-img-btn" class="icon-btn" data-i18n-title="controls.transform">
+                            <span class="material-symbols-outlined">tune</span>
                         </button>
                         <label class="checkbox">
                             <input type="checkbox" id="show-original" />
                             <span data-i18n="controls.showOriginal"></span>
                         </label>
+                    </div>
+
+                    <div id="crop-bar" class="mode-bar hidden">
+                        <span class="mode-bar-hint" data-i18n="controls.cropHint"></span>
+                        <div class="flex-filler"></div>
+                        <button id="crop-apply-btn" data-i18n="controls.apply" disabled></button>
+                        <button id="crop-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
+                    </div>
+
+                    <div id="transform-panel" class="hidden">
+                        <div class="controls-grid">
+                            <label>
+                                <span><span data-i18n="controls.rotation"></span> <em id="transform-rotation-value">0°</em></span>
+                                <input type="range" id="transform-rotation" min="-45" max="45" value="0" step="0.1" />
+                            </label>
+                            <label>
+                                <span><span data-i18n="controls.perspectiveV"></span> <em id="transform-persp-v-value">0</em></span>
+                                <input type="range" id="transform-persp-v" min="-50" max="50" value="0" step="1" />
+                            </label>
+                            <label>
+                                <span><span data-i18n="controls.perspectiveH"></span> <em id="transform-persp-h-value">0</em></span>
+                                <input type="range" id="transform-persp-h" min="-50" max="50" value="0" step="1" />
+                            </label>
+                        </div>
+                        <div class="mode-bar">
+                            <div class="flex-filler"></div>
+                            <button id="transform-apply-btn" data-i18n="controls.apply"></button>
+                            <button id="transform-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
+                        </div>
                     </div>
 
                     <div class="controls-grid">
@@ -108,6 +141,13 @@
                 <div class="config-controls">
                     <button id="open-config-btn" data-i18n-title="config.openFile">
                         <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+                    </button>
+                    <div class="flex-filler"></div>
+                    <button id="save-session-btn" class="icon-btn" data-i18n-title="session.save">
+                        <span class="material-symbols-outlined" aria-hidden="true">save</span>
+                    </button>
+                    <button id="load-session-btn" class="icon-btn" data-i18n-title="session.load">
+                        <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
                     </button>
                     <div class="flex-filler"></div>
                     <div id="language-switcher"></div>
