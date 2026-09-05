@@ -1512,6 +1512,17 @@ function applySynthConfig(el, cfg) {
     });
 }
 
+// One bass/medium/treble filter group: used four times per card
+// (monophonic note + each of the three polyphonic voices)
+function noteRangeGroup() {
+    return `
+        <div class="synth-note-range">
+            <button class="synth-bass icon-btn">𝄢</button>
+            <button class="synth-medium icon-btn">𝄡</button>
+            <button class="synth-treble icon-btn">𝄞</button>
+        </div>`;
+}
+
 function createSynthElement(id, cfg = null) {
     const el = document.createElement('div');
     el.className = 'synth-block';
@@ -1531,8 +1542,7 @@ function createSynthElement(id, cfg = null) {
         `<button class="color-swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`
     ).join('');
 
-    el.innerHTML = `
-        <div class="synth-color-band" style="background:${defaultColor}" data-i18n-title="synth.pickColor"></div>
+    el.innerHTML = `        <div class="synth-color-band" style="background:${defaultColor}" data-i18n-title="synth.pickColor"></div>
         <div class="synth-color-picker hidden">
             <div class="color-swatches">${colorSwatches}</div>
         </div>
@@ -1553,138 +1563,161 @@ function createSynthElement(id, cfg = null) {
             </div>
         </div>
         <div class="synth-body">
-            <div class="synth-zones-row">
-                <span class="synth-zones-label">
-                    <span data-i18n="synth.zonesLabel"></span>
-                    <em class="zones-val"></em>
-                </span>
-                <div class="flex-filler"></div>
-                <button class="synth-eye-btn icon-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
-                <button class="synth-add-zone-btn icon-btn" data-i18n-title="synth.addZone">
-                    <span class="material-symbols-outlined" aria-hidden="true">select</span>
-                </button>
-                <button class="synth-select-all-btn icon-btn" data-i18n-title="synth.selectAllZones">
-                    <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
-                </button>
-                <button class="synth-clear-zones-btn icon-btn" data-i18n-title="synth.clearZones">
-                    <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
-                </button>
-                
-            </div>
-            <div class="synth-direction-row">
-                <button class="synth-reading-direction-btn icon-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
-                    <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-                </button>
-                <button class="synth-loop-btn icon-btn active" data-i18n-title="synth.toggleLoop">
-                    <span class="material-symbols-outlined" aria-hidden="true">laps</span>
-                </button>
-                <button class="synth-back-n-forth-btn icon-btn" data-i18n-title="synth.toggleBackAndForth">
-                    <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
-                </button>
+            <div class="synth-section">
+                <div class="synth-section-header">
+                    <span class="synth-section-title" data-i18n="synth.zonesLabel"></span>
+                    <em class="synth-section-value zones-val"></em>
+                    <div class="flex-filler"></div>
+                    <button class="synth-eye-btn icon-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
+                    <button class="synth-add-zone-btn icon-btn" data-i18n-title="synth.addZone">
+                        <span class="material-symbols-outlined" aria-hidden="true">select</span>
+                    </button>
+                    <button class="synth-select-all-btn icon-btn" data-i18n-title="synth.selectAllZones">
+                        <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
+                    </button>
+                    <button class="synth-clear-zones-btn icon-btn" data-i18n-title="synth.clearZones">
+                        <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
+                    </button>
+                </div>
             </div>
 
-            <div class="synth-controls-row">
-                <select class="synth-tempo">
-                    <option value=1>1/1</option>
-                    <option value=0.75>3/4</option>
-                    <option value=0.66>2/3</option>
-                    <option value=0.5>1/2</option>
-                    <option value=0.33>1/3</option>
-                    <option value=0.25>1/4</option>
-                </select>
-                <button class="synth-rewind icon-btn" data-i18n-title="synth.rewind">
-                    <span class="material-symbols-outlined" aria-hidden="true">fast_rewind</span>
-                </button>
-                <button class="synth-play">
-                    <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
-                    <span class="synth-play-label"></span>
-                </button>
-                <button class="synth-step-forward icon-btn" data-i18n-title="synth.stepForward">
-                    <span class="material-symbols-outlined" aria-hidden="true">step</span>
-                </button>
+            <div class="synth-section">
+                <div class="synth-section-header">
+                    <span class="synth-section-title" data-i18n="synth.playbackTitle"></span>
+                </div>
+                <div class="synth-section-body">
+                    <button class="synth-reading-direction-btn icon-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </button>
+                    <button class="synth-loop-btn icon-btn active" data-i18n-title="synth.toggleLoop">
+                        <span class="material-symbols-outlined" aria-hidden="true">laps</span>
+                    </button>
+                    <button class="synth-back-n-forth-btn icon-btn" data-i18n-title="synth.toggleBackAndForth">
+                        <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
+                    </button>
+                    <div class="flex-filler"></div>
+                    <select class="synth-tempo" data-i18n-title="synth.tempoRatio">
+                        <option value=1>1/1</option>
+                        <option value=0.75>3/4</option>
+                        <option value=0.66>2/3</option>
+                        <option value=0.5>1/2</option>
+                        <option value=0.33>1/3</option>
+                        <option value=0.25>1/4</option>
+                    </select>
+                </div>
+                <div class="synth-section-body">
+                    <button class="synth-rewind icon-btn" data-i18n-title="synth.rewind">
+                        <span class="material-symbols-outlined" aria-hidden="true">fast_rewind</span>
+                    </button>
+                    <button class="synth-play">
+                        <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
+                        <span class="synth-play-label"></span>
+                    </button>
+                    <button class="synth-step-forward icon-btn" data-i18n-title="synth.stepForward">
+                        <span class="material-symbols-outlined" aria-hidden="true">step</span>
+                    </button>
+                </div>
             </div>
 
-            <div class="synth-mode-row">
-                    <button class="synth-mode-btn active" data-mode="monophonic"></button>
-                    <button class="synth-mode-btn" data-mode="polyphonic"></button>
+            <div class="synth-section">
+                <div class="synth-section-header">
+                    <span class="synth-section-title" data-i18n="synth.modeTitle"></span>
+                    <div class="flex-filler"></div>
                     <button class="synth-toggle-full-options icon-btn" data-i18n-title="synth.toggleFullOptions">
                         <span class="material-symbols-outlined" aria-hidden="true">expand_circle_up</span>
                     </button>
+                </div>
+                <div class="synth-section-body">
+                    <button class="synth-mode-btn toggle-btn active" data-mode="monophonic"></button>
+                    <button class="synth-mode-btn toggle-btn" data-mode="polyphonic"></button>
+                </div>
             </div>
 
             <div class="synth-full-options">
                 <div class="synth-mode-panel synth-mode-panel-mono">
-                    <div class="synth-note-range">
-                        <button class="synth-bass">𝄢</button>
-                        <button class="synth-medium">𝄡</button>
-                        <button class="synth-treble">𝄞</button>
+                    <div class="synth-section">
+                        <div class="synth-section-header">
+                            <span class="synth-section-title" data-i18n="synth.noteRangeTitle"></span>
+                        </div>
+                        <div class="synth-section-body">
+                            ${noteRangeGroup()}
+                        </div>
                     </div>
-                    <label class="hue-shift synth-slider-label">
-                        <span><span data-i18n="synth.hueShift"></span> <em class="hue-shift-val">0°</em></span>
-                        <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
-                    </label>
+                    <div class="synth-section">
+                        <div class="synth-section-header">
+                            <span class="synth-section-title" data-i18n="synth.hueShift"></span>
+                            <em class="synth-section-value hue-shift-val">0°</em>
+                        </div>
+                        <div class="synth-section-body">
+                            <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
+                        </div>
+                    </div>
                 </div>
 
                 <div class="synth-mode-panel synth-mode-panel-poly hidden">
-                    <span class="synth-mode-panel-label" data-i18n="synth.channelsPanelLabel"></span>
-                    <div class="synth-channel-toggles">
-                        <div class="synth-channel-toggle-group">
-                            <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
-                            <div class="synth-note-range">
-                                <button class="synth-bass">𝄢</button>
-                                <button class="synth-medium">𝄡</button>
-                                <button class="synth-treble">𝄞</button>
-                            </div>
+                    <div class="synth-section">
+                        <div class="synth-section-header">
+                            <span class="synth-section-title" data-i18n="synth.channelsPanelLabel"></span>
                         </div>
-                        <div class="synth-channel-toggle-group">
-                            <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
-                            <div class="synth-note-range">
-                                <button class="synth-bass">𝄢</button>
-                                <button class="synth-medium">𝄡</button>
-                                <button class="synth-treble">𝄞</button>
-                            </div>
-                        </div>
-                        <div class="synth-channel-toggle-group">
-                            <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
-                            <div class="synth-note-range">
-                                <button class="synth-bass">𝄢</button>
-                                <button class="synth-medium">𝄡</button>
-                                <button class="synth-treble">𝄞</button>
+                        <div class="synth-section-body">
+                            <div class="synth-channel-toggles">
+                                <div class="synth-channel-toggle-group">
+                                    <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
+                                    ${noteRangeGroup()}
+                                </div>
+                                <div class="synth-channel-toggle-group">
+                                    <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
+                                    ${noteRangeGroup()}
+                                </div>
+                                <div class="synth-channel-toggle-group">
+                                    <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
+                                    ${noteRangeGroup()}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="note-lengths">
-                    <button class="note-length-btn noto-music" data-length="sixteenth" data-i18n-title="synth.noteLengthSixteenth">𝅘𝅥𝅯</button>
-                    <button class="note-length-btn noto-music" data-length="eighth" data-i18n-title="synth.noteLengthEighth">𝅘𝅥𝅮</button>
-                    <button class="note-length-btn noto-music active" data-length="quarter" data-i18n-title="synth.noteLengthQuarter">𝅘𝅥</button>
-                    <button class="note-length-btn noto-music" data-length="half" data-i18n-title="synth.noteLengthHalf">𝅗𝅥</button>
-                    <button class="note-length-btn noto-music" data-length="whole" data-i18n-title="synth.noteLengthWhole">𝅝</button>
-                    <button class="synth-reverse-note-length icon-btn" data-i18n-title="synth.reverseNoteLength">
-                        <span class="material-symbols-outlined" aria-hidden="true">reset_exposure</span>
-                    </button>
-                </div>
-                
-                <div class="brightness-threshold synth-range-wrapper">
-                    <div class="synth-range-labels">
-                        <span data-i18n="synth.brightnessThreshold"></span>
-                        <span class="synth-range-values">
-                            <em class="brightness-start-val">0</em> – <em class="brightness-end-val">127</em>
-                        </span>
+                <div class="synth-section">
+                    <div class="synth-section-header">
+                        <span class="synth-section-title" data-i18n="synth.noteLengthsTitle"></span>
+                        <div class="flex-filler"></div>
+                        <button class="synth-reverse-note-length icon-btn" data-i18n-title="synth.reverseNoteLength">
+                            <span class="material-symbols-outlined" aria-hidden="true">reset_exposure</span>
+                        </button>
                     </div>
-                    <div class="synth-range-track">
+                    <div class="synth-section-body">
+                        <button class="note-length-btn noto-music icon-btn" data-length="sixteenth" data-i18n-title="synth.noteLengthSixteenth">𝅘𝅥𝅯</button>
+                        <button class="note-length-btn noto-music icon-btn" data-length="eighth" data-i18n-title="synth.noteLengthEighth">𝅘𝅥𝅮</button>
+                        <button class="note-length-btn noto-music icon-btn active" data-length="quarter" data-i18n-title="synth.noteLengthQuarter">𝅘𝅥</button>
+                        <button class="note-length-btn noto-music icon-btn" data-length="half" data-i18n-title="synth.noteLengthHalf">𝅗𝅥</button>
+                        <button class="note-length-btn noto-music icon-btn" data-length="whole" data-i18n-title="synth.noteLengthWhole">𝅝</button>
+                    </div>
+                </div>
+
+                <div class="synth-section">
+                    <div class="synth-section-header">
+                        <span class="synth-section-title" data-i18n="synth.brightnessThreshold"></span>
+                        <em class="synth-section-value"><span class="brightness-start-val">0</span> – <span class="brightness-end-val">127</span></em>
+                    </div>
+                    <div class="synth-section-body synth-range-track">
                         <div class="synth-range-fill"></div>
-                        <input type="range" class="synth-range-input brightness-start" min="0" max="127" value="0"   step="1" />
-                        <input type="range" class="synth-range-input brightness-end"   min="0" max="127" value="127" step="1" />
+                        <input type="range" class="synth-range-input brightness-start" min="0" max="127" value="0" step="1" />
+                        <input type="range" class="synth-range-input brightness-end" min="0" max="127" value="127" step="1" />
                     </div>
                 </div>
 
-                <label class="synth-slider-label">
-                    <span><span data-i18n="synth.velocityMin"></span> <em class="velocity-min-val">0</em></span>
-                    <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
-                </label>
-                <p class="synth-pixel-info"></p>    
+                <div class="synth-section">
+                    <div class="synth-section-header">
+                        <span class="synth-section-title" data-i18n="synth.velocityMin"></span>
+                        <em class="synth-section-value velocity-min-val">0</em>
+                    </div>
+                    <div class="synth-section-body">
+                        <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
+                    </div>
+                </div>
+
+                <p class="synth-pixel-info"></p>
             </div>
         </div>
     `;
