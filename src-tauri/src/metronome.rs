@@ -193,16 +193,14 @@ fn process_polyphonic(
 /// Builds the flat, ordered list of pixel indices covered by the synth's
 /// zones, following the reading direction: line by line for the horizontal
 /// directions, column by column for the vertical ones. An empty zone list
-/// covers the whole image; zones are clipped to the image bounds.
+/// yields an empty sequence (nothing selected); zones are clipped to the
+/// image bounds.
 fn build_pixel_sequence(
     zones: &[PixelZone],
     width: usize,
     height: usize,
     direction: ReadingDirection,
 ) -> Vec<usize> {
-    let full_zone = [PixelZone { x: 0, y: 0, w: width as u32, h: height as u32 }];
-    let zones = if zones.is_empty() { &full_zone[..] } else { zones };
-
     let mut sequence = Vec::new();
     for zone in zones {
         let x0 = (zone.x as usize).min(width);
@@ -262,10 +260,10 @@ fn step_synth_once(
     let width = image.width() as usize;
     let height = image.height() as usize;
 
-    // Flat sequence of pixels covered by the synth's zones (empty zone list
-    // = the whole image), in the synth's reading direction. The cursor is
-    // an index into this sequence; zones partially outside the image are
-    // clipped, and a zone list that covers nothing leaves the synth stalled.
+    // Flat sequence of pixels covered by the synth's zones, in the synth's
+    // reading direction. The cursor is an index into this sequence; zones
+    // partially outside the image are clipped, and an empty zone list
+    // (nothing selected) leaves the synth stalled.
     let sequence = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction);
     let seq_len = sequence.len();
     if seq_len == 0 {

@@ -241,23 +241,22 @@ function clearOverlay() {
 
 // ---------- Mouse-based rectangular zone selection ----------
 // Only one synth can be in zone-drawing mode at a time. While the mode is
-// active, each rectangle dragged on the image either adds a zone (drag
-// starting on a free pixel) or removes pixels from the existing zones
-// (drag starting on an already-selected pixel).
+// active, each rectangle dragged on the image either adds a zone (when it
+// overlaps no existing zone) or removes pixels from the existing zones
+// (when it overlaps one, even partially).
 let zonePickState = null; // { id, btn } while the drawing mode is armed
-let zoneDrag = null;      // { id, start, cur, mode: 'add'|'remove' } while dragging
+let zoneDrag = null;      // { id, start, cur } while dragging
 
-// A pixel is "selected" if it is covered by one of the synth's explicit
-// zones. With no zone defined yet, the whole image is the default selection
-// but the first drag always creates a zone (rather than removing from the
-// implicit whole-image selection).
-function isPixelSelected(id, col, row) {
+// Does the rectangle overlap (even partially) one of the synth's zones?
+// Such a drag removes pixels instead of creating an overlapping zone.
+function rectOverlapsZones(id, rect) {
     const hi = synthHighlights.get(id);
     if (!hi) return false;
-    if (hi.zones.length === 0) return false;
     return hi.zones.some(z =>
-        col >= z.x && col < z.x + z.w &&
-        row >= z.y && row < z.y + z.h
+        rect.x < z.x + z.w &&
+        rect.y < z.y + z.h &&
+        rect.x + rect.w > z.x &&
+        rect.y + rect.h > z.y
     );
 }
 
@@ -315,10 +314,7 @@ pixelOverlay.addEventListener('mousedown', (e) => {
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
     e.preventDefault(); // prevents image dragging during selection
-    const mode = isPixelSelected(zonePickState.id, cell.col, cell.row)
-        ? 'remove'
-        : 'add';
-    zoneDrag = { id: zonePickState.id, start: cell, cur: cell, mode };
+    zoneDrag = { id: zonePickState.id, start: cell, cur: cell };
 });
 
 pixelOverlay.addEventListener('mousemove', (e) => {
@@ -353,24 +349,26 @@ window.addEventListener('mouseup', (e) => {
         return;
     }
     if (!zoneDrag) return;
-    const { id, start, cur, mode } = zoneDrag;
+    const { id, start, cur } = zoneDrag;
+    const rect = {
+        x: Math.min(start.col, cur.col),
+        y: Math.min(start.row, cur.row),
+        w: Math.abs(cur.col - start.col) + 1,
+        h: Math.abs(cur.row - start.row) + 1,
+    };
     zoneDrag = null;
-    const moved = start.col !== cur.col || start.row !== cur.row;
-    if (moved) {
-        const rect = {
-            x: Math.min(start.col, cur.col),
-            y: Math.min(start.row, cur.row),
-            w: Math.abs(cur.col - start.col) + 1,
-            h: Math.abs(cur.row - start.row) + 1,
-        };
-        if (mode === 'add') addSynthZone(id, rect);
-        else                removeSynthZoneRect(id, rect);
+    if (start.col !== cur.col || start.row !== cur.row) {
+        // A rectangle overlapping an existing zone (even partially) only
+        // removes pixels; it never creates an overlapping zone
+        if (rectOverlapsZones(id, rect)) removeSynthZoneRect(id, rect);
+        else                             addSynthZone(id, rect);
     }
     redrawAllHighlights();
 });
 
 // Live preview of the rectangle being dragged: filled with the synth's
-// color in add mode, "erasing" the highlights beneath it in remove mode.
+// color while it overlaps no zone, "erasing" the highlights beneath it
+// as soon as it touches one — the drag then removes pixels instead.
 function drawZonePreview() {
     if (!zoneDrag) return;
     const layout = getImageLayout();
@@ -381,10 +379,11 @@ function drawZonePreview() {
     const y = Math.min(start.row, cur.row);
     const w = Math.abs(cur.col - start.col) + 1;
     const h = Math.abs(cur.row - start.row) + 1;
+    const rect = { x, y, w, h };
 
     const ctx = pixelOverlay.getContext('2d');
     ctx.save();
-    if (zoneDrag.mode === 'remove') {
+    if (rectOverlapsZones(zoneDrag.id, rect)) {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, w * cellW, h * cellH);
     } else {
@@ -405,14 +404,9 @@ function addSynthZone(id, zone) {
 
 // Subtracts a rectangle from the synth's zones. Sub-zones that end up empty
 // are dropped; a zone split by the rectangle is cut into up to 4 bands.
-// With no zone defined (whole image selected), the whole image is first
-// materialized as a single zone so the subtraction has something to bite.
 function removeSynthZoneRect(id, rect) {
     const hi = synthHighlights.get(id);
     if (!hi) return;
-    if (hi.zones.length === 0) {
-        hi.zones = [{ x: 0, y: 0, w: gridW, h: gridH }];
-    }
     const next = [];
     for (const z of hi.zones) {
         for (const r of subtractRect(z, rect)) next.push(r);
@@ -469,12 +463,11 @@ function sendSynthNoteLengths(id, el) {
 }
 
 // Number of pixels a synth will play: the sum of its zone areas (clipped
-// to the grid), or the whole image when no zone is defined. Overlapping
-// zones are counted twice, mirroring the backend's playback sequence.
+// to the grid), 0 when no zone is selected. Overlapping zones are counted
+// twice, mirroring the backend's playback sequence.
 function synthSequenceLength(id) {
     const hi = synthHighlights.get(id);
     if (!hi) return 0;
-    if (hi.zones.length === 0) return gridW * gridH;
     let total = 0;
     for (const z of hi.zones) {
         const w = Math.min(z.w, gridW - z.x);
@@ -515,7 +508,9 @@ function updateZonesLabel(id) {
     const bpm = clampBpm(Number(bpmInput.value));
     const seconds = pixelCount * (60 / bpm) / tempoRatio;
 
-    zonesVal.textContent = `${pixelCount} px (${formatDuration(seconds)})`;
+    zonesVal.textContent = pixelCount > 0
+        ? `${pixelCount} px (${formatDuration(seconds)})`
+        : '0 px';
 }
 
 function updateAllSynthZonesLabels() {
@@ -552,15 +547,27 @@ function drawRangeHighlight(synthId) {
     const color = synthColors.get(synthId);
     if (!color) return;
 
-    // No zone = the whole image is selected
-    const zones = hi.zones.length > 0 ? hi.zones : [{ x: 0, y: 0, w: gridW, h: gridH }];
-
     const ctx = pixelOverlay.getContext('2d');
     ctx.save();
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle   = color;
-    for (const z of zones) {
-        ctx.fillRect(offsetX + z.x * cellW, offsetY + z.y * cellH, z.w * cellW, z.h * cellH);
+    for (const z of hi.zones) {
+        const x = offsetX + z.x * cellW;
+        const y = offsetY + z.y * cellH;
+        const w = z.w * cellW;
+        const h = z.h * cellH;
+
+        // Light fill: the image stays readable underneath
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle   = color;
+        ctx.fillRect(x, y, w, h);
+
+        // Full-opacity outline, inset so it stays inside the zone:
+        // clearly visible on any image content. The inset shrinks on
+        // tiny zones (sub-pixel cells) to keep the rect positive.
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 1.5;
+        const inset = Math.min(0.75, w / 2, h / 2);
+        ctx.strokeRect(x + inset, y + inset, w - 2 * inset, h - 2 * inset);
     }
     ctx.restore();
 }
@@ -1267,7 +1274,16 @@ loadSessionBtn.addEventListener('click', async () => {
             // (serde flatten), so `s` itself is the config to apply
             synthListBody.appendChild(createSynthElement(s.id, s));
             const hi = synthHighlights.get(s.id);
-            if (hi) hi.zones = s.zones || [];
+            if (hi) {
+                hi.zones = s.zones || [];
+                // Version 1 sessions: an empty zone list implicitly meant
+                // "whole image". Materialize it explicitly to keep the old
+                // behavior (since version 2, empty = nothing selected).
+                if ((session.version ?? 1) < 2 && hi.zones.length === 0) {
+                    hi.zones = [{ x: 0, y: 0, w: gridW, h: gridH }];
+                    sendSynthZones(s.id);
+                }
+            }
             updateZonesLabel(s.id);
         }
         redrawAllHighlights();
@@ -1505,9 +1521,12 @@ function createSynthElement(id, cfg = null) {
                     <em class="zones-val"></em>
                 </span>
                 <div class="flex-filler"></div>
-                <button class="synth-eye-btn" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
+                <button class="synth-eye-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
                 <button class="synth-add-zone-btn" data-i18n-title="synth.addZone">
                     <span class="material-symbols-outlined" aria-hidden="true">select</span>
+                </button>
+                <button class="synth-select-all-btn" data-i18n-title="synth.selectAllZones">
+                    <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
                 </button>
                 <button class="synth-clear-zones-btn" data-i18n-title="synth.clearZones">
                     <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
@@ -1896,8 +1915,8 @@ function createSynthElement(id, cfg = null) {
         });
     });
 
-    // Initialize the highlight state (hidden by default, whole image selected)
-    synthHighlights.set(id, { visible: false, zones: [] });
+    // Initialize the highlight state (visible by default, nothing selected)
+    synthHighlights.set(id, { visible: true, zones: [] });
     updateZonesLabel(id);
 
     // Eye button
@@ -1931,7 +1950,19 @@ function createSynthElement(id, cfg = null) {
         }
     });
 
-    // Clear all zones: back to the whole image
+    // Select all: the whole image as a single explicit zone
+    el.querySelector('.synth-select-all-btn').addEventListener('click', () => {
+        if (!hasImage) return;
+        const hi = synthHighlights.get(id);
+        if (!hi) return;
+        if (zonePickState && zonePickState.id === id) cancelZonePicking();
+        hi.zones = [{ x: 0, y: 0, w: gridW, h: gridH }];
+        sendSynthZones(id);
+        updateZonesLabel(id);
+        redrawAllHighlights();
+    });
+
+    // Clear all zones: back to nothing selected
     el.querySelector('.synth-clear-zones-btn').addEventListener('click', () => {
         const hi = synthHighlights.get(id);
         if (!hi) return;

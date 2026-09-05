@@ -86,7 +86,7 @@ pub struct Synth {
     pub note: u8,           // fixed MIDI note for now: A4 = 69
     pub channel: u8,        // MIDI channel 0-15
     pub midi_port: usize,   // MIDI output port index (see list_midi_ports)
-    pub zones: Vec<PixelZone>, // rectangular zones to play (empty = whole image)
+    pub zones: Vec<PixelZone>, // rectangular zones to play (empty = nothing selected)
     pub loop_enabled: bool,   // loop playback or stop at end of range
     pub back_and_forth: bool, // bounce back and forth between the sequence
                               // bounds (mutually exclusive with the loop)
@@ -134,7 +134,7 @@ impl Synth {
             note: 69, // A4
             channel: 0,
             midi_port: 0,
-            zones: Vec::new(),    // empty = whole image
+            zones: Vec::new(),    // empty = nothing selected
             loop_enabled: true,   // loop enabled by default
             back_and_forth: false,
             reading_direction: ReadingDirection::LeftToRight,

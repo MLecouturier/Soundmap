@@ -42,7 +42,8 @@ pub struct SessionImageSettings {
 }
 
 /// A synthesizer as stored in a session file: its identity, display color,
-/// pixel zones, and settings (flattened SynthTemplate).
+/// pixel zones (empty = nothing selected since version 2; in version 1 it
+/// implicitly meant the whole image), and settings (flattened SynthTemplate).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SessionSynth {
     pub id: u32,
@@ -73,6 +74,7 @@ pub struct SessionImage {
 /// Payload returned by `load_session`, for the frontend to rebuild its UI.
 #[derive(Serialize, Debug)]
 pub struct LoadedSession {
+    pub version: u32,
     pub bpm: u32,
     pub image_base64: String,
     pub orig_width: u32,
@@ -135,7 +137,7 @@ pub async fn save_session(
         .collect();
 
     let file = SessionFile {
-        version: 1,
+        version: 2,
         bpm: ui.bpm,
         image,
         image_settings: SessionImageSettings {
@@ -232,6 +234,7 @@ pub async fn load_session(
     }
 
     Ok(Some(LoadedSession {
+        version: file.version,
         bpm: file.bpm,
         image_base64,
         orig_width,
