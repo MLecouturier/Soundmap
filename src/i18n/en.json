@@ -23,6 +23,7 @@
     "transformGrid": "Grid",
     "fullscreen": "Fullscreen (hide the panels)",
     "exitFullscreen": "Exit fullscreen",
+    "help": "Interactive help",
     "apply": "Apply",
     "cancel": "Cancel",
     "showOriginal": "Show original",

@@ -24,7 +24,7 @@
 
                 <div id="controls">
                     <div class="controls-row">
-                        <button id="load-btn">
+                        <button id="load-btn" class="primary" data-i18n-title="controls.load">
                             <span class="material-symbols-outlined">image_search</span>
                         </button>
                         <button id="rotate-img-btn" class="icon-btn" data-i18n-title="controls.rotate">
@@ -36,7 +36,7 @@
                         <button id="transform-img-btn" class="icon-btn" data-i18n-title="controls.transform">
                             <span class="material-symbols-outlined">tune</span>
                         </button>
-                        <button id="show-original-btn" class="toggle-btn" >
+                        <button id="show-original-btn" class="icon-btn" data-i18n-title="controls.showOriginal">
                             <span class="material-symbols-outlined">compare</span>
                         </button>
                     </div>
@@ -44,7 +44,7 @@
                     <div id="crop-bar" class="mode-bar hidden">
                         <span class="mode-bar-hint" data-i18n="controls.cropHint"></span>
                         <div class="flex-filler"></div>
-                        <button id="crop-apply-btn" data-i18n="controls.apply" disabled></button>
+                        <button id="crop-apply-btn" class="primary" data-i18n="controls.apply" disabled></button>
                         <button id="crop-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
                     </div>
 
@@ -66,7 +66,7 @@
                         <div class="mode-bar">
                             <button id="transform-grid-btn" class="toggle-btn active" data-i18n="controls.transformGrid"></button>
                             <div class="flex-filler"></div>
-                            <button id="transform-apply-btn" data-i18n="controls.apply"></button>
+                            <button id="transform-apply-btn" class="primary" data-i18n="controls.apply"></button>
                             <button id="transform-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
                         </div>
                     </div>
@@ -96,7 +96,7 @@
                             <span><span data-i18n="controls.posterize"></span> <em id="posterize-value">off</em></span>
                             <input type="range" id="posterize" min="1" max="32" value="1" step="1" />
                         </label>
-                        <button id="reset-btn" class="secondary">
+                        <button id="reset-btn" class="secondary" data-i18n-title="controls.reset">
                             <span class="material-symbols-outlined">reset_settings</span>
                         </button>
                     </div>
@@ -146,13 +146,13 @@
             <div class="footer-area" id="common-controls">
                 <!-- <h2 data-i18n="synthList.commonControlsTitle"></h2> -->
                 <div class="config-controls">
-                    <button id="open-config-btn" data-i18n-title="config.openFile">
+                    <button id="open-config-btn" class="icon-btn" data-i18n-title="config.openFile">
                         <span class="material-symbols-outlined" aria-hidden="true">settings</span>
                     </button>
                     <button id="fullscreen-btn" class="icon-btn" data-i18n-title="controls.fullscreen">
                         <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
                     </button>
-                    <button id="interactive-help-btn" class="icon-btn" data-i18n-title="">
+                    <button id="interactive-help-btn" class="icon-btn" data-i18n-title="controls.help">
                         <span class="material-symbols-outlined" aria-hidden="true">live_help</span>
                     </button>
                     <div class="flex-filler"></div>

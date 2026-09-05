@@ -17,12 +17,25 @@ $color-accent-alt: #219a52;
 $color-accent-hover: #2d5fa8;
 $color-disactivated: #555;
 
+// Semantic accents, one meaning each:
+// - $color-accent (blue): toggle/mode currently active
+// - $color-stop (red): playback in progress (stop affordance)
+// - $color-accent-alt (green): transient confirmation (template saved, LED)
+$color-stop: #c0392b;
+$color-stop-hover: #a5281b;
+
+// Neutral filled background for small transport controls (bpm steps)
+$color-bg-neutral: #444;
+$color-bg-neutral-hover: #555;
+
+// Panels and overlays darker than the page background
+$color-bg-panel: #1a1a1a;
+
 $color-red: #c00000;
 $color-green: #00cd00;
 $color-blue: #2121c8;
 
 $sidebar-width: 22.5vw;
-$footer-height: 140px;
 
 $border-radius-base: .25rem;
 $transition-fast: 0.2s ease;
@@ -165,10 +178,10 @@ h2 {
         justify-content: center;
         position: relative;
         background-image:
-            linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
-            linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
-            linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            linear-gradient(45deg, $color-bg-panel 25%, transparent 25%),
+            linear-gradient(-45deg, $color-bg-panel 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, $color-bg-panel 75%),
+            linear-gradient(-45deg, transparent 75%, $color-bg-panel 75%);
         background-size: 1rem 1rem;
         background-position: 0 0, 0 .5rem, .5rem -.5rem, -.5rem 0;
         border: 1px solid $color-border;
@@ -308,6 +321,120 @@ input[type="range"].synth-range-input {
 }
 
 // ==========================================================================
+// Shared form controls
+// ==========================================================================
+// One class per role, used across every section of the interface:
+// - .primary:    committing action (load, apply, add synth, play all)
+// - .secondary:  cancel / reset
+// - .icon-btn:   every icon-only button, one size everywhere
+// - .toggle-btn: text on/off toggle
+// The `.active` state is always the accent color, with two documented
+// exceptions: the play button (red = stop affordance, see .synth-play) and
+// the template-save button (green = transient confirmation).
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid $color-border;
+    border-radius: $border-radius-base;
+    background: none;
+    color: $color-text-secondary;
+    cursor: pointer;
+    transition: color $transition-fast, border-color $transition-fast, background-color $transition-fast;
+
+    .material-symbols-outlined { font-size: 1.05rem; }
+
+    &:hover {
+        color: $color-text-primary;
+        border-color: $color-text-muted;
+    }
+
+    // Mode/toggle currently active (crop, transform, show original, eye...)
+    &.active {
+        background-color: $color-accent;
+        border-color: $color-accent;
+        color: white;
+    }
+}
+
+button.primary {
+    background-color: $color-accent;
+    border: none;
+    color: white;
+    padding: 6px .875rem;
+    border-radius: $border-radius-base;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color $transition-fast;
+
+    &:hover { background-color: $color-accent-hover; }
+}
+
+button.secondary {
+    background-color: transparent;
+    border: 1px solid $color-border;
+    color: $color-text-secondary;
+    padding: 6px .875rem;
+    border-radius: $border-radius-base;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color $transition-fast, color $transition-fast, border-color $transition-fast;
+
+    &:hover { background-color: $color-bg-light; }
+}
+
+// Text on/off toggle: ghost look when inactive, accent look when active
+button.toggle-btn {
+    background-color: transparent;
+    border: 1px solid $color-border;
+    color: $color-text-secondary;
+    padding: 6px .875rem;
+    border-radius: $border-radius-base;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast;
+
+    &:hover { background-color: $color-bg-light; }
+
+    &.active {
+        background-color: $color-accent;
+        border-color: $color-accent;
+        color: white;
+
+        &:hover { background-color: $color-accent-hover; }
+    }
+}
+
+select {
+    background-color: $color-bg-light;
+    color: $color-text-secondary;
+    border: 1px solid $color-border;
+    border-radius: $border-radius-base;
+    padding: 4px .5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &:hover { border-color: $color-accent; }
+}
+
+// Every disabled control, everywhere
+button:disabled,
+input:disabled,
+select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
+// ==========================================================================
 // Controls (left column)
 // ==========================================================================
 #controls {
@@ -319,59 +446,11 @@ input[type="range"].synth-range-input {
         align-items: center;
         gap: 10px;
         margin-bottom: .75rem;
-
-        &.disabled {
-            opacity: 0.4;
-            pointer-events: none;
-        }
-
-        // Session save / open icon buttons
-        .icon-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.75rem;
-            height: 1.75rem;
-            padding: 0;
-            border: 1px solid $color-border;
-            border-radius: $border-radius-base;
-            background: none;
-            color: $color-text-secondary;
-            cursor: pointer;
-            transition: color $transition-fast, border-color $transition-fast;
-
-            .material-symbols-outlined { font-size: 1.05rem; }
-
-            &:hover {
-                color: $color-text-primary;
-                border-color: $color-text-muted;
-            }
-
-            &:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
-                pointer-events: none;
-            }
-        }
     }
 
     // Language switcher, pushed to the right of the controls row
     #language-switcher {
         margin-left: auto;
-
-        select {
-            background-color: $color-bg-light;
-            color: $color-text-secondary;
-            border: 1px solid $color-border;
-            border-radius: $border-radius-base;
-            padding: 5px .5rem;
-            font-size: 0.8rem;
-            cursor: pointer;
-
-            &:hover {
-                border-color: $color-accent;
-            }
-        }
     }
 
     .controls-grid {
@@ -386,13 +465,12 @@ input[type="range"].synth-range-input {
         gap: 10px;
         margin-bottom: .75rem;
 
-        &.hidden { display: none; }
-
         .mode-bar-hint {
             font-size: 0.8rem;
             color: $color-text-muted;
         }
 
+        // Compact sizing for the action buttons of a mode bar
         button {
             padding: 4px .75rem;
             font-size: 0.8rem;
@@ -414,22 +492,11 @@ input[type="range"].synth-range-input {
         padding: .625rem .75rem;
         border: 1px solid $color-border;
         border-radius: $border-radius-base;
-        background-color: #1a1a1a;
+        background-color: $color-bg-panel;
         box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
-
-        &.hidden { display: none; }
     }
 
     // Controls locked while a synthesizer is playing
-    // (the "Show original" button stays active, so we target each disabled
-    // element individually rather than the whole .controls-row)
-    button:disabled,
-    input:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-        pointer-events: none;
-    }
-
     &.locked label:has(input:disabled) {
         opacity: 0.5;
     }
@@ -450,47 +517,6 @@ input[type="range"].synth-range-input {
                 font-style: normal;
                 color: $color-text-muted;
                 font-variant-numeric: tabular-nums;
-            }
-        }
-    }
-
-    .span-2 { grid-column: span 2; }
-
-    button {
-        background-color: $color-accent;
-        border: none;
-        color: white;
-        padding: 6px .875rem;
-        border-radius: $border-radius-base;
-        cursor: pointer;
-        font-size: 0.85rem;
-        transition: background-color $transition-fast;
-
-        &:hover { background-color: $color-accent-hover; }
-
-        &.secondary {
-            background-color: transparent;
-            border: 1px solid $color-border;
-            color: $color-text-secondary;
-            &:hover { background-color: $color-bg-light; }
-        }
-
-        // On/off toggle button (grid overlay, show original...):
-        // ghost look when inactive, accent look when active.
-        &.toggle-btn {
-            background-color: transparent;
-            border: 1px solid $color-border;
-            color: $color-text-secondary;
-            transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast;
-
-            &:hover { background-color: $color-bg-light; }
-
-            &.active {
-                background-color: $color-accent;
-                border-color: $color-accent;
-                color: white;
-
-                &:hover { background-color: $color-accent-hover; }
             }
         }
     }
@@ -538,12 +564,27 @@ $metronome-led-transition: 0.05s ease;
                 width: 3.5em;
                 text-align: center;
                 font-size: 2.25rem;
+                background-color: $color-bg-light;
+                color: $color-text-primary;
+                border: 1px solid $color-border;
+                border-radius: $border-radius-base;
+                outline: none;
             }
 
             .bpm-step {
                 padding: .125rem 6px;
                 font-size: 0.85em;
+                border: none;
+                border-radius: $border-radius-base;
+                background-color: $color-bg-neutral;
+                color: $color-text-secondary;
                 cursor: pointer;
+                transition: background-color $transition-fast, color $transition-fast;
+
+                &:hover {
+                    background-color: $color-bg-neutral-hover;
+                    color: $color-text-primary;
+                }
             }
 
 
@@ -580,7 +621,6 @@ $metronome-led-transition: 0.05s ease;
     align-items: center;
     justify-content: space-between;
     padding: .5rem 1rem;
-    // margin-bottom: .75rem;
 
     .synth-list-header-actions {
         display: flex;
@@ -632,11 +672,6 @@ $metronome-led-transition: 0.05s ease;
     padding: 10px 10px 10px .875rem;
     overflow: visible;
 
-    select:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-    }
-
     // Clickable color band on the left edge
     .synth-color-band {
         position: absolute;
@@ -662,8 +697,6 @@ $metronome-led-transition: 0.05s ease;
         border-radius: $border-radius-base;
         padding: .5rem;
         box-shadow: 0 .25rem 1rem rgba(0,0,0,0.5);
-
-        &.hidden { display: none; }
 
         .color-swatches {
             display: grid;
@@ -702,10 +735,6 @@ $metronome-led-transition: 0.05s ease;
             gap: .5rem;
         }
 
-        .synth-title-label {
-            &.hidden { display: none; }
-        }
-
         .synth-title-input {
             background-color: $color-bg-light;
             color: $color-text-primary;
@@ -717,21 +746,13 @@ $metronome-led-transition: 0.05s ease;
             outline: none;
         }
 
-        .synth-remove,
-        .synth-save-template {
-            background: none;
-            border: none;
-            color: $color-text-muted;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-
-            .material-symbols-outlined { font-size: 1.125rem; }
-
-            &:hover { color: $color-text-primary; }
+        // Template saved: transient green confirmation (~800 ms) — one of
+        // the two documented exceptions to the "active = accent" rule
+        .synth-save-template.active {
+            background-color: transparent;
+            border-color: $color-accent-alt;
+            color: $color-accent-alt;
         }
-
-        .synth-save-template.active { color: $color-accent-alt; }
     }
 
     .synth-body {
@@ -739,38 +760,15 @@ $metronome-led-transition: 0.05s ease;
         flex-direction: column;
         gap: 6px;
 
-        select:disabled,
-        input[type="range"]:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
         .synth-controls-row {
             display: flex;
             align-items: center;
             gap: .75rem;
-            margin: 0 0 .5rem 0
         }
 
-        .synth-eye-btn {
-            font-size: 0.9rem;
-            padding: .25rem .5rem;
-            border-radius: $border-radius-base;
-            border: none;
-            background: none;
-            color: $color-disactivated;
-            cursor: pointer;
-            transition: color $transition-fast;
-            display: flex;
-            align-items: center;
-
-            &:hover  { color: $color-text-primary; }
-            &.active { color: $color-accent-alt; }
-        }
-
-        .synth-play,
-        .synth-rewind,
-        .synth-step-forward {
+        // Play button: icon + label. Red while playing — the documented
+        // exception to "active = accent": red reads as "stop".
+        .synth-play {
             display: flex;
             align-items: center;
             font-size: 0.82rem;
@@ -779,26 +777,22 @@ $metronome-led-transition: 0.05s ease;
             border: none;
             cursor: pointer;
             gap: .25rem;
+            background-color: $color-bg-neutral;
+            color: $color-text-secondary;
+            transition: background-color $transition-fast, color $transition-fast;
 
             .material-symbols-outlined { font-size: 1.125rem; }
-        }
-
-        .synth-rewind,
-        .synth-step-forward {
-
-            transition: background-color $transition-fast, color $transition-fast;
-            background-color: #444;
-            color: $color-text-muted;
 
             &:hover {
-                background-color: #555;
+                background-color: $color-bg-neutral-hover;
                 color: $color-text-secondary;
             }
-        }
 
-        .synth-play.active {
-            background-color: #c0392b;
-            &:hover { background-color: #a5281b; }
+            &.active {
+                background-color: $color-stop;
+                color: #fff;
+                &:hover { background-color: $color-stop-hover; }
+            }
         }
 
         .synth-slider-label {
@@ -836,26 +830,6 @@ $metronome-led-transition: 0.05s ease;
             gap: .5rem;
         }
 
-        // Collapse/expand button for the advanced options section
-        .synth-toggle-full-options {
-            display: flex;
-            align-items: center;
-            padding: .25rem;
-            border: none;
-            border-radius: $border-radius-base;
-            background: none;
-            color: $color-text-muted;
-            cursor: pointer;
-            transition: color $transition-fast, background-color $transition-fast;
-
-            .material-symbols-outlined { font-size: 1.1rem; }
-
-            &:hover {
-                color: $color-text-primary;
-                background-color: rgba(255, 255, 255, 0.06);
-            }
-        }
-
         // Collapsible advanced options section
         .synth-full-options {
             display: flex;
@@ -863,8 +837,6 @@ $metronome-led-transition: 0.05s ease;
             gap: 6px;
             border-top: 1px solid $color-border;
             padding-top: 6px;
-
-            &.hidden { display: none; }
         }
 
         // Note lengths: brightness→duration mapping toggles
@@ -873,31 +845,10 @@ $metronome-led-transition: 0.05s ease;
             align-items: center;
             gap: .25rem;
             padding: .25rem 0;
-
-            .synth-reverse-note-length {
-                display: flex;
-                align-items: center;
-                padding: .25rem;
-                border: none;
-                border-radius: $border-radius-base;
-                background: none;
-                color: $color-text-muted;
-                cursor: pointer;
-                transition: color $transition-fast, background-color $transition-fast;
-
-                .material-symbols-outlined { font-size: 1.1rem; }
-
-                &:hover {
-                    color: $color-text-primary;
-                    background-color: rgba(255, 255, 255, 0.06);
-                }
-
-                &.active { color: $color-accent-alt; }
-            }
         }
 
         // Shared look for the note-length and note-range glyph buttons
-        .note-lengths button,
+        .note-lengths .note-length-btn,
         .synth-note-range button {
             padding: .125rem .375rem;
             border: 1px solid $color-disactivated;
@@ -937,12 +888,6 @@ $metronome-led-transition: 0.05s ease;
                 background-color: $color-accent;
                 color: #fff;
             }
-
-            &:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
-                pointer-events: none;
-            }
         }
 
         // Conditional panels depending on the active mode
@@ -965,8 +910,6 @@ $metronome-led-transition: 0.05s ease;
                     aspect-ratio: 1/1;
                 }
             }
-
-            &.hidden { display: none; }
 
             .synth-mode-panel-label {
                 font-size: 0.78rem;
@@ -1008,20 +951,7 @@ $metronome-led-transition: 0.05s ease;
             transition: background-color $transition-fast, color $transition-fast, border-color $transition-fast;
 
             &.active {
-                // background-color: $color-accent;
-                // border-color: $color-accent;
                 color: #fff;
-            }
-
-            // &:not(.active):hover {
-            //     border-color: $color-accent;
-            //     color: $color-text-primary;
-            // }
-
-            &:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
-                pointer-events: none;
             }
 
             &.channel-red {
@@ -1062,12 +992,13 @@ $metronome-led-transition: 0.05s ease;
         }
     }
 
-    // Rectangular zone selection row
-    .synth-zones-row {
+    // Zone selection and playback direction rows: the buttons themselves
+    // are shared .icon-btn (see the shared controls section)
+    .synth-zones-row,
+    .synth-direction-row {
         display: flex;
         align-items: center;
         gap: .5rem;
-        margin: 0 0 .5rem 0;
 
         .synth-zones-label {
             display: flex;
@@ -1080,46 +1011,6 @@ $metronome-led-transition: 0.05s ease;
                 font-style: normal;
                 color: $color-text-muted;
                 font-variant-numeric: tabular-nums;
-            }
-        }
-
-        .synth-add-zone-btn,
-        .synth-clear-zones-btn,
-        .synth-reading-direction-btn,
-        .synth-loop-btn,
-        .synth-back-n-forth-btn {
-            flex: 0 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.5rem;
-            height: 1.5rem;
-            padding: 0;
-            border: none;
-            border-radius: $border-radius-base;
-            background: none;
-            color: $color-text-muted;
-            cursor: pointer;
-            transition: color $transition-fast, background-color $transition-fast;
-
-            .material-symbols-outlined {
-                font-size: 1rem;
-            }
-
-            &:hover {
-                color: $color-text-primary;
-                background-color: rgba(255, 255, 255, 0.06);
-            }
-
-            &.active {
-                color: #fff;
-                background-color: $color-accent;
-            }
-
-            &:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
-                pointer-events: none;
             }
         }
     }
@@ -1213,39 +1104,11 @@ $metronome-led-transition: 0.05s ease;
     background-color: $color-bg-light;
 }
 
-#metronome,
-#common-controls {
-    h3 {
-        margin-bottom: .5rem;
-        font-size: 1rem;
-        color: $color-text-secondary;
-    }
-}
-
-// Global configuration controls (footer)
+// Global configuration controls (footer): all buttons are .icon-btn
 .config-controls {
     display: flex;
     align-items: center;
     gap: .75rem;
-
-    #open-config-btn {
-        display: flex;
-        align-items: center;
-        padding: .25rem;
-        border: none;
-        border-radius: $border-radius-base;
-        background: none;
-        color: $color-text-muted;
-        cursor: pointer;
-        transition: color $transition-fast, background-color $transition-fast;
-
-        .material-symbols-outlined { font-size: 1.2rem; }
-
-        &:hover {
-            color: $color-text-primary;
-            background-color: rgba(255, 255, 255, 0.06);
-        }
-    }
 }
 
 // ==========================================================================
@@ -1260,6 +1123,6 @@ $metronome-led-transition: 0.05s ease;
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: #444;
+    background-color: $color-bg-neutral;
     border-radius: $border-radius-base;
 }

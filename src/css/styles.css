@@ -261,22 +261,8 @@ input[type=range].synth-range-input::-moz-range-track {
   border: none;
 }
 
-#controls {
-  position: relative;
-  flex: 0 0 auto;
-}
-#controls .controls-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 0.75rem;
-}
-#controls .controls-row.disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-#controls .controls-row .icon-btn {
-  display: flex;
+.icon-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.75rem;
@@ -287,34 +273,108 @@ input[type=range].synth-range-input::-moz-range-track {
   background: none;
   color: #ccc;
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
-#controls .controls-row .icon-btn .material-symbols-outlined {
+.icon-btn .material-symbols-outlined {
   font-size: 1.05rem;
 }
-#controls .controls-row .icon-btn:hover {
+.icon-btn:hover {
   color: #e0e0e0;
   border-color: #888;
 }
-#controls .controls-row .icon-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
+.icon-btn.active {
+  background-color: #3a7bd5;
+  border-color: #3a7bd5;
+  color: white;
 }
-#controls #language-switcher {
-  margin-left: auto;
+
+button.primary {
+  background-color: #3a7bd5;
+  border: none;
+  color: white;
+  padding: 6px 0.875rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
 }
-#controls #language-switcher select {
+button.primary:hover {
+  background-color: #2d5fa8;
+}
+
+button.secondary {
+  background-color: transparent;
+  border: 1px solid #333;
+  color: #ccc;
+  padding: 6px 0.875rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+button.secondary:hover {
+  background-color: #262626;
+}
+
+button.toggle-btn {
+  background-color: transparent;
+  border: 1px solid #333;
+  color: #ccc;
+  padding: 6px 0.875rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+button.toggle-btn:hover {
+  background-color: #262626;
+}
+button.toggle-btn.active {
+  background-color: #3a7bd5;
+  border-color: #3a7bd5;
+  color: white;
+}
+button.toggle-btn.active:hover {
+  background-color: #2d5fa8;
+}
+
+select {
   background-color: #262626;
   color: #ccc;
   border: 1px solid #333;
   border-radius: 0.25rem;
-  padding: 5px 0.5rem;
+  padding: 4px 0.5rem;
   font-size: 0.8rem;
   cursor: pointer;
 }
-#controls #language-switcher select:hover {
+select:hover {
   border-color: #3a7bd5;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#controls {
+  position: relative;
+  flex: 0 0 auto;
+}
+#controls .controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.75rem;
+}
+#controls #language-switcher {
+  margin-left: auto;
 }
 #controls .controls-grid {
   display: flex;
@@ -325,9 +385,6 @@ input[type=range].synth-range-input::-moz-range-track {
   align-items: center;
   gap: 10px;
   margin-bottom: 0.75rem;
-}
-#controls .mode-bar.hidden {
-  display: none;
 }
 #controls .mode-bar .mode-bar-hint {
   font-size: 0.8rem;
@@ -352,15 +409,6 @@ input[type=range].synth-range-input::-moz-range-track {
   background-color: #1a1a1a;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
 }
-#controls #transform-panel.hidden {
-  display: none;
-}
-#controls button:disabled,
-#controls input:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
-}
 #controls.locked label:has(input:disabled) {
   opacity: 0.5;
 }
@@ -380,47 +428,6 @@ input[type=range].synth-range-input::-moz-range-track {
   font-style: normal;
   color: #888;
   font-variant-numeric: tabular-nums;
-}
-#controls .span-2 {
-  grid-column: span 2;
-}
-#controls button {
-  background-color: #3a7bd5;
-  border: none;
-  color: white;
-  padding: 6px 0.875rem;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: background-color 0.2s ease;
-}
-#controls button:hover {
-  background-color: #2d5fa8;
-}
-#controls button.secondary {
-  background-color: transparent;
-  border: 1px solid #333;
-  color: #ccc;
-}
-#controls button.secondary:hover {
-  background-color: #262626;
-}
-#controls button.toggle-btn {
-  background-color: transparent;
-  border: 1px solid #333;
-  color: #ccc;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-#controls button.toggle-btn:hover {
-  background-color: #262626;
-}
-#controls button.toggle-btn.active {
-  background-color: #3a7bd5;
-  border-color: #3a7bd5;
-  color: white;
-}
-#controls button.toggle-btn.active:hover {
-  background-color: #2d5fa8;
 }
 #controls .info {
   margin-top: 10px;
@@ -456,11 +463,25 @@ input[type=range].synth-range-input::-moz-range-track {
   width: 3.5em;
   text-align: center;
   font-size: 2.25rem;
+  background-color: #262626;
+  color: #e0e0e0;
+  border: 1px solid #333;
+  border-radius: 0.25rem;
+  outline: none;
 }
 .metronome-controls .metronome-bpm .bpm-input-group .bpm-step {
   padding: 0.125rem 6px;
   font-size: 0.85em;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: #444;
+  color: #ccc;
   cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.metronome-controls .metronome-bpm .bpm-input-group .bpm-step:hover {
+  background-color: #555;
+  color: #e0e0e0;
 }
 .metronome-controls .led {
   width: 1.5rem;
@@ -537,10 +558,6 @@ input[type=range].synth-range-input::-moz-range-track {
   padding: 10px 10px 10px 0.875rem;
   overflow: visible;
 }
-.synth-block select:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 .synth-block .synth-color-band {
   position: absolute;
   left: -0.5rem;
@@ -564,9 +581,6 @@ input[type=range].synth-range-input::-moz-range-track {
   border-radius: 0.25rem;
   padding: 0.5rem;
   box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.5);
-}
-.synth-block .synth-color-picker.hidden {
-  display: none;
 }
 .synth-block .synth-color-picker .color-swatches {
   display: grid;
@@ -600,9 +614,6 @@ input[type=range].synth-range-input::-moz-range-track {
   align-items: center;
   gap: 0.5rem;
 }
-.synth-block .synth-header .synth-title-label.hidden {
-  display: none;
-}
 .synth-block .synth-header .synth-title-input {
   background-color: #262626;
   color: #e0e0e0;
@@ -613,24 +624,9 @@ input[type=range].synth-range-input::-moz-range-track {
   width: 8rem;
   outline: none;
 }
-.synth-block .synth-header .synth-remove,
-.synth-block .synth-header .synth-save-template {
-  background: none;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-.synth-block .synth-header .synth-remove .material-symbols-outlined,
-.synth-block .synth-header .synth-save-template .material-symbols-outlined {
-  font-size: 1.125rem;
-}
-.synth-block .synth-header .synth-remove:hover,
-.synth-block .synth-header .synth-save-template:hover {
-  color: #e0e0e0;
-}
 .synth-block .synth-header .synth-save-template.active {
+  background-color: transparent;
+  border-color: #219a52;
   color: #219a52;
 }
 .synth-block .synth-body {
@@ -638,38 +634,12 @@ input[type=range].synth-range-input::-moz-range-track {
   flex-direction: column;
   gap: 6px;
 }
-.synth-block .synth-body select:disabled,
-.synth-block .synth-body input[type=range]:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 .synth-block .synth-body .synth-controls-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin: 0 0 0.5rem 0;
 }
-.synth-block .synth-body .synth-eye-btn {
-  font-size: 0.9rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  border: none;
-  background: none;
-  color: #555;
-  cursor: pointer;
-  transition: color 0.2s ease;
-  display: flex;
-  align-items: center;
-}
-.synth-block .synth-body .synth-eye-btn:hover {
-  color: #e0e0e0;
-}
-.synth-block .synth-body .synth-eye-btn.active {
-  color: #219a52;
-}
-.synth-block .synth-body .synth-play,
-.synth-block .synth-body .synth-rewind,
-.synth-block .synth-body .synth-step-forward {
+.synth-block .synth-body .synth-play {
   display: flex;
   align-items: center;
   font-size: 0.82rem;
@@ -678,25 +648,20 @@ input[type=range].synth-range-input::-moz-range-track {
   border: none;
   cursor: pointer;
   gap: 0.25rem;
+  background-color: #444;
+  color: #ccc;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
-.synth-block .synth-body .synth-play .material-symbols-outlined,
-.synth-block .synth-body .synth-rewind .material-symbols-outlined,
-.synth-block .synth-body .synth-step-forward .material-symbols-outlined {
+.synth-block .synth-body .synth-play .material-symbols-outlined {
   font-size: 1.125rem;
 }
-.synth-block .synth-body .synth-rewind,
-.synth-block .synth-body .synth-step-forward {
-  transition: background-color 0.2s ease, color 0.2s ease;
-  background-color: #444;
-  color: #888;
-}
-.synth-block .synth-body .synth-rewind:hover,
-.synth-block .synth-body .synth-step-forward:hover {
+.synth-block .synth-body .synth-play:hover {
   background-color: #555;
   color: #ccc;
 }
 .synth-block .synth-body .synth-play.active {
   background-color: #c0392b;
+  color: #fff;
 }
 .synth-block .synth-body .synth-play.active:hover {
   background-color: #a5281b;
@@ -730,24 +695,6 @@ input[type=range].synth-range-input::-moz-range-track {
   color: #ccc;
   gap: 0.5rem;
 }
-.synth-block .synth-body .synth-toggle-full-options {
-  display: flex;
-  align-items: center;
-  padding: 0.25rem;
-  border: none;
-  border-radius: 0.25rem;
-  background: none;
-  color: #888;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-.synth-block .synth-body .synth-toggle-full-options .material-symbols-outlined {
-  font-size: 1.1rem;
-}
-.synth-block .synth-body .synth-toggle-full-options:hover {
-  color: #e0e0e0;
-  background-color: rgba(255, 255, 255, 0.06);
-}
 .synth-block .synth-body .synth-full-options {
   display: flex;
   flex-direction: column;
@@ -755,37 +702,13 @@ input[type=range].synth-range-input::-moz-range-track {
   border-top: 1px solid #333;
   padding-top: 6px;
 }
-.synth-block .synth-body .synth-full-options.hidden {
-  display: none;
-}
 .synth-block .synth-body .note-lengths {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0;
 }
-.synth-block .synth-body .note-lengths .synth-reverse-note-length {
-  display: flex;
-  align-items: center;
-  padding: 0.25rem;
-  border: none;
-  border-radius: 0.25rem;
-  background: none;
-  color: #888;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-.synth-block .synth-body .note-lengths .synth-reverse-note-length .material-symbols-outlined {
-  font-size: 1.1rem;
-}
-.synth-block .synth-body .note-lengths .synth-reverse-note-length:hover {
-  color: #e0e0e0;
-  background-color: rgba(255, 255, 255, 0.06);
-}
-.synth-block .synth-body .note-lengths .synth-reverse-note-length.active {
-  color: #219a52;
-}
-.synth-block .synth-body .note-lengths button,
+.synth-block .synth-body .note-lengths .note-length-btn,
 .synth-block .synth-body .synth-note-range button {
   padding: 0.125rem 0.375rem;
   border: 1px solid #555;
@@ -796,12 +719,12 @@ input[type=range].synth-range-input::-moz-range-track {
   cursor: pointer;
   transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
-.synth-block .synth-body .note-lengths button:hover,
+.synth-block .synth-body .note-lengths .note-length-btn:hover,
 .synth-block .synth-body .synth-note-range button:hover {
   color: #e0e0e0;
   border-color: #888;
 }
-.synth-block .synth-body .note-lengths button.active,
+.synth-block .synth-body .note-lengths .note-length-btn.active,
 .synth-block .synth-body .synth-note-range button.active {
   background-color: #3a7bd5;
   border-color: #3a7bd5;
@@ -826,11 +749,6 @@ input[type=range].synth-range-input::-moz-range-track {
   background-color: #3a7bd5;
   color: #fff;
 }
-.synth-block .synth-body .synth-mode-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
-}
 .synth-block .synth-body .synth-mode-panel {
   position: relative;
   display: flex;
@@ -847,9 +765,6 @@ input[type=range].synth-range-input::-moz-range-track {
   height: 1.5rem;
   font-size: 1rem;
   aspect-ratio: 1/1;
-}
-.synth-block .synth-body .synth-mode-panel.hidden {
-  display: none;
 }
 .synth-block .synth-body .synth-mode-panel .synth-mode-panel-label {
   font-size: 0.78rem;
@@ -885,11 +800,6 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-channel-toggle.active {
   color: #fff;
 }
-.synth-block .synth-body .synth-channel-toggle:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
-}
 .synth-block .synth-body .synth-channel-toggle.channel-red.active {
   background-color: #c00000;
   border-color: #c00000;
@@ -911,74 +821,25 @@ input[type=range].synth-range-input::-moz-range-track {
 .synth-block .synth-body .synth-channel-toggle.channel-blue:not(.active):hover {
   border-color: #2121c8;
 }
-.synth-block .synth-zones-row {
+.synth-block .synth-zones-row,
+.synth-block .synth-direction-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0 0.5rem 0;
 }
-.synth-block .synth-zones-row .synth-zones-label {
+.synth-block .synth-zones-row .synth-zones-label,
+.synth-block .synth-direction-row .synth-zones-label {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
   font-size: 0.78rem;
   color: #ccc;
 }
-.synth-block .synth-zones-row .synth-zones-label em {
+.synth-block .synth-zones-row .synth-zones-label em,
+.synth-block .synth-direction-row .synth-zones-label em {
   font-style: normal;
   color: #888;
   font-variant-numeric: tabular-nums;
-}
-.synth-block .synth-zones-row .synth-add-zone-btn,
-.synth-block .synth-zones-row .synth-clear-zones-btn,
-.synth-block .synth-zones-row .synth-reading-direction-btn,
-.synth-block .synth-zones-row .synth-loop-btn,
-.synth-block .synth-zones-row .synth-back-n-forth-btn {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  border: none;
-  border-radius: 0.25rem;
-  background: none;
-  color: #888;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-.synth-block .synth-zones-row .synth-add-zone-btn .material-symbols-outlined,
-.synth-block .synth-zones-row .synth-clear-zones-btn .material-symbols-outlined,
-.synth-block .synth-zones-row .synth-reading-direction-btn .material-symbols-outlined,
-.synth-block .synth-zones-row .synth-loop-btn .material-symbols-outlined,
-.synth-block .synth-zones-row .synth-back-n-forth-btn .material-symbols-outlined {
-  font-size: 1rem;
-}
-.synth-block .synth-zones-row .synth-add-zone-btn:hover,
-.synth-block .synth-zones-row .synth-clear-zones-btn:hover,
-.synth-block .synth-zones-row .synth-reading-direction-btn:hover,
-.synth-block .synth-zones-row .synth-loop-btn:hover,
-.synth-block .synth-zones-row .synth-back-n-forth-btn:hover {
-  color: #e0e0e0;
-  background-color: rgba(255, 255, 255, 0.06);
-}
-.synth-block .synth-zones-row .synth-add-zone-btn.active,
-.synth-block .synth-zones-row .synth-clear-zones-btn.active,
-.synth-block .synth-zones-row .synth-reading-direction-btn.active,
-.synth-block .synth-zones-row .synth-loop-btn.active,
-.synth-block .synth-zones-row .synth-back-n-forth-btn.active {
-  color: #fff;
-  background-color: #3a7bd5;
-}
-.synth-block .synth-zones-row .synth-add-zone-btn:disabled,
-.synth-block .synth-zones-row .synth-clear-zones-btn:disabled,
-.synth-block .synth-zones-row .synth-reading-direction-btn:disabled,
-.synth-block .synth-zones-row .synth-loop-btn:disabled,
-.synth-block .synth-zones-row .synth-back-n-forth-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
 }
 .synth-block .synth-range-wrapper {
   display: flex;
@@ -1062,35 +923,10 @@ input[type=range].synth-range-input::-moz-range-track {
   background-color: #262626;
 }
 
-#metronome h3,
-#common-controls h3 {
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  color: #ccc;
-}
-
 .config-controls {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-.config-controls #open-config-btn {
-  display: flex;
-  align-items: center;
-  padding: 0.25rem;
-  border: none;
-  border-radius: 0.25rem;
-  background: none;
-  color: #888;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-.config-controls #open-config-btn .material-symbols-outlined {
-  font-size: 1.2rem;
-}
-.config-controls #open-config-btn:hover {
-  color: #e0e0e0;
-  background-color: rgba(255, 255, 255, 0.06);
 }
 
 ::-webkit-scrollbar {

@@ -1540,10 +1540,10 @@ function createSynthElement(id, cfg = null) {
             <div class="synth-header-row">
                 <span class="synth-title-label" data-i18n-title="synth.renameHint"></span>
                 <div class="flex-filler"></div>
-                <button class="synth-save-template" data-i18n-title="synth.saveAsTemplate">
+                <button class="synth-save-template icon-btn" data-i18n-title="synth.saveAsTemplate">
                     <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
                 </button>
-                <button class="synth-remove" data-i18n-title="synth.remove">
+                <button class="synth-remove icon-btn" data-i18n-title="synth.remove">
                     <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
             </div>
@@ -1559,23 +1559,26 @@ function createSynthElement(id, cfg = null) {
                     <em class="zones-val"></em>
                 </span>
                 <div class="flex-filler"></div>
-                <button class="synth-eye-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
-                <button class="synth-add-zone-btn" data-i18n-title="synth.addZone">
+                <button class="synth-eye-btn icon-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
+                <button class="synth-add-zone-btn icon-btn" data-i18n-title="synth.addZone">
                     <span class="material-symbols-outlined" aria-hidden="true">select</span>
                 </button>
-                <button class="synth-select-all-btn" data-i18n-title="synth.selectAllZones">
+                <button class="synth-select-all-btn icon-btn" data-i18n-title="synth.selectAllZones">
                     <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
                 </button>
-                <button class="synth-clear-zones-btn" data-i18n-title="synth.clearZones">
+                <button class="synth-clear-zones-btn icon-btn" data-i18n-title="synth.clearZones">
                     <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
                 </button>
-                <button class="synth-reading-direction-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
+                
+            </div>
+            <div class="synth-direction-row">
+                <button class="synth-reading-direction-btn icon-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
                     <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
                 </button>
-                <button class="synth-loop-btn active" data-i18n-title="synth.toggleLoop">
+                <button class="synth-loop-btn icon-btn active" data-i18n-title="synth.toggleLoop">
                     <span class="material-symbols-outlined" aria-hidden="true">laps</span>
                 </button>
-                <button class="synth-back-n-forth-btn" data-i18n-title="synth.toggleBackAndForth">
+                <button class="synth-back-n-forth-btn icon-btn" data-i18n-title="synth.toggleBackAndForth">
                     <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
                 </button>
             </div>
@@ -1589,14 +1592,14 @@ function createSynthElement(id, cfg = null) {
                     <option value=0.33>1/3</option>
                     <option value=0.25>1/4</option>
                 </select>
-                <button class="synth-rewind" data-i18n-title="synth.rewind">
+                <button class="synth-rewind icon-btn" data-i18n-title="synth.rewind">
                     <span class="material-symbols-outlined" aria-hidden="true">fast_rewind</span>
                 </button>
                 <button class="synth-play">
                     <span class="material-symbols-outlined synth-play-icon" aria-hidden="true">play_arrow</span>
                     <span class="synth-play-label"></span>
                 </button>
-                <button class="synth-step-forward" data-i18n-title="synth.stepForward">
+                <button class="synth-step-forward icon-btn" data-i18n-title="synth.stepForward">
                     <span class="material-symbols-outlined" aria-hidden="true">step</span>
                 </button>
             </div>
@@ -1604,7 +1607,7 @@ function createSynthElement(id, cfg = null) {
             <div class="synth-mode-row">
                     <button class="synth-mode-btn active" data-mode="monophonic"></button>
                     <button class="synth-mode-btn" data-mode="polyphonic"></button>
-                    <button class="synth-toggle-full-options" data-i18n-title="synth.toggleFullOptions">
+                    <button class="synth-toggle-full-options icon-btn" data-i18n-title="synth.toggleFullOptions">
                         <span class="material-symbols-outlined" aria-hidden="true">expand_circle_up</span>
                     </button>
             </div>
@@ -1658,7 +1661,7 @@ function createSynthElement(id, cfg = null) {
                     <button class="note-length-btn noto-music active" data-length="quarter" data-i18n-title="synth.noteLengthQuarter">𝅘𝅥</button>
                     <button class="note-length-btn noto-music" data-length="half" data-i18n-title="synth.noteLengthHalf">𝅗𝅥</button>
                     <button class="note-length-btn noto-music" data-length="whole" data-i18n-title="synth.noteLengthWhole">𝅝</button>
-                    <button class="synth-reverse-note-length" data-i18n-title="synth.reverseNoteLength">
+                    <button class="synth-reverse-note-length icon-btn" data-i18n-title="synth.reverseNoteLength">
                         <span class="material-symbols-outlined" aria-hidden="true">reset_exposure</span>
                     </button>
                 </div>
