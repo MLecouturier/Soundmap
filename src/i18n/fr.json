@@ -21,6 +21,8 @@
     "perspectiveV": "Perspective verticale",
     "perspectiveH": "Perspective horizontale",
     "transformGrid": "Grille",
+    "fullscreen": "Plein écran (masquer les réglages)",
+    "exitFullscreen": "Quitter le plein écran",
     "apply": "Appliquer",
     "cancel": "Annuler",
     "showOriginal": "Voir l'original",

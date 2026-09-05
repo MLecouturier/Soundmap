@@ -21,6 +21,8 @@
     "perspectiveV": "Vertical perspective",
     "perspectiveH": "Horizontal perspective",
     "transformGrid": "Grid",
+    "fullscreen": "Fullscreen (hide the panels)",
+    "exitFullscreen": "Exit fullscreen",
     "apply": "Apply",
     "cancel": "Cancel",
     "showOriginal": "Show original",

@@ -297,6 +297,7 @@ window.addEventListener('keydown', (e) => {
         exitCropMode();
         closeTransformPanel();
         cancelZonePicking();
+        exitViewerFullscreen();
     }
 });
 
@@ -1285,6 +1286,32 @@ showOriginalBtn.addEventListener('click', () => {
     showOriginalBtn.classList.toggle('active');
     updatePreviewSrc();
 });
+
+// ---------- Viewer fullscreen (hide every panel) ----------
+// Performance mode: hides the controls, the right column and the footer
+// so the image takes the whole window. A floating exit button is overlaid
+// on the viewer; Escape also leaves the mode.
+const fullscreenBtn      = document.querySelector('#fullscreen-btn');
+const exitFullscreenBtn  = document.querySelector('#exit-fullscreen-btn');
+
+let viewerFullscreen = false;
+
+function enterViewerFullscreen() {
+    if (viewerFullscreen) return;
+    viewerFullscreen = true;
+    exitCropMode();
+    closeTransformPanel();
+    document.body.classList.add('viewer-fullscreen');
+}
+
+function exitViewerFullscreen() {
+    if (!viewerFullscreen) return;
+    viewerFullscreen = false;
+    document.body.classList.remove('viewer-fullscreen');
+}
+
+fullscreenBtn.addEventListener('click', enterViewerFullscreen);
+exitFullscreenBtn.addEventListener('click', exitViewerFullscreen);
 
 // ---------- Init ----------
 syncLabels();
