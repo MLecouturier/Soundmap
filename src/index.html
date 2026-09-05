@@ -21,8 +21,9 @@
 
                 <div id="controls">
                     <div class="controls-row">
-                        <button id="load-btn" data-i18n="controls.load"></button>
-                        <button id="reset-btn" class="secondary" data-i18n="controls.reset"></button>
+                        <button id="load-btn">
+                            <span class="material-symbols-outlined">image_search</span>
+                        </button>
                         <button id="rotate-img-btn" class="icon-btn" data-i18n-title="controls.rotate">
                             <span class="material-symbols-outlined">rotate_90_degrees_cw</span>
                         </button>
@@ -32,10 +33,9 @@
                         <button id="transform-img-btn" class="icon-btn" data-i18n-title="controls.transform">
                             <span class="material-symbols-outlined">tune</span>
                         </button>
-                        <label class="checkbox">
-                            <input type="checkbox" id="show-original" />
-                            <span data-i18n="controls.showOriginal"></span>
-                        </label>
+                        <button id="show-original-btn" class="toggle-btn" >
+                            <span class="material-symbols-outlined">compare</span>
+                        </button>
                     </div>
 
                     <div id="crop-bar" class="mode-bar hidden">
@@ -61,6 +61,7 @@
                             </label>
                         </div>
                         <div class="mode-bar">
+                            <button id="transform-grid-btn" class="toggle-btn active" data-i18n="controls.transformGrid"></button>
                             <div class="flex-filler"></div>
                             <button id="transform-apply-btn" data-i18n="controls.apply"></button>
                             <button id="transform-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
@@ -92,6 +93,9 @@
                             <span><span data-i18n="controls.posterize"></span> <em id="posterize-value">off</em></span>
                             <input type="range" id="posterize" min="1" max="32" value="1" step="1" />
                         </label>
+                        <button id="reset-btn" class="secondary">
+                            <span class="material-symbols-outlined">reset_settings</span>
+                        </button>
                     </div>
 
                     <p id="dimensions-info" class="info"></p>
@@ -137,10 +141,16 @@
                 </div>
             </div>
             <div class="footer-area" id="common-controls">
-                <h2 data-i18n="synthList.commonControlsTitle"></h2>
+                <!-- <h2 data-i18n="synthList.commonControlsTitle"></h2> -->
                 <div class="config-controls">
                     <button id="open-config-btn" data-i18n-title="config.openFile">
                         <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+                    </button>
+                    <button id="fullscreen-btn" class="icon-btn" data-i18n-title="">
+                        <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
+                    </button>
+                    <button id="interactive-help-btn" class="icon-btn" data-i18n-title="">
+                        <span class="material-symbols-outlined" aria-hidden="true">live_help</span>
                     </button>
                     <div class="flex-filler"></div>
                     <button id="save-session-btn" class="icon-btn" data-i18n-title="session.save">

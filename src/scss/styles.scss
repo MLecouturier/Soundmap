@@ -275,6 +275,7 @@ input[type="range"].synth-range-input {
 // Controls (left column)
 // ==========================================================================
 #controls {
+    position: relative; // anchor for the transform panel overlay
     flex: 0 0 auto;
 
     .controls-row {
@@ -338,8 +339,7 @@ input[type="range"].synth-range-input {
     }
 
     .controls-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        display: flex;
         gap: 10px 1.125rem;
     }
 
@@ -364,15 +364,22 @@ input[type="range"].synth-range-input {
     }
 
     // Fine rotation + perspective adjustment panel
+    // Overlays the controls below instead of pushing them, so the image
+    // viewer keeps a constant size.
     #transform-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
         display: flex;
         flex-direction: column;
         gap: .75rem;
-        margin-bottom: .75rem;
         padding: .625rem .75rem;
         border: 1px solid $color-border;
         border-radius: $border-radius-base;
         background-color: #1a1a1a;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
 
         &.hidden { display: none; }
     }
@@ -392,6 +399,7 @@ input[type="range"].synth-range-input {
     }
 
     label {
+        flex-grow: 1;
         display: flex;
         flex-direction: column;
         gap: .25rem;
@@ -407,12 +415,6 @@ input[type="range"].synth-range-input {
                 color: $color-text-muted;
                 font-variant-numeric: tabular-nums;
             }
-        }
-
-        &.checkbox {
-            flex-direction: row;
-            align-items: center;
-            gap: 6px;
         }
     }
 
@@ -435,6 +437,25 @@ input[type="range"].synth-range-input {
             border: 1px solid $color-border;
             color: $color-text-secondary;
             &:hover { background-color: $color-bg-light; }
+        }
+
+        // On/off toggle button (grid overlay, show original...):
+        // ghost look when inactive, accent look when active.
+        &.toggle-btn {
+            background-color: transparent;
+            border: 1px solid $color-border;
+            color: $color-text-secondary;
+            transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast;
+
+            &:hover { background-color: $color-bg-light; }
+
+            &.active {
+                background-color: $color-accent;
+                border-color: $color-accent;
+                color: white;
+
+                &:hover { background-color: $color-accent-hover; }
+            }
         }
     }
 

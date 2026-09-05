@@ -20,6 +20,7 @@
     "rotation": "Rotation fine",
     "perspectiveV": "Perspective verticale",
     "perspectiveH": "Perspective horizontale",
+    "transformGrid": "Grille",
     "apply": "Appliquer",
     "cancel": "Annuler",
     "showOriginal": "Voir l'original",

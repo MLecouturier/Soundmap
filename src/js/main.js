@@ -121,7 +121,7 @@ const resetBtn        = document.querySelector('#reset-btn');
 const rotateBtn       = document.querySelector('#rotate-img-btn');
 const cropBtn         = document.querySelector('#crop-img-btn');
 const transformBtn    = document.querySelector('#transform-img-btn');
-const showOriginal    = document.querySelector('#show-original');
+const showOriginalBtn = document.querySelector('#show-original-btn');
 const preview         = document.querySelector('#preview');
 const previewCanvas   = document.querySelector('#processed-preview');
 const viewerEmpty     = document.querySelector('#viewer-empty');
@@ -627,6 +627,7 @@ new ResizeObserver(() => {
     resizeOverlay();
     clearOverlay();
     if (cropMode) drawCropOverlay();
+    else if (transformActive) redrawTransformOverlay();
 }).observe(pixelOverlay);
 
 // ---------- State ----------
@@ -704,10 +705,10 @@ function paintPreviewCanvas(pixels) {
 }
 
 // Shows the right surface: the <img> for the original ("Show original"
-// checkbox), the canvas for everything that comes as raw pixels (processed
+// toggle), the canvas for everything that comes as raw pixels (processed
 // image, transform live preview — the latter taking precedence).
 function updatePreviewSrc() {
-    const showOrig = showOriginal.checked;
+    const showOrig = showOriginalBtn.classList.contains('active');
     const pixels = transformPreviewPixels ?? (showOrig ? null : processedPixels);
 
     if (pixels) {
@@ -795,8 +796,8 @@ loadBtn.addEventListener('click', async () => {
     originalPng = result.base64_png;
     hasImage    = true;
 
-    gridSlider.value      = SLIDER_STEPS;
-    showOriginal.checked  = false;
+    gridSlider.value         = SLIDER_STEPS;
+    showOriginalBtn.classList.remove('active');
 
     viewerEmpty.classList.add('hidden');
 
@@ -938,7 +939,8 @@ const transformRotationValue  = document.querySelector('#transform-rotation-valu
 const transformPerspV         = document.querySelector('#transform-persp-v');
 const transformPerspVValue    = document.querySelector('#transform-persp-v-value');
 const transformPerspH         = document.querySelector('#transform-persp-h');
-const transformPerspHValue     = document.querySelector('#transform-persp-h-value');
+const transformPerspHValue    = document.querySelector('#transform-persp-h-value');
+const transformGridBtn        = document.querySelector('#transform-grid-btn');
 
 let transformActive = false;
 let transformPreviewPixels = null; // live preview { width, height, rgba }, shown instead of the normal image
@@ -956,6 +958,84 @@ function transformParams() {
 function isTransformPending() {
     const p = transformParams();
     return p.rotation !== 0 || p.perspective_v !== 0 || p.perspective_h !== 0;
+}
+
+// ---------- Alignment grid overlay ----------
+// Computes the render rect of the image currently displayed in the viewer:
+// the transform preview while the panel is open (its canvas changes size
+// with the rotation/perspective), the processed grid otherwise.
+function getDisplayedImageLayout() {
+    const vw = pixelOverlay.width;
+    const vh = pixelOverlay.height;
+    const pixels = transformPreviewPixels ?? processedPixels;
+    if (!pixels || !pixels.width || !pixels.height || !vw || !vh) return null;
+    const imgRatio  = pixels.width / pixels.height;
+    const viewRatio = vw / vh;
+    let renderW, renderH;
+    if (imgRatio > viewRatio) { renderW = vw; renderH = vw / imgRatio; }
+    else                      { renderH = vh; renderW = vh * imgRatio; }
+    return {
+        renderW, renderH,
+        offsetX: (vw - renderW) / 2,
+        offsetY: (vh - renderH) / 2,
+    };
+}
+
+// Rule of thirds plus a finer 12-division grid, drawn over the displayed
+// image. The grid is fixed relative to the viewer: it does not rotate with
+// the image, so it can be used as an alignment reference.
+const TRANSFORM_GRID_DIVISIONS = 12;
+
+function drawTransformGrid() {
+    const layout = getDisplayedImageLayout();
+    if (!layout) return;
+    const { offsetX, offsetY, renderW, renderH } = layout;
+    const ctx = pixelOverlay.getContext('2d');
+
+    ctx.save();
+    ctx.lineWidth = 1;
+
+    const vline = i => offsetX + Math.round(renderW * i / TRANSFORM_GRID_DIVISIONS) + 0.5;
+    const hline = i => offsetY + Math.round(renderH * i / TRANSFORM_GRID_DIVISIONS) + 0.5;
+    const third1 = TRANSFORM_GRID_DIVISIONS / 3;
+    const third2 = 2 * TRANSFORM_GRID_DIVISIONS / 3;
+
+    // Fine grid (thirds drawn separately, stronger)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath();
+    for (let i = 1; i < TRANSFORM_GRID_DIVISIONS; i++) {
+        if (i === third1 || i === third2) continue;
+        ctx.moveTo(vline(i), offsetY);
+        ctx.lineTo(vline(i), offsetY + renderH);
+        ctx.moveTo(offsetX, hline(i));
+        ctx.lineTo(offsetX + renderW, hline(i));
+    }
+    ctx.stroke();
+
+    // Rule of thirds
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    for (const i of [third1, third2]) {
+        ctx.moveTo(vline(i), offsetY);
+        ctx.lineTo(vline(i), offsetY + renderH);
+        ctx.moveTo(offsetX, hline(i));
+        ctx.lineTo(offsetX + renderW, hline(i));
+    }
+    ctx.stroke();
+
+    // Displayed image bounds (the transform preview includes transparent
+    // corners when rotated)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.strokeRect(offsetX + 0.5, offsetY + 0.5, renderW - 1, renderH - 1);
+
+    ctx.restore();
+}
+
+// Rebuilds the whole overlay while the transform panel is open: synth
+// highlights first, alignment grid on top.
+function redrawTransformOverlay() {
+    redrawAllHighlights();
+    if (transformGridBtn.classList.contains('active')) drawTransformGrid();
 }
 
 function syncTransformLabels() {
@@ -977,6 +1057,7 @@ async function requestTransformPreview() {
         transformRequestToken++;
         transformPreviewPixels = null;
         updatePreviewSrc();
+        redrawTransformOverlay();
         return;
     }
     const params = transformParams();
@@ -986,6 +1067,7 @@ async function requestTransformPreview() {
         if (!transformActive || token !== transformRequestToken) return;
         transformPreviewPixels = decodePixelResponse(buf);
         updatePreviewSrc();
+        redrawTransformOverlay();
     } catch (err) {
         console.error('Error in preview_image_transform:', err);
     }
@@ -1006,6 +1088,7 @@ function openTransformPanel() {
     syncTransformLabels();
     transformPreviewPixels = null;
     updatePreviewSrc();
+    redrawTransformOverlay();
 }
 
 function closeTransformPanel() {
@@ -1017,6 +1100,7 @@ function closeTransformPanel() {
     transformBtn.classList.remove('active');
     transformPanel.classList.add('hidden');
     updatePreviewSrc();
+    redrawAllHighlights(); // removes the alignment grid
 }
 
 transformBtn.addEventListener('click', () => transformActive ? closeTransformPanel() : openTransformPanel());
@@ -1024,6 +1108,52 @@ transformCancelBtn.addEventListener('click', closeTransformPanel);
 
 [transformRotation, transformPerspV, transformPerspH].forEach(el => {
     el.addEventListener('input', () => {
+        syncTransformLabels();
+        scheduleTransformPreview();
+    });
+});
+
+transformGridBtn.addEventListener('click', () => {
+    transformGridBtn.classList.toggle('active');
+    redrawTransformOverlay();
+});
+
+// Keyboard control while the transform panel is open: arrows adjust the
+// perspective, Shift+up/down the fine rotation. Skipped when the focus is
+// already in a form field or button, since the focused widget handles the
+// keys itself (native slider behavior).
+window.addEventListener('keydown', (e) => {
+    if (!transformActive) return;
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+
+    let slider = null;
+    let delta  = 0;
+    if (e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        slider = transformRotation;
+        delta  = e.key === 'ArrowUp' ? 0.1 : -0.1;
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        slider = transformPerspV;
+        delta  = e.key === 'ArrowUp' ? 1 : -1;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        slider = transformPerspH;
+        delta  = e.key === 'ArrowRight' ? 1 : -1;
+    }
+    if (!slider) return;
+
+    e.preventDefault(); // the arrows must not scroll the page
+    const next = Math.min(Number(slider.max), Math.max(Number(slider.min), Number(slider.value) + delta));
+    // Rounded to one decimal: the rotation accumulates 0.1 steps and the
+    // float sum would drift (0.1 + 0.2 = 0.30000000000000004)
+    slider.value = Math.round(next * 10) / 10;
+    syncTransformLabels();
+    scheduleTransformPreview();
+});
+
+// Double-click on a slider resets it to zero
+[transformRotation, transformPerspV, transformPerspH].forEach(el => {
+    el.addEventListener('dblclick', () => {
+        el.value = 0;
         syncTransformLabels();
         scheduleTransformPreview();
     });
@@ -1119,7 +1249,7 @@ loadSessionBtn.addEventListener('click', async () => {
     brightness.value = session.image_settings.brightness;
     saturation.value = session.image_settings.saturation;
     posterize.value = session.image_settings.posterize_levels ?? 1;
-    showOriginal.checked = false;
+    showOriginalBtn.classList.remove('active');
     viewerEmpty.classList.add('hidden');
     syncLabels();
     await refresh();
@@ -1151,7 +1281,10 @@ loadSessionBtn.addEventListener('click', async () => {
   });
 });
 
-showOriginal.addEventListener('change', updatePreviewSrc);
+showOriginalBtn.addEventListener('click', () => {
+    showOriginalBtn.classList.toggle('active');
+    updatePreviewSrc();
+});
 
 // ---------- Init ----------
 syncLabels();

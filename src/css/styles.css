@@ -229,6 +229,7 @@ input[type=range].synth-range-input::-moz-range-track {
 }
 
 #controls {
+  position: relative;
   flex: 0 0 auto;
 }
 #controls .controls-row {
@@ -283,8 +284,7 @@ input[type=range].synth-range-input::-moz-range-track {
   border-color: #3a7bd5;
 }
 #controls .controls-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
   gap: 10px 1.125rem;
 }
 #controls .mode-bar {
@@ -305,14 +305,19 @@ input[type=range].synth-range-input::-moz-range-track {
   font-size: 0.8rem;
 }
 #controls #transform-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
   padding: 0.625rem 0.75rem;
   border: 1px solid #333;
   border-radius: 0.25rem;
   background-color: #1a1a1a;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
 }
 #controls #transform-panel.hidden {
   display: none;
@@ -327,6 +332,7 @@ input[type=range].synth-range-input::-moz-range-track {
   opacity: 0.5;
 }
 #controls label {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -341,11 +347,6 @@ input[type=range].synth-range-input::-moz-range-track {
   font-style: normal;
   color: #888;
   font-variant-numeric: tabular-nums;
-}
-#controls label.checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
 }
 #controls .span-2 {
   grid-column: span 2;
@@ -370,6 +371,23 @@ input[type=range].synth-range-input::-moz-range-track {
 }
 #controls button.secondary:hover {
   background-color: #262626;
+}
+#controls button.toggle-btn {
+  background-color: transparent;
+  border: 1px solid #333;
+  color: #ccc;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+#controls button.toggle-btn:hover {
+  background-color: #262626;
+}
+#controls button.toggle-btn.active {
+  background-color: #3a7bd5;
+  border-color: #3a7bd5;
+  color: white;
+}
+#controls button.toggle-btn.active:hover {
+  background-color: #2d5fa8;
 }
 #controls .info {
   margin-top: 10px;
@@ -1053,6 +1071,4 @@ input[type=range].synth-range-input::-moz-range-track {
 ::-webkit-scrollbar-thumb {
   background-color: #444;
   border-radius: 0.25rem;
-}
-
-/*# sourceMappingURL=styles.css.map */
+}/*# sourceMappingURL=styles.css.map */

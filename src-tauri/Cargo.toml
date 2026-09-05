@@ -1,6 +1,6 @@
 [package]
 name = "soundmap"
-version = "1.0.0"
+version = "1.1.0"
 description = "Pixels to Synth App"
 authors = ["MLecout"]
 edition = "2021"
