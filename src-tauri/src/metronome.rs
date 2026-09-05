@@ -6,6 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use image::{DynamicImage, GenericImageView};
 
 use crate::error::{err, AppError};
+use crate::config::ConfigState;
 use crate::state::{
     ImageState, NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, MidiState,
 };
@@ -87,6 +88,7 @@ fn saturation_to_velocity(saturation: f32, velocity_min: u8) -> u8 {
 fn process_monophonic(
     synth: &mut Synth,
     midi: &MidiState,
+    note_range_bounds: &[(u8, u8); 3],
     r: u8, g: u8, b: u8,
     brightness_level: u8,
     velocity: u8,
@@ -97,7 +99,7 @@ fn process_monophonic(
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
     let raw_note = hue_to_midi_note(shifted_hue);
     // Fold the hue-derived note into the enabled MIDI range filters
-    let effective_note = fold_note_into_range(raw_note, &synth.mono_note_range);
+    let effective_note = fold_note_into_range(raw_note, note_range_bounds, &synth.mono_note_range);
 
     let in_range = brightness_level >= synth.brightness_min
         && brightness_level <= synth.brightness_max;
@@ -136,6 +138,7 @@ fn process_monophonic(
 fn process_polyphonic(
     synth: &mut Synth,
     midi: &MidiState,
+    note_range_bounds: &[(u8, u8); 3],
     r: u8, g: u8, b: u8,
     brightness_level: u8,
     velocity: u8,
@@ -153,7 +156,7 @@ fn process_polyphonic(
         let enabled = synth.channel_enabled[i];
         let raw_note = channel_to_midi_note(channel_values[i]);
         // Fold the channel-derived note into this voice's enabled range filters
-        let effective_note = fold_note_into_range(raw_note, &synth.voice_note_ranges[i]);
+        let effective_note = fold_note_into_range(raw_note, note_range_bounds, &synth.voice_note_ranges[i]);
         let voice = &mut synth.poly_voices[i];
 
         let in_range = enabled && global_in_range;
@@ -321,6 +324,9 @@ fn step_synth_once(
     };
     let retrigger = note_length.is_some();
 
+    // User-configurable note-range bounds (bass, medium, treble)
+    let note_range_bounds = app.state::<ConfigState>().config.lock().unwrap().note_range_bounds;
+
     let mut payload = serde_json::json!({
         "id": synth.id,
         "cursor": pixel_index,
@@ -333,13 +339,13 @@ fn step_synth_once(
     match synth.mode {
         SynthMode::Monophonic => {
             process_monophonic(
-                synth, midi, r, g, b,
+                synth, midi, &note_range_bounds, r, g, b,
                 brightness_level, velocity, &mut payload, retrigger,
             );
         }
         SynthMode::Polyphonic => {
             process_polyphonic(
-                synth, midi, r, g, b,
+                synth, midi, &note_range_bounds, r, g, b,
                 brightness_level, velocity, &mut payload, retrigger,
             );
         }
@@ -414,14 +420,11 @@ fn pick_note_length(synth: &Synth, brightness_level: u8) -> f64 {
     lengths[idx]
 }
 
-/// Bounds of the three note-range filters (bass, medium, treble), in MIDI
-/// note numbers. Toggles are cumulative: the allowed range is the union of
-/// the enabled sub-ranges.
-const NOTE_RANGE_BOUNDS: [(u8, u8); 3] = [(21, 47), (48, 71), (72, 108)];
-
-/// Collects the (low, high) bounds of the enabled sub-ranges.
-fn active_note_ranges(toggles: &[bool; 3]) -> Vec<(u8, u8)> {
-    NOTE_RANGE_BOUNDS
+/// Collects the (low, high) bounds of the enabled sub-ranges. Toggles are
+/// cumulative: the allowed range is the union of the enabled sub-ranges;
+/// the bounds are user-configurable (`AppConfig::note_range_bounds`).
+fn active_note_ranges(bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> Vec<(u8, u8)> {
+    bounds
         .iter()
         .zip(toggles.iter())
         .filter(|(_, &on)| on)
@@ -433,8 +436,8 @@ fn active_note_ranges(toggles: &[bool; 3]) -> Vec<(u8, u8)> {
 /// allowed range is transposed up or down by whole octaves until it lands
 /// in one of them, preserving its pitch class). With no sub-range enabled
 /// the full MIDI range (0–127) is allowed and the note is unchanged.
-fn fold_note_into_range(note: u8, toggles: &[bool; 3]) -> u8 {
-    let allowed = active_note_ranges(toggles);
+fn fold_note_into_range(note: u8, bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> u8 {
+    let allowed = active_note_ranges(bounds, toggles);
     if allowed.is_empty() {
         return note;
     }
@@ -442,9 +445,11 @@ fn fold_note_into_range(note: u8, toggles: &[bool; 3]) -> u8 {
         return note;
     }
 
-    // Each active sub-range spans more than one octave (27, 24 and 37
-    // semitones), so a valid fold always exists; try both directions by
-    // increasing octave distance, folding down first.
+    // The default sub-ranges each span more than one octave (27, 24 and 37
+    // semitones), so a valid fold always exists; user-defined bounds
+    // narrower than an octave may have none, in which case the note is
+    // left unchanged. Try both directions by increasing octave distance,
+    // folding down first.
     for octave in 1..=10i32 {
         for &sign in &[-1i32, 1] {
             let candidate = note as i32 + sign * 12 * octave;

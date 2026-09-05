@@ -54,6 +54,7 @@ function setPlayButtonState(btn, playing) {
 // that data-i18n alone can't express.
 function retranslateSynthElement(el) {
     applyTranslations(el);
+    applyNoteRangeTitles(el);
 
     const id = Number(el.dataset.synthId);
     el.querySelector('.synth-title-label').textContent = synthDisplayName(id);
@@ -83,6 +84,16 @@ function retranslateSynthElement(el) {
 // apply on the next application start).
 invoke('get_config').then(config => {
     bpmInput.value = config.default_bpm;
+    if (Array.isArray(config.synth_colors) && config.synth_colors.length > 0) {
+        SYNTH_COLORS = config.synth_colors;
+    }
+    if (Array.isArray(config.note_range_bounds) && config.note_range_bounds.length === 3) {
+        NOTE_RANGE_BOUNDS = config.note_range_bounds.map(([lo, hi]) => {
+            const l = Math.min(Number(lo), Number(hi));
+            const h = Math.max(Number(lo), Number(hi));
+            return [Math.max(0, Math.min(127, l)), Math.max(0, Math.min(127, h))];
+        });
+    }
 }).catch(err => console.error('Error in get_config:', err));
 
 document.querySelector('#open-config-btn').addEventListener('click', () => {
@@ -646,12 +657,39 @@ let originalPng   = null;       // base64 PNG of the original image
 let processedPixels = null;     // { width, height, rgba } of the last processed render
 let totalPixels   = 0;          // total number of pixels in the current grid
 
-// Predefined colors for the synths
-const SYNTH_COLORS = [
+// Colors offered for the synths (palette configurable in config.json,
+// replaced at startup by the value from get_config)
+let SYNTH_COLORS = [
     '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
     '#1abc9c', '#3498db', '#9b59b6', '#e91e63',
     '#ff5722', '#00bcd4', '#8bc34a', '#ffffff',
 ];
+
+// Bounds (low, high) of the bass / medium / treble note-range filters,
+// in MIDI note numbers (configurable in config.json, replaced at startup
+// by the value from get_config)
+let NOTE_RANGE_BOUNDS = [[21, 47], [48, 71], [72, 108]];
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function midiNoteName(n) {
+    return NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1);
+}
+
+// Tooltip of the bass / medium / treble buttons, built from the
+// configured bounds (the values are user-configurable, they cannot be
+// hardcoded in the i18n files)
+function applyNoteRangeTitles(el) {
+    [
+        ['bass',    'synth.noteRangeBass'],
+        ['medium',  'synth.noteRangeMedium'],
+        ['treble',  'synth.noteRangeTreble'],
+    ].forEach(([kind, key], i) => {
+        const [lo, hi] = NOTE_RANGE_BOUNDS[i];
+        const params = { lowName: midiNoteName(lo), highName: midiNoteName(hi), low: lo, high: hi };
+        el.querySelectorAll(`.synth-${kind}`).forEach(btn => { btn.title = t(key, params); });
+    });
+}
 
 // Map id → current color
 const synthColors = new Map();
@@ -1574,9 +1612,9 @@ function createSynthElement(id, cfg = null) {
             <div class="synth-full-options">
                 <div class="synth-mode-panel synth-mode-panel-mono">
                     <div class="synth-note-range">
-                        <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
-                        <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
-                        <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                        <button class="synth-bass">𝄢</button>
+                        <button class="synth-medium">𝄡</button>
+                        <button class="synth-treble">𝄞</button>
                     </div>
                     <label class="hue-shift synth-slider-label">
                         <span><span data-i18n="synth.hueShift"></span> <em class="hue-shift-val">0°</em></span>
@@ -1590,25 +1628,25 @@ function createSynthElement(id, cfg = null) {
                         <div class="synth-channel-toggle-group">
                             <button class="synth-channel-toggle channel-red active" data-channel="0" data-i18n-title="synth.toggleRed">R</button>
                             <div class="synth-note-range">
-                                <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
-                                <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
-                                <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                                <button class="synth-bass">𝄢</button>
+                                <button class="synth-medium">𝄡</button>
+                                <button class="synth-treble">𝄞</button>
                             </div>
                         </div>
                         <div class="synth-channel-toggle-group">
                             <button class="synth-channel-toggle channel-green active" data-channel="1" data-i18n-title="synth.toggleGreen">G</button>
                             <div class="synth-note-range">
-                                <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
-                                <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
-                                <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                                <button class="synth-bass">𝄢</button>
+                                <button class="synth-medium">𝄡</button>
+                                <button class="synth-treble">𝄞</button>
                             </div>
                         </div>
                         <div class="synth-channel-toggle-group">
                             <button class="synth-channel-toggle channel-blue active" data-channel="2" data-i18n-title="synth.toggleBlue">B</button>
                             <div class="synth-note-range">
-                                <button class="synth-bass" data-i18n-title="synth.noteRangeBass">𝄢</button>
-                                <button class="synth-medium" data-i18n-title="synth.noteRangeMedium">𝄡</button>
-                                <button class="synth-treble" data-i18n-title="synth.noteRangeTreble">𝄞</button>
+                                <button class="synth-bass">𝄢</button>
+                                <button class="synth-medium">𝄡</button>
+                                <button class="synth-treble">𝄞</button>
                             </div>
                         </div>
                     </div>
@@ -1651,6 +1689,7 @@ function createSynthElement(id, cfg = null) {
     // Translate everything marked with data-i18n* above, plus the elements
     // whose text depends on dynamic state (title, play button, pixel info).
     applyTranslations(el);
+    applyNoteRangeTitles(el);
     el.querySelector('.synth-title-label').textContent = synthDisplayName(id);
     setPlayButtonState(el.querySelector('.synth-play'), false);
     el.querySelector('.synth-mode-btn[data-mode="monophonic"]').textContent = t('synth.modeMonophonic');
@@ -2233,10 +2272,8 @@ window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     drawSynthPixel(id, cursor, muted);
 });
 
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+// Formats a MIDI note as "C4 (60)" for the pixel info line
 function midiNoteToName(midi) {
     if (midi == null) return '-';
-    const octave = Math.floor(midi / 12) - 1;
-    const name = NOTE_NAMES[midi % 12];
-    return `${name}${octave} (${midi})`;
+    return `${midiNoteName(midi)} (${midi})`;
 }

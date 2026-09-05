@@ -7,6 +7,24 @@ use crate::error::{err, AppError};
 use crate::metronome::MetronomeState;
 use crate::state::{NoteLength, ReadingDirection, Synth, SynthMode};
 
+/// Default bounds of the three note-range filters, in MIDI note numbers.
+pub const DEFAULT_NOTE_RANGE_BOUNDS: [(u8, u8); 3] = [(21, 47), (48, 71), (72, 108)];
+
+/// Default palette offered for the synthesizers.
+fn default_synth_colors() -> Vec<String> {
+    ["#e74c3c", "#e67e22", "#f1c40f", "#2ecc71",
+     "#1abc9c", "#3498db", "#9b59b6", "#e91e63",
+     "#ff5722", "#00bcd4", "#8bc34a", "#ffffff"]
+        .iter().map(|s| s.to_string()).collect()
+}
+
+fn is_valid_hex_color(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    bytes.len() == 7
+        && bytes[0] == b'#'
+        && bytes[1..].iter().all(|c| c.is_ascii_hexdigit())
+}
+
 /// Global application configuration, persisted as JSON in the app config
 /// directory. Missing or corrupt fields fall back to their default.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -19,6 +37,14 @@ pub struct AppConfig {
     pub default_bpm: u32,
     /// Template applied to every newly created synthesizer.
     pub default_synth: SynthTemplate,
+    /// Bounds (low, high), in MIDI note numbers, of the three note-range
+    /// filters (bass, medium, treble). Hand-edited values are sanitized on
+    /// load: swapped if inverted, clamped to 0–127.
+    pub note_range_bounds: [(u8, u8); 3],
+    /// Colors offered for the synthesizers, "#rrggbb" hex strings. Invalid
+    /// entries are dropped on load; an empty list falls back to the default
+    /// palette.
+    pub synth_colors: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -27,6 +53,24 @@ impl Default for AppConfig {
             max_image_size: 2048,
             default_bpm: 120,
             default_synth: SynthTemplate::default(),
+            note_range_bounds: DEFAULT_NOTE_RANGE_BOUNDS,
+            synth_colors: default_synth_colors(),
+        }
+    }
+}
+
+impl AppConfig {
+    /// Clamps hand-edited values into shape.
+    fn sanitize(&mut self) {
+        for (lo, hi) in self.note_range_bounds.iter_mut() {
+            let l = (*lo).min(*hi);
+            let h = (*lo).max(*hi);
+            *lo = l.min(127);
+            *hi = h.min(127);
+        }
+        self.synth_colors.retain(|c| is_valid_hex_color(c));
+        if self.synth_colors.is_empty() {
+            self.synth_colors = default_synth_colors();
         }
     }
 }
@@ -119,14 +163,47 @@ fn config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(dir.join("config.json"))
 }
 
+/// Recursively checks that every object field present in the serialized
+/// config also exists in the raw JSON (arrays and leaves are accepted
+/// as-is). Used to detect a config file written by an older version of
+/// the app, so the new fields can be materialized in the file.
+fn covers_fields(raw: &serde_json::Value, full: &serde_json::Value) -> bool {
+    match (raw, full) {
+        (serde_json::Value::Object(r), serde_json::Value::Object(f)) => f
+            .iter()
+            .all(|(k, v)| match r.get(k) {
+                Some(rv) => covers_fields(rv, v),
+                None => false,
+            }),
+        _ => true,
+    }
+}
+
 /// Loads the configuration from the app config directory, falling back to
-/// the defaults if the file is missing or unreadable.
+/// the defaults if the file is missing or unreadable. Fields absent from
+/// the file (e.g. added by a newer version) are materialized in it with
+/// their default value, so the user always sees every configurable value;
+/// existing values and formatting of other fields are left untouched. A
+/// file that fails to parse is never rewritten.
 pub fn load_config(app: &AppHandle) -> AppConfig {
     let Some(path) = config_path(app) else {
         return AppConfig::default();
     };
     match fs::read_to_string(&path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Ok(content) => match serde_json::from_str::<AppConfig>(&content) {
+            Ok(parsed) => {
+                let mut config = parsed;
+                config.sanitize();
+                let raw = serde_json::from_str::<serde_json::Value>(&content)
+                    .unwrap_or_default();
+                let full = serde_json::to_value(&config).unwrap_or_default();
+                if !covers_fields(&raw, &full) {
+                    save_config(app, &config);
+                }
+                config
+            }
+            Err(_) => AppConfig::default(), // corrupt: left untouched
+        },
         Err(_) => AppConfig::default(),
     }
 }
@@ -213,4 +290,61 @@ pub fn set_default_synth_from(
     config.default_synth = template;
     save_config(&app, &config);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn covers_fields_detects_missing_top_level_field() {
+        // A file written before note_range_bounds / synth_colors existed
+        let raw: serde_json::Value = serde_json::from_str(
+            r#"{ "max_image_size": 2048, "default_bpm": 120 }"#,
+        )
+        .unwrap();
+        let full = serde_json::to_value(AppConfig::default()).unwrap();
+        assert!(!covers_fields(&raw, &full));
+
+        let raw: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&AppConfig::default()).unwrap())
+                .unwrap();
+        assert!(covers_fields(&raw, &full));
+    }
+
+    #[test]
+    fn covers_fields_detects_missing_nested_field() {
+        let mut raw: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&AppConfig::default()).unwrap()).unwrap();
+        raw["default_synth"]
+            .as_object_mut()
+            .unwrap()
+            .remove("velocity_min");
+        let full = serde_json::to_value(AppConfig::default()).unwrap();
+        assert!(!covers_fields(&raw, &full));
+    }
+
+    #[test]
+    fn sanitize_fixes_bounds_and_colors() {
+        let mut config = AppConfig {
+            note_range_bounds: [(47, 21), (200, 130), (72, 108)],
+            synth_colors: vec![
+                "red".to_string(),         // invalid: dropped
+                "#3498db".to_string(),     // valid
+                "#123abc".to_string(),     // valid
+            ],
+            ..AppConfig::default()
+        };
+        config.sanitize();
+        assert_eq!(config.note_range_bounds, [(21, 47), (127, 127), (72, 108)]);
+        assert_eq!(
+            config.synth_colors,
+            vec!["#3498db".to_string(), "#123abc".to_string()]
+        );
+
+        // An empty list falls back to the default palette
+        config.synth_colors = vec![];
+        config.sanitize();
+        assert_eq!(config.synth_colors, default_synth_colors());
+    }
 }
