@@ -487,6 +487,7 @@ select:disabled {
     #transform-panel,
     #crop-bar {
         position: absolute;
+        height: 100%;
         left: 0;
         right: 0;
         bottom: 0;
@@ -737,6 +738,10 @@ $metronome-led-transition: 0.05s ease;
             justify-content: flex-start;
             align-items: center;
             gap: .5rem;
+
+            &.center {
+                justify-content: center;
+            }
         }
 
         .synth-title-input {
@@ -798,6 +803,14 @@ $metronome-led-transition: 0.05s ease;
                 gap: .5rem;
 
                 select { height: 1.75rem; }
+
+                &.center {
+                    justify-content: center;
+                }
+
+                &.extra-margin {
+                    padding: .25rem 0;
+                }
             }
         }
 

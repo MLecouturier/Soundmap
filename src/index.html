@@ -45,8 +45,8 @@
                         </button>
                     </div>
 
-                    <div id="crop-bar" class="mode-bar hidden">
-                        <div class="controls-grid">
+                    <div id="crop-bar" class=" hidden">
+                        <div class="controls-grid mode-bar">
                             <span class="mode-bar-hint" data-i18n="controls.cropHint"></span>
                             <div class="flex-filler"></div>
                             <button id="crop-apply-btn" class="primary" data-i18n="controls.apply" disabled></button>
@@ -55,6 +55,11 @@
                     </div>
 
                     <div id="transform-panel" class="hidden">
+                        <div class="mode-bar">
+                            <button id="transform-grid-btn" class="toggle-btn active" data-i18n-title="controls.transformGrid">
+                                <span class="material-symbols-outlined">grid_3x3</span>
+                            </button>
+                        </div>
                         <div class="controls-grid">
                             <label>
                                 <span><span data-i18n="controls.rotation"></span> <em id="transform-rotation-value">0°</em></span>
@@ -70,10 +75,6 @@
                             </label>
                         </div>
                         <div class="mode-bar">
-                            <button id="transform-grid-btn" class="toggle-btn active" data-i18n-title="controls.transformGrid">
-                                <span class="material-symbols-outlined">grid_3x3</span>
-                            </button>
-                            <div class="flex-filler"></div>
                             <button id="transform-apply-btn" class="primary" data-i18n="controls.apply"></button>
                             <button id="transform-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
                         </div>

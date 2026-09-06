@@ -1544,18 +1544,20 @@ function createSynthElement(id, cfg = null) {
         </div>
         <div class="synth-header">
             <div class="synth-header-row">
-                <span class="synth-title-label" data-i18n-title="synth.renameHint"></span>
-                <div class="flex-filler"></div>
                 <button class="synth-save-template icon-btn" data-i18n-title="synth.saveAsTemplate">
                     <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
                 </button>
+                <div class="flex-filler"></div>
+                <select class="synth-midi-port" data-i18n-title="synth.midiPort"></select>
+                <select class="synth-channel">${channelOptions}</select>
+                <div class="flex-filler"></div>
+                
                 <button class="synth-remove icon-btn" data-i18n-title="synth.remove">
                     <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
             </div>
             <div class="synth-header-row">
-                <select class="synth-midi-port" data-i18n-title="synth.midiPort"></select>
-                <select class="synth-channel">${channelOptions}</select>
+                <span class="synth-title-label" data-i18n-title="synth.renameHint"></span>
             </div>
         </div>
         <div class="synth-body">
@@ -1564,7 +1566,6 @@ function createSynthElement(id, cfg = null) {
                     <span class="synth-section-title" data-i18n="synth.zonesLabel"></span>
                     <em class="synth-section-value zones-val"></em>
                     <div class="flex-filler"></div>
-                    <button class="synth-eye-btn icon-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
                     <button class="synth-add-zone-btn icon-btn" data-i18n-title="synth.addZone">
                         <span class="material-symbols-outlined" aria-hidden="true">select</span>
                     </button>
@@ -1574,23 +1575,14 @@ function createSynthElement(id, cfg = null) {
                     <button class="synth-clear-zones-btn icon-btn" data-i18n-title="synth.clearZones">
                         <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
                     </button>
+                    <div class="flex-filler"></div>
+                    <button class="synth-eye-btn icon-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
                 </div>
             </div>
 
             <div class="synth-section">
                 <div class="synth-section-header">
                     <span class="synth-section-title" data-i18n="synth.playbackTitle"></span>
-                </div>
-                <div class="synth-section-body">
-                    <button class="synth-reading-direction-btn icon-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
-                        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-                    </button>
-                    <button class="synth-loop-btn icon-btn active" data-i18n-title="synth.toggleLoop">
-                        <span class="material-symbols-outlined" aria-hidden="true">laps</span>
-                    </button>
-                    <button class="synth-back-n-forth-btn icon-btn" data-i18n-title="synth.toggleBackAndForth">
-                        <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
-                    </button>
                     <div class="flex-filler"></div>
                     <select class="synth-tempo" data-i18n-title="synth.tempoRatio">
                         <option value=1>1/1</option>
@@ -1600,8 +1592,20 @@ function createSynthElement(id, cfg = null) {
                         <option value=0.33>1/3</option>
                         <option value=0.25>1/4</option>
                     </select>
+                    <div class="flex-filler"></div>                    
+                    <button class="synth-reading-direction-btn icon-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </button>
+                    <div class="flex-filler"></div>
+                    <button class="synth-loop-btn icon-btn active" data-i18n-title="synth.toggleLoop">
+                        <span class="material-symbols-outlined" aria-hidden="true">laps</span>
+                    </button>
+                    <button class="synth-back-n-forth-btn icon-btn" data-i18n-title="synth.toggleBackAndForth">
+                        <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
+                    </button>    
                 </div>
-                <div class="synth-section-body">
+                
+                <div class="synth-section-body center extra-margin">
                     <button class="synth-rewind icon-btn" data-i18n-title="synth.rewind">
                         <span class="material-symbols-outlined" aria-hidden="true">fast_rewind</span>
                     </button>
@@ -1617,15 +1621,11 @@ function createSynthElement(id, cfg = null) {
 
             <div class="synth-section">
                 <div class="synth-section-header">
-                    <span class="synth-section-title" data-i18n="synth.modeTitle"></span>
-                    <div class="flex-filler"></div>
+                    <button class="synth-mode-btn toggle-btn active" data-mode="monophonic"></button>
+                    <button class="synth-mode-btn toggle-btn" data-mode="polyphonic"></button>
                     <button class="synth-toggle-full-options icon-btn" data-i18n-title="synth.toggleFullOptions">
                         <span class="material-symbols-outlined" aria-hidden="true">expand_circle_up</span>
                     </button>
-                </div>
-                <div class="synth-section-body">
-                    <button class="synth-mode-btn toggle-btn active" data-mode="monophonic"></button>
-                    <button class="synth-mode-btn toggle-btn" data-mode="polyphonic"></button>
                 </div>
             </div>
 

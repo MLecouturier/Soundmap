@@ -401,6 +401,7 @@ select:disabled {
 #controls #transform-panel,
 #controls #crop-bar {
   position: absolute;
+  height: 100%;
   left: 0;
   right: 0;
   bottom: 0;
@@ -618,6 +619,9 @@ select:disabled {
   align-items: center;
   gap: 0.5rem;
 }
+.synth-block .synth-header .synth-header-row.center {
+  justify-content: center;
+}
 .synth-block .synth-header .synth-title-input {
   background-color: #262626;
   color: #e0e0e0;
@@ -667,6 +671,12 @@ select:disabled {
 }
 .synth-block .synth-body .synth-section .synth-section-body select {
   height: 1.75rem;
+}
+.synth-block .synth-body .synth-section .synth-section-body.center {
+  justify-content: center;
+}
+.synth-block .synth-body .synth-section .synth-section-body.extra-margin {
+  padding: 0.25rem 0;
 }
 .synth-block .synth-body .synth-play {
   display: flex;
