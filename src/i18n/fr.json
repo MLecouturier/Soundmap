@@ -34,7 +34,7 @@
     "posterize": "Postérisation",
     "posterizeOff": "off",
     "posterizeLevels": "{count} niveaux",
-    "dimensionsInfo": "Original : {origWidth} × {origHeight}  —  Grille : {width} × {height}  ({cellCount} cellules)"
+    "dimensionsInfo": "Original : {origWidth} × {origHeight}  —  Grille : {width} × {height}  ({cellCount} px)"
   },
   "metronome": {
     "title": "Tempo (BPM)",
@@ -101,7 +101,7 @@
     "toggleRed": "Activer/désactiver le rouge",
     "toggleGreen": "Activer/désactiver le vert",
     "toggleBlue": "Activer/désactiver le bleu",
-    "zonesLabel": "Pixels",
+    "zonesLabel": "Zones",
     "addZone": "Tracer une zone sur l'image",
     "selectAllZones": "Tout sélectionner (image entière)",
     "clearZones": "Tout désélectionner",

@@ -34,7 +34,7 @@
     "posterize": "Posterize",
     "posterizeOff": "off",
     "posterizeLevels": "{count} levels",
-    "dimensionsInfo": "Original: {origWidth} × {origHeight}  —  Grid: {width} × {height}  ({cellCount} cells)"
+    "dimensionsInfo": "Original: {origWidth} × {origHeight}  —  Grid: {width} × {height}  ({cellCount} px)"
   },
   "metronome": {
     "title": "Tempo (BPM)",
@@ -101,7 +101,7 @@
     "toggleRed": "Enable/disable red",
     "toggleGreen": "Enable/disable green",
     "toggleBlue": "Enable/disable blue",
-    "zonesLabel": "Pix2Play",
+    "zonesLabel": "Zones",
     "addZone": "Draw a zone on the image",
     "selectAllZones": "Select all (whole image)",
     "clearZones": "Deselect all",

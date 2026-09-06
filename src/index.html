@@ -36,16 +36,22 @@
                         <button id="transform-img-btn" class="icon-btn" data-i18n-title="controls.transform">
                             <span class="material-symbols-outlined">tune</span>
                         </button>
+                        <div class="flex-filler">
+                            <p id="dimensions-info" class="info"></p>
+                        </div>
+                        
                         <button id="show-original-btn" class="icon-btn" data-i18n-title="controls.showOriginal">
                             <span class="material-symbols-outlined">compare</span>
                         </button>
                     </div>
 
                     <div id="crop-bar" class="mode-bar hidden">
-                        <span class="mode-bar-hint" data-i18n="controls.cropHint"></span>
-                        <div class="flex-filler"></div>
-                        <button id="crop-apply-btn" class="primary" data-i18n="controls.apply" disabled></button>
-                        <button id="crop-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
+                        <div class="controls-grid">
+                            <span class="mode-bar-hint" data-i18n="controls.cropHint"></span>
+                            <div class="flex-filler"></div>
+                            <button id="crop-apply-btn" class="primary" data-i18n="controls.apply" disabled></button>
+                            <button id="crop-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
+                        </div>
                     </div>
 
                     <div id="transform-panel" class="hidden">
@@ -101,7 +107,7 @@
                         </button>
                     </div>
 
-                    <p id="dimensions-info" class="info"></p>
+                    
                 </div>
             </div>
             

@@ -96,6 +96,9 @@ h2 {
 
 .flex-filler {
   flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 #image-viewer-container {
@@ -394,7 +397,8 @@ select:disabled {
   padding: 4px 0.75rem;
   font-size: 0.8rem;
 }
-#controls #transform-panel {
+#controls #transform-panel,
+#controls #crop-bar {
   position: absolute;
   left: 0;
   right: 0;
@@ -430,7 +434,6 @@ select:disabled {
   font-variant-numeric: tabular-nums;
 }
 #controls .info {
-  margin-top: 10px;
   font-size: 0.78rem;
   color: #888;
   font-variant-numeric: tabular-nums;
@@ -852,6 +855,4 @@ select:disabled {
 ::-webkit-scrollbar-thumb {
   background-color: #444;
   border-radius: 0.25rem;
-}
-
-/*# sourceMappingURL=styles.css.map */
+}/*# sourceMappingURL=styles.css.map */
