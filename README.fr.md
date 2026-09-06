@@ -14,7 +14,7 @@ SoundMap est une application desktop Tauri qui transforme une image en musique. 
 - Ajustement du nombre de colonnes via un slider à échelle logarithmique (la hauteur est déduite automatiquement pour préserver le ratio d'aspect).
 - Ajustements de saturation, contraste, luminosité et postérisation (réduction du nombre de niveaux de couleur/luminosité).
 - Réinitialisation de tous les paramètres de traitement.
-- Les contrôles d'image sont automatiquement verrouillés pendant qu'un synthétiseur joue, afin de garder la grille de pixels stable pendant la lecture (le bouton « Voir l'original » reste disponible).
+- Pendant qu'un synthétiseur joue, les contrôles structurels d'image (chargement, rotation, recadrage, transformation, taille de grille) sont automatiquement verrouillés afin de garder la grille de pixels stable. Les ajustements de valeurs (saturation, contraste, luminosité, postérisation) restent modifiables : leur effet est appliqué en direct à la lecture, au pas de métronome suivant (le bouton « Voir l'original » reste également disponible).
 
 ### Synthétiseurs
 
@@ -23,7 +23,7 @@ Vous pouvez créer autant de synthétiseurs indépendants que vous le souhaitez,
 - **Deux modes de traduction pixel → note, interchangeables pour chaque synthétiseur :**
   - **Monophonique** — la teinte du pixel (cercle chromatique TSL/HSL) détermine une note unique. Un curseur de décalage de teinte (0–360°) permet de faire tourner le cercle chromatique pour ajuster la tonalité dominante du morceau.
   - **Polyphonique** — chaque canal de couleur (Rouge, Vert, Bleu) est lu indépendamment et traduit en sa propre note, formant un accord de 1 à 3 notes. Chaque canal peut être activé ou désactivé individuellement. Survoler les boutons R/V/B affiche la carte d'intensité du canal correspondant directement sur l'image, pour vous aider à choisir les canaux à utiliser.
-- **Zones rectangulaires** — sélectionnez les pixels que chaque synthétiseur doit jouer en traçant des rectangles directement sur l'image. Tous les pixels sont sélectionnés par défaut ; un rectangle tracé depuis un pixel libre ajoute une zone, tandis qu'un rectangle tracé depuis un pixel déjà sélectionné retire ces pixels. La ligne affiche également le nombre total de pixels sélectionnés et le temps de lecture estimé au tempo propre du synthé.
+- **Zones rectangulaires** — sélectionnez les pixels que chaque synthétiseur doit jouer en traçant des rectangles directement sur l'image. Tous les pixels sont sélectionnés par défaut ; un rectangle tracé depuis un pixel libre ajoute une zone, tandis qu'un rectangle tracé depuis un pixel déjà sélectionné retire ces pixels. La ligne affiche également le nombre total de pixels sélectionnés.
 - **Tempo par synthé** — chaque synthétiseur peut jouer à une fraction du tempo du métronome commun (1/1, 3/4, 2/3, 1/2, 1/3 ou 1/4 du BPM global), permettant aux synthés de se désynchroniser pour dynamiser la musique.
 - **Nom personnalisé** — double-cliquez sur le titre d'un synthétiseur pour le renommer ; le nom est conservé dans les sessions.
 - **Port de sortie MIDI par synthétiseur** — chaque synthé peut envoyer ses notes vers une interface MIDI différente. Les connexions sont ouvertes paresseusement à la première utilisation, et le premier port disponible est connecté automatiquement au démarrage.
@@ -37,7 +37,9 @@ Vous pouvez créer autant de synthétiseurs indépendants que vous le souhaitez,
 - **Choix du canal MIDI** par synthétiseur (16 canaux disponibles), verrouillé pendant la lecture.
 - **Attribution d'une couleur** à chaque synthétiseur (via un sélecteur de couleurs prédéfinies), utilisée pour surligner ses zones et sa position de lecture courante directement sur l'image.
 - **Bascule de visibilité** du surlignage des zones, automatiquement masqué pendant la lecture pour n'afficher que le curseur de lecture courant.
-- **Options avancées dépliables** — les réglages avancés de chaque synthétiseur (panneaux propres au mode, longueurs de note, filtres de plage, seuils, vélocité) sont regroupés dans une section dépliable, afin que la liste reste compacte même avec de nombreux synthétiseurs.
+- **Affichage compact** — un bouton sur chaque synthétiseur le réduit au strict minimum : seuls les contrôles de lecture (tempo, sens de lecture, boucle, aller-retour, rembobinage, lecture/pause, pas en avant) restent visibles, accompagnés du port MIDI, du canal et du titre. Recliquez pour retrouver tous les réglages.
+- **Suppression sécurisée** — supprimer un synthétiseur demande une confirmation : le premier clic arme le bouton (rouge) pendant 3 secondes, et seul un second clic dans cette fenêtre supprime réellement le synthé ; passé ce délai, le bouton reprend son état normal.
+- **Aide contextuelle** — un bouton d'aide dans le pied de page active un mode d'aide au survol : survoler n'importe quel contrôle de l'interface ouvre une fenêtre d'explication détaillée à la place de l'info-bulle native, pour que les nouveaux utilisateurs découvrent chaque réglage sans fouiller dans ce README. Recliquez ou appuyez sur Échap pour quitter le mode.
 - Lecture/arrêt individuel par synthétiseur, ainsi qu'un bouton « tout jouer / tout arrêter » pour l'ensemble de la liste.
 - Le métronome commun démarre automatiquement dès qu'un synthétiseur commence à jouer, et s'arrête automatiquement une fois tous les synthétiseurs inactifs.
 

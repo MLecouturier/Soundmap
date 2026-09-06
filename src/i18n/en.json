@@ -110,7 +110,7 @@
     "brightnessThreshold": "Brightness threshold",
     "velocityMin": "Minimum velocity",
     "pixelInfoEmpty": "Pixel: -",
-    "pixelInfo": "Pixel {cursor} — {rgba} — {noteInfo} — Vel {velocity}",
+    "pixelInfo": "Pixel {cursor} — {rgb}\n{noteInfo} — Vel {velocity}",
     "noteLabel": "Note {note}",
     "noteMuted": " — muted",
     "voiceOff": "{channel}:off",

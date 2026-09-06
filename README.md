@@ -14,7 +14,7 @@ SoundMap is a Tauri desktop application that turns an image into music. Load an 
 - Adjusting the number of columns with a logarithmic-scale slider (the height is deduced automatically to preserve the aspect ratio).
 - Saturation, contrast, brightness, and posterization (color/brightness level reduction) adjustments.
 - Resetting all processing parameters to their default values.
-- Image controls are automatically locked while any synthesizer is playing, to keep the pixel grid stable during playback ("Show original" stays available).
+- While any synthesizer is playing, the structural image controls (loading, rotation, crop, transform, grid size) are automatically locked to keep the pixel grid stable. The value adjustments (saturation, contrast, brightness, posterization) stay editable: their effect is applied live to the playback, at the next metronome step ("Show original" also stays available).
 
 ### Synthesizers
 
@@ -23,7 +23,7 @@ You can create any number of independent synthesizers, each reading the pixel gr
 - **Two pixel-to-note translation modes, switchable per synthesizer:**
   - **Monophonic** — the pixel's hue (HSL color wheel) determines a single note. A hue shift slider (0–360°) lets you rotate the color wheel to change the dominant tonality of the piece.
   - **Polyphonic** — each color channel (Red, Green, Blue) is read independently and mapped to its own note, forming a 1-to-3-note chord. Each channel can be enabled or disabled individually. Hovering over the R/G/B toggle buttons displays that channel's intensity map directly over the image, to help you decide which channels to use.
-- **Rectangular zones** — select the pixels each synthesizer plays by drawing rectangles directly on the image. All pixels are selected by default; a rectangle dragged from a free pixel adds a zone, while one dragged from an already selected pixel removes those pixels instead. The zone row also displays the total number of selected pixels and the estimated playing time at the synth's own tempo.
+- **Rectangular zones** — select the pixels each synthesizer plays by drawing rectangles directly on the image. All pixels are selected by default; a rectangle dragged from a free pixel adds a zone, while one dragged from an already selected pixel removes those pixels instead. The zone row also displays the total number of selected pixels.
 - **Per-synth tempo** — each synthesizer can play at a fraction of the main metronome tempo (1/1, 3/4, 2/3, 1/2, 1/3 or 1/4 of the global BPM), letting synths desynchronize from one another for more dynamic music.
 - **Custom name** — double-click a synthesizer's title to rename it; the name is saved in sessions.
 - **MIDI output port per synthesizer** — each synth can send its notes to a different MIDI interface. Connections are opened lazily on first use, and the first available port is connected automatically at startup.
@@ -37,7 +37,9 @@ You can create any number of independent synthesizers, each reading the pixel gr
 - **MIDI channel selection** per synthesizer (16 channels available), locked while the synthesizer is playing.
 - **Color tagging** — each synthesizer is assigned a color (with a picker of predefined swatches), used to highlight its zones and its current playback position directly on the image.
 - **Visibility toggle** for the zone highlight, automatically hidden during playback to only show the current playback cursor.
-- **Collapsible advanced options** — each synthesizer's advanced settings (mode-specific panels, note lengths, note range filters, thresholds, velocity) live in a collapsible section, so the list stays compact when many synthesizers are present.
+- **Compact view** — a toggle on each synthesizer collapses it to the strict minimum: only the playback controls (tempo, reading direction, loop, ping-pong, rewind, play/pause, step forward) remain visible, alongside the MIDI port, channel and title. Click again to get every setting back.
+- **Safe removal** — deleting a synthesizer requires a confirmation: the first click arms the button (red) for 3 seconds, and only a second click within that window actually removes the synth; otherwise the button reverts to its normal state.
+- **Contextual help** — a live-help button in the footer enables an on-hover help mode: hovering any control of the interface opens a detailed explanation window instead of the native tooltip, so first-time users can discover every setting without digging into this README. Click again or press Escape to leave the mode.
 - Per-synthesizer play/stop, plus a "play all / stop all" button for the whole synthesizer list.
 - The shared metronome starts automatically as soon as any synthesizer starts playing, and stops automatically once all synthesizers are idle.
 

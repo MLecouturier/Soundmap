@@ -568,22 +568,7 @@ function synthSequenceLength(id) {
     return total;
 }
 
-// Compact duration: seconds below one minute, m:ss below one hour
-function formatDuration(seconds) {
-    if (seconds < 60) {
-        return `${Math.round(seconds * 10) / 10} s`;
-    }
-    const total = Math.round(seconds);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    if (m < 60) return `${m}:${String(s).padStart(2, '0')}`;
-    const h = Math.floor(m / 60);
-    return `${h}:${String(m % 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-// "zones-val" shows the number of selected pixels and, in parentheses,
-// the total playing time at the synth's own tempo (metronome BPM scaled
-// by its tempo ratio).
+// "zones-val" shows the number of selected pixels for the synth.
 function updateZonesLabel(id) {
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
@@ -595,13 +580,7 @@ function updateZonesLabel(id) {
     }
 
     const pixelCount = synthSequenceLength(id);
-    const tempoRatio = Number(el.querySelector('.synth-tempo').value) || 1;
-    const bpm = clampBpm(Number(bpmInput.value));
-    const seconds = pixelCount * (60 / bpm) / tempoRatio;
-
-    zonesVal.textContent = pixelCount > 0
-        ? `${pixelCount} px (${formatDuration(seconds)})`
-        : '0 px';
+    zonesVal.textContent = pixelCount > 0 ? `${pixelCount} px` : '0 px';
 }
 
 function updateAllSynthZonesLabels() {
@@ -2407,11 +2386,11 @@ window.__TAURI__.event.listen('synth-stopped', async (event) => {
 
 // Receiving pixel ticks, one per synth
 window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
-    const { id, cursor, r, g, b, a, velocity, muted, mode, note, voices } = event.payload;
+    const { id, cursor, r, g, b, velocity, muted, mode, note, voices } = event.payload;
     const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
     if (!el) return;
 
-    const rgbaStr = `rgba(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'}, ${a ?? '-'})`;
+    const rgbStr = `rgb(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'})`;
     let noteInfo;
 
     if (mode === 'polyphonic' && Array.isArray(voices)) {
@@ -2429,7 +2408,7 @@ window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     }
 
     const pixelInfoEl = el.querySelector('.synth-pixel-info');
-    pixelInfoEl.textContent = t('synth.pixelInfo', { cursor, rgba: rgbaStr, noteInfo, velocity: velocity ?? '-' });
+    pixelInfoEl.textContent = t('synth.pixelInfo', { cursor, rgb: rgbStr, noteInfo, velocity: velocity ?? '-' });
     pixelInfoEl.dataset.hasTick = '1';
     drawSynthPixel(id, cursor, muted);
 });

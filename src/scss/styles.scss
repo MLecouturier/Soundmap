@@ -465,6 +465,8 @@ select:disabled {
         font-size: 0.78rem;
         line-height: 1.4;
         margin: 0;
+        // Renders the \n line breaks of the help.* i18n strings
+        white-space: pre-line;
         color: $color-text-secondary;
     }
 }
@@ -947,6 +949,7 @@ $metronome-led-transition: 0.05s ease;
             font-size: 0.78rem;
             color: $color-text-muted;
             font-variant-numeric: tabular-nums;
+            white-space: pre-line;
         }
 
         // Collapsible advanced options section
