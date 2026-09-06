@@ -62,7 +62,7 @@
     "saveAsTemplate": "Use this synth as the default template",
     "pickColor": "Choose a color",
     "play": "Play",
-    "stop": "Stop",
+    "stop": "Pause",
     "toggleLoop": "Enable/disable looping",
     "toggleBackAndForth": "Back-and-forth playback (bounces between the sequence bounds)",
     "readingDirection": {

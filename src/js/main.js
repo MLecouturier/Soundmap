@@ -597,11 +597,8 @@ function redrawAllHighlights() {
 
 // ---------- Color channel preview (hovering the R/G/B buttons) ----------
 // channelIndex: 0 = red, 1 = green, 2 = blue
-const CHANNEL_TINTS = [
-    [255, 0, 0],
-    [0, 255, 0],
-    [0, 0, 255],
-];
+// The preview is rendered in grayscale rather than tinted with the channel's
+// color, so luminosities can be compared at a glance between layers.
 
 function drawChannelOverlay(channelIndex) {
     if (!hasImage || !processedPixels) return;
@@ -612,20 +609,19 @@ function drawChannelOverlay(channelIndex) {
     if (!width || !height) return;
 
     // Build an offscreen canvas at the grid's resolution, where each pixel
-    // reflects the intensity of the chosen channel, tinted with its color.
+    // reflects the intensity of the chosen channel as a gray level.
     const offCanvas = document.createElement('canvas');
     offCanvas.width = width;
     offCanvas.height = height;
     const offCtx = offCanvas.getContext('2d');
     const imageData = offCtx.createImageData(width, height);
-    const [tr, tg, tb] = CHANNEL_TINTS[channelIndex];
 
     for (let i = 0; i < width * height; i++) {
         const value = rgba[i * 4 + channelIndex];
         const o = i * 4;
-        imageData.data[o]     = (tr * value) / 255;
-        imageData.data[o + 1] = (tg * value) / 255;
-        imageData.data[o + 2] = (tb * value) / 255;
+        imageData.data[o]     = value;
+        imageData.data[o + 1] = value;
+        imageData.data[o + 2] = value;
         imageData.data[o + 3] = 255;
     }
     offCtx.putImageData(imageData, 0, 0);

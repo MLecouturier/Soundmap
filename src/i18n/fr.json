@@ -62,7 +62,7 @@
     "saveAsTemplate": "Utiliser ce synthé comme modèle par défaut",
     "pickColor": "Choisir une couleur",
     "play": "Play",
-    "stop": "Stop",
+    "stop": "Pause",
     "toggleLoop": "Activer/désactiver la boucle",
     "toggleBackAndForth": "Lecture aller-retour (rebond entre les bornes de la séquence)",
     "readingDirection": {

@@ -237,7 +237,7 @@ h2 {
         #exit-fullscreen-btn {
             display: none;
             position: absolute;
-            top: .5rem;
+            bottom: .5rem;
             right: .5rem;
             z-index: 5;
             align-items: center;
@@ -268,7 +268,7 @@ body.viewer-fullscreen {
     .column-right,
     #controls { display: none; }
 
-    #image-viewer #exit-fullscreen-btn { display: flex; }
+    #image-viewer #exit-fullscreen-btn { display: flex !important; }
 }
 
 // ==========================================================================
@@ -457,6 +457,7 @@ select:disabled {
     }
 
     .controls-grid {
+        flex-grow: 1;
         display: flex;
         gap: 10px 1.125rem;
     }
@@ -491,7 +492,7 @@ select:disabled {
         bottom: 0;
         z-index: 10;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         gap: .75rem;
         padding: .625rem .75rem;
         border: 1px solid $color-border;

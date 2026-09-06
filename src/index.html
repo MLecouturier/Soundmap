@@ -70,7 +70,9 @@
                             </label>
                         </div>
                         <div class="mode-bar">
-                            <button id="transform-grid-btn" class="toggle-btn active" data-i18n="controls.transformGrid"></button>
+                            <button id="transform-grid-btn" class="toggle-btn active" data-i18n-title="controls.transformGrid">
+                                <span class="material-symbols-outlined">grid_3x3</span>
+                            </button>
                             <div class="flex-filler"></div>
                             <button id="transform-apply-btn" class="primary" data-i18n="controls.apply"></button>
                             <button id="transform-cancel-btn" class="secondary" data-i18n="controls.cancel"></button>
@@ -152,15 +154,13 @@
             <div class="footer-area" id="common-controls">
                 <!-- <h2 data-i18n="synthList.commonControlsTitle"></h2> -->
                 <div class="config-controls">
-                    <button id="open-config-btn" class="icon-btn" data-i18n-title="config.openFile">
-                        <span class="material-symbols-outlined" aria-hidden="true">settings</span>
-                    </button>
-                    <button id="fullscreen-btn" class="icon-btn" data-i18n-title="controls.fullscreen">
-                        <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
-                    </button>
+                    <div id="language-switcher"></div>
                     <button id="interactive-help-btn" class="icon-btn" data-i18n-title="controls.help">
                         <span class="material-symbols-outlined" aria-hidden="true">live_help</span>
                     </button>
+                    <button id="open-config-btn" class="icon-btn" data-i18n-title="config.openFile">
+                        <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+                    </button>                 
                     <div class="flex-filler"></div>
                     <button id="save-session-btn" class="icon-btn" data-i18n-title="session.save">
                         <span class="material-symbols-outlined" aria-hidden="true">save</span>
@@ -169,7 +169,9 @@
                         <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
                     </button>
                     <div class="flex-filler"></div>
-                    <div id="language-switcher"></div>
+                    <button id="fullscreen-btn" class="icon-btn" data-i18n-title="controls.fullscreen">
+                        <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
+                    </button>                    
                 </div>
             </div>
         </div>
