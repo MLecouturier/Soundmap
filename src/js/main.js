@@ -111,6 +111,84 @@ window.addEventListener('locale-changed', () => {
     if (typeof syncPlayAllButton === 'function') syncPlayAllButton();
 });
 
+// ---------- Contextual help mode (live-help button) ----------
+// When active, hovering any element carrying a data-i18n-title opens a
+// detailed help window instead of the native tooltip. Detailed texts live
+// under the "help.*" i18n keys; elements without one fall back to their
+// short tooltip text as the heading.
+const liveHelpBtn = document.querySelector('#live-help-btn');
+
+const helpPopup = document.createElement('div');
+helpPopup.id = 'help-popup';
+helpPopup.classList.add('hidden');
+helpPopup.innerHTML = '<h3 class="help-heading"></h3><p class="help-body"></p>';
+document.body.appendChild(helpPopup);
+
+let helpModeEnabled = false;
+let helpTarget = null;
+let helpTargetTitle = '';
+
+// The native tooltip of the element we cover is saved and restored, so the
+// two never overlap while help mode is on.
+function restoreHelpTargetTitle() {
+    if (helpTarget) {
+        helpTarget.title = helpTargetTitle;
+        helpTarget = null;
+        helpTargetTitle = '';
+    }
+}
+
+function hideHelpPopup() {
+    restoreHelpTargetTitle();
+    helpPopup.classList.add('hidden');
+}
+
+function setHelpMode(enabled) {
+    helpModeEnabled = enabled;
+    liveHelpBtn.classList.toggle('active', enabled);
+    if (!enabled) hideHelpPopup();
+}
+
+function showHelpPopup(target) {
+    restoreHelpTargetTitle();
+    helpTarget = target;
+    helpTargetTitle = target.title;
+    target.title = '';
+
+    const detailed = t(`help.${target.dataset.i18nTitle}`);
+    const hasDetailed = detailed !== `help.${target.dataset.i18nTitle}`;
+    helpPopup.querySelector('.help-heading').textContent = helpTargetTitle;
+    const body = helpPopup.querySelector('.help-body');
+    body.textContent = hasDetailed ? detailed : '';
+    body.classList.toggle('hidden', !hasDetailed);
+
+    helpPopup.classList.remove('hidden');
+
+    // Below the target (above if it overflows), clamped to the viewport
+    const rect = target.getBoundingClientRect();
+    const x = Math.min(Math.max(8, rect.left), window.innerWidth - helpPopup.offsetWidth - 8);
+    let y = rect.bottom + 6;
+    if (y + helpPopup.offsetHeight > window.innerHeight) {
+        y = rect.top - helpPopup.offsetHeight - 6;
+    }
+    helpPopup.style.left = `${x}px`;
+    helpPopup.style.top = `${Math.max(8, y)}px`;
+}
+
+liveHelpBtn.addEventListener('click', () => setHelpMode(!helpModeEnabled));
+
+document.addEventListener('mouseover', (e) => {
+    if (!helpModeEnabled) return;
+    const target = e.target.closest('[data-i18n-title]');
+    if (target === helpTarget) return;
+    if (target) showHelpPopup(target);
+    else hideHelpPopup();
+});
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && helpModeEnabled) setHelpMode(false);
+});
+
 // Icon and localized title of each reading direction, applied to the
 // cycling button of a synth.
 const READING_DIRECTION_ICONS = {
@@ -1516,9 +1594,9 @@ function applySynthConfig(el, cfg) {
 function noteRangeGroup() {
     return `
         <div class="synth-note-range">
-            <button class="synth-bass icon-btn">𝄢</button>
-            <button class="synth-medium icon-btn">𝄡</button>
-            <button class="synth-treble icon-btn">𝄞</button>
+            <button class="synth-bass icon-btn" data-i18n-title="synth.noteRangeBass">𝄢</button>
+            <button class="synth-medium icon-btn" data-i18n-title="synth.noteRangeMedium">𝄡</button>
+            <button class="synth-treble icon-btn" data-i18n-title="synth.noteRangeTreble">𝄞</button>
         </div>`;
 }
 
@@ -1634,7 +1712,7 @@ function createSynthElement(id, cfg = null) {
                 <div class="synth-mode-panel synth-mode-panel-mono">
                     <div class="synth-section">
                         <div class="synth-section-header">
-                            <span class="synth-section-title" data-i18n="synth.noteRangeTitle"></span>
+                            <span class="synth-section-title" data-i18n="synth.noteRangeTitle" data-i18n-title="synth.noteRangeTitle"></span>
                         </div>
                         <div class="synth-section-body">
                             ${noteRangeGroup()}
@@ -1642,7 +1720,7 @@ function createSynthElement(id, cfg = null) {
                     </div>
                     <div class="synth-section">
                         <div class="synth-section-header">
-                            <span class="synth-section-title" data-i18n="synth.hueShift"></span>
+                            <span class="synth-section-title" data-i18n="synth.hueShift" data-i18n-title="synth.hueShift"></span>
                             <em class="synth-section-value hue-shift-val">0°</em>
                         </div>
                         <div class="synth-section-body">
@@ -1694,7 +1772,7 @@ function createSynthElement(id, cfg = null) {
                 <div class="synth-section-separator gradient-wb"></div>
                 <div class="synth-section">
                     <div class="synth-section-header">
-                        <span class="synth-section-title" data-i18n="synth.brightnessThreshold"></span>
+                        <span class="synth-section-title" data-i18n="synth.brightnessThreshold" data-i18n-title="synth.brightnessThreshold"></span>
                         <em class="synth-section-value"><span class="brightness-start-val">0</span> – <span class="brightness-end-val">127</span></em>
                     </div>
                     <div class="synth-section-body synth-range-track">
@@ -1706,7 +1784,7 @@ function createSynthElement(id, cfg = null) {
 
                 <div class="synth-section">
                     <div class="synth-section-header">
-                        <span class="synth-section-title" data-i18n="synth.velocityMin"></span>
+                        <span class="synth-section-title" data-i18n="synth.velocityMin" data-i18n-title="synth.velocityMin"></span>
                         <em class="synth-section-value velocity-min-val">0</em>
                     </div>
                     <div class="synth-section-body">

@@ -81,27 +81,27 @@
                     </div>
 
                     <div class="controls-grid">
-                        <label>
+                        <label data-i18n-title="controls.columns">
                             <span><span data-i18n="controls.columns"></span> <em id="grid-width-value">-</em></span>
                             <input type="range" id="grid-width" min="0" max="1000" value="1000" />
                         </label>
 
-                        <label>
+                        <label data-i18n-title="controls.contrast">
                             <span><span data-i18n="controls.contrast"></span> <em id="contrast-value">0</em></span>
                             <input type="range" id="contrast" min="-100" max="100" value="0" step="1" />
                         </label>
 
-                        <label>
+                        <label data-i18n-title="controls.brightness">
                             <span><span data-i18n="controls.brightness"></span> <em id="brightness-value">0</em></span>
                             <input type="range" id="brightness" min="-100" max="100" value="0" step="1" />
                         </label>
 
-                        <label>
+                        <label data-i18n-title="controls.saturation">
                             <span><span data-i18n="controls.saturation"></span> <em id="saturation-value">0</em></span>
                             <input type="range" id="saturation" min="-100" max="100" value="0" step="1" />
                         </label>
 
-                        <label>
+                        <label data-i18n-title="controls.posterize">
                             <span><span data-i18n="controls.posterize"></span> <em id="posterize-value">off</em></span>
                             <input type="range" id="posterize" min="1" max="32" value="1" step="1" />
                         </label>
@@ -158,7 +158,7 @@
                 <!-- <h2 data-i18n="synthList.commonControlsTitle"></h2> -->
                 <div class="config-controls">
                     <div id="language-switcher"></div>
-                    <button id="interactive-help-btn" class="icon-btn" data-i18n-title="controls.help">
+                    <button id="live-help-btn" class="icon-btn toggle-btn" data-i18n-title="controls.help">
                         <span class="material-symbols-outlined" aria-hidden="true">live_help</span>
                     </button>
                     <button id="open-config-btn" class="icon-btn" data-i18n-title="config.openFile">
@@ -178,7 +178,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <script type="module" src="js/main.js"></script>

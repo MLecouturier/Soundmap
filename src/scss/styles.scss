@@ -441,6 +441,34 @@ select:disabled {
     display: none !important;
 }
 
+// Contextual help window (live-help mode): floats near the hovered control.
+// pointer-events:none keeps it from intercepting the hover that shows it.
+#help-popup {
+    position: fixed;
+    z-index: 1000;
+    max-width: 18rem;
+    background-color: $color-bg-panel;
+    border: 1px solid $color-border;
+    border-radius: $border-radius-base;
+    padding: .5rem .75rem;
+    box-shadow: 0 .25rem 1rem rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+
+    .help-heading {
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin: 0 0 .25rem;
+        color: $color-text-primary;
+    }
+
+    .help-body {
+        font-size: 0.78rem;
+        line-height: 1.4;
+        margin: 0;
+        color: $color-text-secondary;
+    }
+}
+
 // ==========================================================================
 // Controls (left column)
 // ==========================================================================
