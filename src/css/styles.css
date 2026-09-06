@@ -548,6 +548,13 @@ select:disabled {
   font-size: 1.125rem;
 }
 
+#play-all-btn {
+  background-color: #219a52;
+}
+#play-all-btn:hover {
+  background-color: #1d8446;
+}
+
 #panic-btn {
   background-color: #c0392b;
 }
@@ -577,6 +584,14 @@ select:disabled {
   border-radius: 0.25rem;
   padding: 10px 10px 10px 0.875rem;
   overflow: visible;
+}
+.synth-block .synth-title-label {
+  width: 100%;
+  text-align: center;
+  font-weight: 600;
+  background-color: #232323;
+  border-radius: 1rem;
+  border: 1px solid #888;
 }
 .synth-block .synth-color-band {
   position: absolute;
@@ -652,6 +667,20 @@ select:disabled {
   border-color: #219a52;
   color: #219a52;
 }
+.synth-block .synth-header .synth-remove:hover {
+  background-color: #a5281b;
+  border-color: #a5281b;
+  color: #fff;
+}
+.synth-block .synth-header .synth-remove.confirm-pending {
+  background-color: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+}
+.synth-block .synth-header .synth-remove.confirm-pending:hover {
+  background-color: #a5281b;
+  border-color: #a5281b;
+}
 .synth-block .synth-body {
   display: flex;
   flex-direction: column;
@@ -708,7 +737,7 @@ select:disabled {
   cursor: pointer;
   gap: 0.25rem;
   min-width: 6rem;
-  background-color: rgba(33, 154, 82, 0.8);
+  background-color: #219a52;
   color: #ccc;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
@@ -721,7 +750,7 @@ select:disabled {
   text-transform: uppercase;
 }
 .synth-block .synth-body .synth-play:hover {
-  background-color: #219a52;
+  background-color: #1d8446;
   color: #ccc;
 }
 .synth-block .synth-body .synth-play.active {
@@ -811,6 +840,10 @@ select:disabled {
 }
 .synth-block .synth-body .synth-channel-toggle.channel-blue:not(.active):hover {
   border-color: #2121c8;
+}
+.synth-block.compact .synth-body > .synth-section:not(.synth-playback),
+.synth-block.compact .synth-body > .synth-full-options {
+  display: none;
 }
 .synth-block .synth-section-separator {
   height: 1px;

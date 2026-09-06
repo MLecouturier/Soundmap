@@ -14,12 +14,14 @@ $color-text-muted: #888;
 
 $color-accent: #3a7bd5;
 $color-accent-alt: #219a52;
+$color-accent-alt-hover: #1d8446;
 $color-accent-hover: #2d5fa8;
 $color-disactivated: #555;
 
 // Semantic accents, one meaning each:
 // - $color-accent (blue): toggle/mode currently active
-// - $color-stop (red): playback in progress (stop affordance)
+// - $color-stop (red): playback in progress (stop affordance),
+//   and destructive action awaiting confirmation (synth removal)
 // - $color-accent-alt (green): transient confirmation (template saved, LED)
 $color-stop: #c0392b;
 $color-stop-hover: #a5281b;
@@ -334,6 +336,8 @@ input[type="range"].synth-range-input {
 // The `.active` state is always the accent color, with two documented
 // exceptions: the play button (red = stop affordance, see .synth-play) and
 // the template-save button (green = transient confirmation).
+// Likewise, the synth-remove button turns red on hover/armed state
+// (destructive action pending confirmation, see .synth-remove).
 
 .icon-btn {
     display: inline-flex;
@@ -660,6 +664,14 @@ $metronome-led-transition: 0.05s ease;
     }
 }
 
+#play-all-btn {
+    background-color: $color-accent-alt;
+
+    &:hover {
+        background-color: $color-accent-alt-hover;
+    }
+}
+
 // Kill switch: a global stop affordance, hence the stop (red) color
 #panic-btn {
     background-color: $color-stop;
@@ -691,6 +703,16 @@ $metronome-led-transition: 0.05s ease;
     border-radius: $border-radius-base;
     padding: 10px 10px 10px .875rem;
     overflow: visible;
+
+    .synth-title-label {
+        width: 100%;
+        text-align: center;
+        font-weight: 600;
+        // color: $color-text-primary;
+        background-color: $color-bg-medium;
+        border-radius: 1rem;
+        border: 1px solid $color-text-muted;
+    }
 
     // Clickable color band on the left edge
     .synth-color-band {
@@ -777,6 +799,29 @@ $metronome-led-transition: 0.05s ease;
             border-color: $color-accent-alt;
             color: $color-accent-alt;
         }
+
+        // Remove: destructive action guarded by a confirmation click.
+        // Hover warns in red; the first click arms the button ($color-stop)
+        // for 3 s — a second click within that window actually removes the
+        // synth, otherwise the button reverts to its initial state.
+        .synth-remove {
+            &:hover {
+                background-color: $color-stop-hover;
+                border-color: $color-stop-hover;
+                color: #fff;
+            }
+
+            &.confirm-pending {
+                background-color: $color-stop;
+                border-color: $color-stop;
+                color: #fff;
+
+                &:hover {
+                    background-color: $color-stop-hover;
+                    border-color: $color-stop-hover;
+                }
+            }
+        }
     }
 
     .synth-body {
@@ -847,7 +892,7 @@ $metronome-led-transition: 0.05s ease;
             cursor: pointer;
             gap: .25rem;
             min-width: 6rem;
-            background-color: rgba($color-accent-alt, .8);
+            background-color: $color-accent-alt;
             color: $color-text-secondary;
             transition: background-color $transition-fast, color $transition-fast;
 
@@ -860,7 +905,7 @@ $metronome-led-transition: 0.05s ease;
             }
 
             &:hover {
-                background-color: $color-accent-alt;
+                background-color: $color-accent-alt-hover;
                 color: $color-text-secondary;
             }
 
@@ -990,6 +1035,15 @@ $metronome-led-transition: 0.05s ease;
                     border-color: $color-blue;
                 }
             }
+        }
+    }
+
+    // Compact mode (synth-toggle-full-options click): reduce the card to
+    // the strict minimum — header + playback section only
+    &.compact .synth-body {
+        > .synth-section:not(.synth-playback),
+        > .synth-full-options {
+            display: none;
         }
     }
 

@@ -1545,14 +1545,15 @@ function createSynthElement(id, cfg = null) {
         </div>
         <div class="synth-header">
             <div class="synth-header-row">
-                <button class="synth-save-template icon-btn" data-i18n-title="synth.saveAsTemplate">
-                    <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
-                </button>
-                <div class="flex-filler"></div>
                 <select class="synth-midi-port" data-i18n-title="synth.midiPort"></select>
                 <select class="synth-channel">${channelOptions}</select>
                 <div class="flex-filler"></div>
-                
+                <button class="synth-save-template icon-btn" data-i18n-title="synth.saveAsTemplate">
+                    <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
+                </button>
+                <button class="synth-toggle-full-options icon-btn" data-i18n-title="synth.toggleFullOptions">
+                        <span class="material-symbols-outlined" aria-hidden="true">collapse_all</span>
+                    </button>
                 <button class="synth-remove icon-btn" data-i18n-title="synth.remove">
                     <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
@@ -1581,7 +1582,7 @@ function createSynthElement(id, cfg = null) {
                 </div>
             </div>
 
-            <div class="synth-section">
+            <div class="synth-section synth-playback">
                 <div class="synth-section-header">
                     <span class="synth-section-title" data-i18n="synth.playbackTitle"></span>
                     <div class="flex-filler"></div>
@@ -1624,9 +1625,6 @@ function createSynthElement(id, cfg = null) {
                 <div class="synth-section-header">
                     <button class="synth-mode-btn toggle-btn active" data-mode="monophonic"></button>
                     <button class="synth-mode-btn toggle-btn" data-mode="polyphonic"></button>
-                    <button class="synth-toggle-full-options icon-btn" data-i18n-title="synth.toggleFullOptions">
-                        <span class="material-symbols-outlined" aria-hidden="true">expand_circle_up</span>
-                    </button>
                 </div>
             </div>
 
@@ -1680,7 +1678,7 @@ function createSynthElement(id, cfg = null) {
                         <span class="synth-section-title" data-i18n="synth.noteLengthsTitle"></span>
                         <div class="flex-filler"></div>
                         <button class="synth-reverse-note-length icon-btn" data-i18n-title="synth.reverseNoteLength">
-                            <span class="material-symbols-outlined" aria-hidden="true">reset_exposure</span>
+                            <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
                         </button>
                     </div>
                     <div class="synth-section-body synth-note-length-section">
@@ -1895,13 +1893,14 @@ function createSynthElement(id, cfg = null) {
     });
     updateReadingDirectionBtn(directionBtn);
 
-    // ---- Collapse/expand the full options section ----
-    const fullOptions = el.querySelector('.synth-full-options');
+    // ---- Compact mode: reduce the card to the playback controls ----
+    // Everything is driven by the .compact class on the synth block (see
+    // the SCSS); the JS only toggles the class and the button icon.
     const toggleFullOptionsBtn = el.querySelector('.synth-toggle-full-options');
     toggleFullOptionsBtn.addEventListener('click', () => {
-        const collapsed = fullOptions.classList.toggle('hidden');
+        const compact = el.classList.toggle('compact');
         toggleFullOptionsBtn.querySelector('.material-symbols-outlined').textContent =
-            collapsed ? 'expand_circle_down' : 'expand_circle_up';
+            compact ? 'expand_all' : 'collapse_all';
     });
 
     // ---- Monophonic / polyphonic mode ----
@@ -2203,7 +2202,43 @@ function restoreHighlightAfterStop(id, el) {
     redrawAllHighlights();
 }
 
+// Double-click confirmation for synth removal: only one remove button can
+// be armed at a time; the arming auto-expires after the delay below.
+const SYNTH_REMOVE_CONFIRM_DELAY_MS = 3000;
+let armedSynthRemoveBtn = null;
+let armedSynthRemoveTimer = null;
+
+function resetSynthRemoveConfirm() {
+    if (armedSynthRemoveTimer) {
+        clearTimeout(armedSynthRemoveTimer);
+        armedSynthRemoveTimer = null;
+    }
+    if (armedSynthRemoveBtn) {
+        armedSynthRemoveBtn.classList.remove('confirm-pending');
+        armedSynthRemoveBtn.title = t('synth.remove');
+        armedSynthRemoveBtn.querySelector('.material-symbols-outlined').textContent = 'close';
+        armedSynthRemoveBtn = null;
+    }
+}
+
 async function onSynthRemoveClick(id, el) {
+    const btn = el.querySelector('.synth-remove');
+
+    // First click: arm the confirmation (red state) and wait up to 3 s.
+    // A second click within the window performs the removal; without it,
+    // the button silently reverts to its initial state.
+    if (btn !== armedSynthRemoveBtn) {
+        resetSynthRemoveConfirm();
+        armedSynthRemoveBtn = btn;
+        btn.classList.add('confirm-pending');
+        btn.title = t('synth.removeConfirm');
+        btn.querySelector('.material-symbols-outlined').textContent = 'delete';
+        armedSynthRemoveTimer = setTimeout(resetSynthRemoveConfirm, SYNTH_REMOVE_CONFIRM_DELAY_MS);
+        return;
+    }
+
+    // Confirmation click: disarm, then actually remove
+    resetSynthRemoveConfirm();
     await invoke('stop_synth', { id }).catch(() => {});
     await invoke('remove_synth', { id });
 
