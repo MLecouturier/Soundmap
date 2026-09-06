@@ -153,8 +153,10 @@ const posterizeValue  = document.querySelector('#posterize-value');
 const dimensionsInfo  = document.querySelector('#dimensions-info');
 
 // Image controls to lock while a synthesizer is playing
-// (the "Show original" button is intentionally excluded)
-const imageLockControls = [loadBtn, resetBtn, rotateBtn, cropBtn, transformBtn, gridSlider, contrast, brightness, saturation, posterize];
+// (the "Show original" button is intentionally excluded, and the value
+// sliders contrast/brightness/saturation/posterize stay editable: they
+// only change pixel values, which the playback step re-reads fresh)
+const imageLockControls = [loadBtn, resetBtn, rotateBtn, cropBtn, transformBtn, gridSlider];
 
 // Locks/unlocks image controls depending on whether a synth is playing
 function updateImageControlsLockState() {
