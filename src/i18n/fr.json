@@ -44,6 +44,7 @@
     "title": "Synthétiseurs",
     "playAllStart": "Démarrer tous les synthétiseurs",
     "playAllStop": "Arrêter tous les synthétiseurs",
+    "panic": "Kill switch : tout arrêter et couper toutes les notes",
     "add": "Ajouter un synthétiseur",
     "commonControlsTitle": "Paramètres de l'application",
     "commonControlsText": "Paramètres globaux appliqués à tous les synthétiseurs."

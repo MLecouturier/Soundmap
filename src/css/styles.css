@@ -59,7 +59,7 @@ html, body {
 
 h2 {
   font-size: 1.1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
   color: #ccc;
 }
 
@@ -517,11 +517,14 @@ select:disabled {
 .synth-list-header .synth-list-header-actions {
   display: flex;
   align-items: center;
+  flex-grow: 1;
+  margin-left: 0.5rem;
   gap: 0.5rem;
 }
 
 #add-synth-btn,
-#play-all-btn {
+#play-all-btn,
+#panic-btn {
   background-color: #3a7bd5;
   border: none;
   color: white;
@@ -535,18 +538,30 @@ select:disabled {
   transition: background-color 0.2s ease;
 }
 #add-synth-btn:hover,
-#play-all-btn:hover {
+#play-all-btn:hover,
+#panic-btn:hover {
   background-color: #2d5fa8;
 }
 #add-synth-btn .material-symbols-outlined,
-#play-all-btn .material-symbols-outlined {
+#play-all-btn .material-symbols-outlined,
+#panic-btn .material-symbols-outlined {
   font-size: 1.125rem;
+}
+
+#panic-btn {
+  background-color: #c0392b;
+}
+#panic-btn:hover {
+  background-color: #a5281b;
 }
 
 .synth-list-body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+}
+.synth-list-body::-webkit-scrollbar {
+  display: none;
 }
 
 .placeholder-text {
@@ -667,6 +682,7 @@ select:disabled {
 .synth-block .synth-body .synth-section .synth-section-body {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
 }
 .synth-block .synth-body .synth-section .synth-section-body select {
@@ -678,6 +694,9 @@ select:disabled {
 .synth-block .synth-body .synth-section .synth-section-body.extra-margin {
   padding: 0.25rem 0;
 }
+.synth-block .synth-body .synth-section .synth-section-body.reversed {
+  flex-direction: row-reverse;
+}
 .synth-block .synth-body .synth-play {
   display: flex;
   align-items: center;
@@ -688,15 +707,21 @@ select:disabled {
   border: none;
   cursor: pointer;
   gap: 0.25rem;
-  background-color: #444;
+  min-width: 6rem;
+  background-color: rgba(33, 154, 82, 0.8);
   color: #ccc;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 .synth-block .synth-body .synth-play .material-symbols-outlined {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
+}
+.synth-block .synth-body .synth-play .synth-play-label {
+  flex-grow: 1;
+  text-align: center;
+  text-transform: uppercase;
 }
 .synth-block .synth-body .synth-play:hover {
-  background-color: #555;
+  background-color: #219a52;
   color: #ccc;
 }
 .synth-block .synth-body .synth-play.active {
@@ -786,6 +811,13 @@ select:disabled {
 }
 .synth-block .synth-body .synth-channel-toggle.channel-blue:not(.active):hover {
   border-color: #2121c8;
+}
+.synth-block .synth-section-separator {
+  height: 1px;
+  background: #3a7bd5;
+}
+.synth-block .synth-section-separator.gradient-wb {
+  background: linear-gradient(to left, white, black);
 }
 .synth-block .synth-range-track {
   position: relative;

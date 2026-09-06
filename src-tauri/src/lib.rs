@@ -63,6 +63,7 @@ pub fn run() {
             synth::remove_synth,
             synth::start_synth,
             synth::stop_synth,
+            synth::panic_all,
             synth::reset_synth_cursor,
             synth::is_synth_playing,
             synth::set_synth_channel,

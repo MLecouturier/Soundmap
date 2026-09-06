@@ -117,6 +117,34 @@ pub fn stop_synth(
     }
 }
 
+/// Kill switch: stops every synthesizer and immediately turns off all
+/// sounding notes (mono + polyphonic voices). The note generation is
+/// bumped so pending delayed Note Offs cancel themselves.
+#[tauri::command]
+pub fn panic_all(
+    state: State<SynthState>,
+    midi_state: State<MidiState>,
+) {
+    let mut synths = state.synths.lock().unwrap();
+    for synth in synths.values_mut() {
+        synth.playing = false;
+        synth.end_pending = false;
+        synth.tempo_accumulator = 0.0;
+        synth.note_generation += 1;
+
+        if synth.note_is_on {
+            midi_state.note_off(synth.midi_port, synth.channel, synth.note);
+            synth.note_is_on = false;
+        }
+        for voice in synth.poly_voices.iter_mut() {
+            if voice.note_is_on {
+                midi_state.note_off(synth.midi_port, synth.channel, voice.note);
+                voice.note_is_on = false;
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn is_synth_playing(id: u32, state: State<SynthState>) -> bool {
     state

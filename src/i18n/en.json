@@ -44,6 +44,7 @@
     "title": "Synthesizers",
     "playAllStart": "Start all synthesizers",
     "playAllStop": "Stop all synthesizers",
+    "panic": "Kill switch: stop everything and cut all sounding notes",
     "add": "Add a synthesizer",
     "commonControlsTitle": "Software parameters",
     "commonControlsText": "Global settings applied to all synthesizers."

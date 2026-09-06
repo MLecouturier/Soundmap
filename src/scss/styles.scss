@@ -118,7 +118,7 @@ html, body {
 
 h2 {
     font-size: 1.1rem;
-    margin-bottom: .5rem;
+    margin-bottom: .25rem;
     color: $color-text-secondary;
 }
 
@@ -630,12 +630,15 @@ $metronome-led-transition: 0.05s ease;
     .synth-list-header-actions {
         display: flex;
         align-items: center;
+        flex-grow: 1;
+        margin-left: .5rem;
         gap: .5rem;
     }
 }
 
 #add-synth-btn,
-#play-all-btn {
+#play-all-btn,
+#panic-btn {
     background-color: $color-accent;
     border: none;
     color: white;
@@ -657,10 +660,22 @@ $metronome-led-transition: 0.05s ease;
     }
 }
 
+// Kill switch: a global stop affordance, hence the stop (red) color
+#panic-btn {
+    background-color: $color-stop;
+
+    &:hover {
+        background-color: $color-stop-hover;
+    }
+}
+
 .synth-list-body {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    &::-webkit-scrollbar {
+        display: none;
+    }
 }
 
 .placeholder-text {
@@ -800,6 +815,7 @@ $metronome-led-transition: 0.05s ease;
             .synth-section-body {
                 display: flex;
                 align-items: center;
+                justify-content: center;
                 gap: .5rem;
 
                 select { height: 1.75rem; }
@@ -810,6 +826,10 @@ $metronome-led-transition: 0.05s ease;
 
                 &.extra-margin {
                     padding: .25rem 0;
+                }
+
+                &.reversed {
+                    flex-direction: row-reverse;
                 }
             }
         }
@@ -826,14 +846,21 @@ $metronome-led-transition: 0.05s ease;
             border: none;
             cursor: pointer;
             gap: .25rem;
-            background-color: $color-bg-neutral;
+            min-width: 6rem;
+            background-color: rgba($color-accent-alt, .8);
             color: $color-text-secondary;
             transition: background-color $transition-fast, color $transition-fast;
 
-            .material-symbols-outlined { font-size: 1.125rem; }
+            .material-symbols-outlined { font-size: 1.25rem; }
+
+            .synth-play-label {
+                flex-grow: 1;
+                text-align: center;
+                text-transform: uppercase;
+            }
 
             &:hover {
-                background-color: $color-bg-neutral-hover;
+                background-color: $color-accent-alt;
                 color: $color-text-secondary;
             }
 
@@ -963,6 +990,15 @@ $metronome-led-transition: 0.05s ease;
                     border-color: $color-blue;
                 }
             }
+        }
+    }
+
+    .synth-section-separator {
+        height: 1px;
+        background: $color-accent;
+
+        &.gradient-wb {
+            background: linear-gradient(to left, white, black);
         }
     }
 

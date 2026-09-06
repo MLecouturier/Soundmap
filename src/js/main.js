@@ -1498,6 +1498,7 @@ function applySynthConfig(el, cfg) {
         btn.classList.toggle('active', lengths.includes(btn.dataset.length));
     });
     el.querySelector('.synth-reverse-note-length').classList.toggle('active', !!cfg.note_length_reversed);
+    el.querySelector('.synth-note-length-section').classList.toggle('reversed', !!cfg.note_length_reversed);
     // Note ranges (mono + one per voice)
     const setRange = (group, toggles) => ['bass', 'medium', 'treble'].forEach((kind, i) => {
         group.querySelector(`.synth-${kind}`).classList.toggle('active', !!(toggles && toggles[i]));
@@ -1682,7 +1683,7 @@ function createSynthElement(id, cfg = null) {
                             <span class="material-symbols-outlined" aria-hidden="true">reset_exposure</span>
                         </button>
                     </div>
-                    <div class="synth-section-body">
+                    <div class="synth-section-body synth-note-length-section">
                         <button class="note-length-btn noto-music icon-btn" data-length="sixteenth" data-i18n-title="synth.noteLengthSixteenth">𝅘𝅥𝅯</button>
                         <button class="note-length-btn noto-music icon-btn" data-length="eighth" data-i18n-title="synth.noteLengthEighth">𝅘𝅥𝅮</button>
                         <button class="note-length-btn noto-music icon-btn active" data-length="quarter" data-i18n-title="synth.noteLengthQuarter">𝅘𝅥</button>
@@ -1690,7 +1691,7 @@ function createSynthElement(id, cfg = null) {
                         <button class="note-length-btn noto-music icon-btn" data-length="whole" data-i18n-title="synth.noteLengthWhole">𝅝</button>
                     </div>
                 </div>
-
+                <div class="synth-section-separator gradient-wb"></div>
                 <div class="synth-section">
                     <div class="synth-section-header">
                         <span class="synth-section-title" data-i18n="synth.brightnessThreshold"></span>
@@ -1962,6 +1963,7 @@ function createSynthElement(id, cfg = null) {
         const btn = e.currentTarget;
         const reversed = !btn.classList.contains('active');
         btn.classList.toggle('active', reversed);
+        el.querySelector('.synth-note-length-section').classList.toggle('reversed', reversed);
         invoke('set_synth_note_length_reversed', { id, reversed })
             .catch(err => console.error('Error in set_synth_note_length_reversed:', err));
     });
@@ -2257,6 +2259,19 @@ playAllBtn.addEventListener('click', async () => {
         }
     }
     syncPlayAllButton();
+});
+
+// Kill switch: stop every synthesizer and cut all sounding notes
+const panicBtn = document.querySelector('#panic-btn');
+panicBtn.addEventListener('click', async () => {
+    await invoke('panic_all');
+    synthListBody.querySelectorAll('.synth-block').forEach(el => {
+        setPlayButtonState(el.querySelector('.synth-play'), false);
+        setSynthControlsLocked(el, false);
+    });
+    syncPlayAllButton();
+    await stopMetronomeIfIdle();
+    updateImageControlsLockState();
 });
 
 // Automatic stop at the end of the sequence (non-loop mode)
