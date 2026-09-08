@@ -13,7 +13,7 @@ pub struct MidiPortInfo {
 /// Opens the connection to the given output port index, or None if the
 /// port doesn't exist or can't be opened.
 fn open_connection(port_index: usize) -> Option<MidiOutputConnection> {
-    let midi_out = match MidiOutput::new("SoundMap") {
+    let midi_out = match MidiOutput::new("Wysiwyl") {
         Ok(m) => m,
         Err(e) => {
             eprintln!("Unable to initialize MIDI: {e}");
@@ -39,7 +39,7 @@ fn open_connection(port_index: usize) -> Option<MidiOutputConnection> {
         .port_name(port)
         .unwrap_or_else(|_| "unknown port".to_string());
 
-    match midi_out.connect(port, "soundmap-out") {
+    match midi_out.connect(port, "wysiwyl-out") {
         Ok(conn) => {
             println!("Connected to MIDI port {port_index}: {port_name}");
             Some(conn)
@@ -107,7 +107,7 @@ pub fn send_note_off(conn: &mut MidiOutputConnection, channel: u8, note: u8) {
 /// port identifier to pass to `set_synth_midi_port`.
 #[tauri::command]
 pub fn list_midi_ports() -> Vec<MidiPortInfo> {
-    let midi_out = match MidiOutput::new("SoundMap") {
+    let midi_out = match MidiOutput::new("Wysiwyl") {
         Ok(m) => m,
         Err(_) => return Vec::new(),
     };

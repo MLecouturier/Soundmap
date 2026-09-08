@@ -58,7 +58,7 @@ function resolveSystemLocale() {
     return FALLBACK_LOCALE;
 }
 
-const STORAGE_KEY = 'soundmap.locale';
+const STORAGE_KEY = 'wysiwyl.locale';
 
 /// Initializes i18n: loads the stored locale (if any) or detects the system
 /// locale, falling back to English, then loads its dictionary (and English

@@ -83,7 +83,7 @@ pub struct LoadedSession {
     pub synths: Vec<SessionSynth>,
 }
 
-/// Saves the current work session to a `.soundmap` file picked through a
+/// Saves the current work session to a `.wysiwyl` file picked through a
 /// native save dialog. Canceling the dialog is not an error.
 #[tauri::command]
 pub async fn save_session(
@@ -97,7 +97,7 @@ pub async fn save_session(
     let file_path = app
         .dialog()
         .file()
-        .add_filter("SoundMap session", &["soundmap"])
+        .add_filter("Wysiwyl session", &["wysiwyl"])
         .blocking_save_file();
 
     let Some(path) = file_path else {
@@ -157,7 +157,7 @@ pub async fn save_session(
     Ok(())
 }
 
-/// Loads a `.soundmap` file picked through a native open dialog and
+/// Loads a `.wysiwyl` (or legacy `.soundmap`) file picked through a native open dialog and
 /// reinstalls its whole state (image, synths) into the backend. Returns
 /// the session's content for the frontend to rebuild its UI; `None` means
 /// the dialog was canceled.
@@ -173,7 +173,7 @@ pub async fn load_session(
     let file_path = app
         .dialog()
         .file()
-        .add_filter("SoundMap session", &["soundmap"])
+        .add_filter("Wysiwyl session", &["wysiwyl", "soundmap"])
         .blocking_pick_file();
 
     let Some(path) = file_path else {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "soundmap",
+  "productName": "wysiwyl",
   "version": "1.5.0",
-  "identifier": "be.somethinks.soundmap",
+  "identifier": "be.somethinks.wysiwyl",
   "build": {
     "frontendDist": "../src"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "SoundMap",
+        "title": "Wysiwyl",
         "width": 1400,
         "height": 900,
         "minWidth": 1000,

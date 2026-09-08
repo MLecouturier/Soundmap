@@ -1,5 +1,5 @@
 [package]
-name = "soundmap"
+name = "wysiwyl"
 version = "1.5.0"
 description = "Pixels to Synth App"
 authors = ["MLecout"]
@@ -8,11 +8,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "soundmap_lib"
+name = "wysiwyl_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "soundmap"
+name = "wysiwyl"
 path = "src/main.rs"
 
 [build-dependencies]

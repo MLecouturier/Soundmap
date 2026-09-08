@@ -48,7 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'SoundMap ${{ github.ref_name }}'
+          releaseName: 'Wysiwyl ${{ github.ref_name }}'
           releaseBody: 'Voir les changements dans le CHANGELOG ou les commits associés.'
           releaseDraft: true
           prerelease: ${{ steps.prerelease_check.outputs.is_prerelease }}

@@ -1,8 +1,10 @@
-# SoundMap
+# Wysiwyl
+
+*What You See Is What You Listen*
 
 *[English version](README.md)*
 
-SoundMap est une application desktop Tauri qui transforme une image en musique. Chargez une image, convertissez-la en grille de pixels, puis laissez un ou plusieurs synthétiseurs lire cette grille pour générer des notes MIDI en temps réel — transformant ainsi couleurs et luminosité en son.
+Wysiwyl est une application desktop Tauri qui transforme une image en musique. Chargez une image, convertissez-la en grille de pixels, puis laissez un ou plusieurs synthétiseurs lire cette grille pour générer des notes MIDI en temps réel — transformant ainsi couleurs et luminosité en son.
 
 ## Fonctionnalités principales
 
@@ -50,7 +52,7 @@ Vous pouvez créer autant de synthétiseurs indépendants que vous le souhaitez,
 
 ### Sessions de travail
 
-- **Sauvegarde de l'état complet** dans un unique fichier `.soundmap` autoportant (boîte de dialogue d'enregistrement native) : l'image originale (embarquée en base64 PNG), les réglages de traitement d'image, le tempo du métronome, et chaque synthétiseur avec sa configuration complète (nom, couleur, zones, tempo, mode, longueurs de note, plages MIDI, seuils, vélocité, canal et port MIDI, sens de lecture, boucle/aller-retour).
+- **Sauvegarde de l'état complet** dans un unique fichier `.wysiwyl` autoportant (boîte de dialogue d'enregistrement native) : l'image originale (embarquée en base64 PNG), les réglages de traitement d'image, le tempo du métronome, et chaque synthétiseur avec sa configuration complète (nom, couleur, zones, tempo, mode, longueurs de note, plages MIDI, seuils, vélocité, canal et port MIDI, sens de lecture, boucle/aller-retour).
 - **Réouverture d'une session** via une boîte de dialogue native : l'image est re-dérivée de l'originale avec les réglages stockés, et tous les synthétiseurs sont recréés exactement tels qu'ils ont été laissés. L'état de lecture (positions des têtes de lecture, notes en cours) n'est volontairement pas restauré : tout repart du début.
 
 ### Configuration globale
@@ -92,12 +94,12 @@ Node.js **n'est pas requis** : le frontend utilise du HTML, CSS et JavaScript va
 Depuis le répertoire du projet :
 
 ```bash
-cd soundmap
+cd wysiwyl
 ```
 
 ## Utilisation
 
-Lancer SoundMap en mode développement :
+Lancer Wysiwyl en mode développement :
 
 ```bash
 cargo tauri dev
@@ -115,12 +117,12 @@ Dans l'application :
 2. Ajoutez un ou plusieurs synthétiseurs, choisissez un port MIDI, un canal MIDI et une couleur pour chacun, et renommez-les en double-cliquant sur leur titre.
 3. Tracez des zones sur l'image pour restreindre ce que chaque synthétiseur doit lire, choisissez un tempo par synthé, puis ouvrez les options avancées pour configurer le mode de traduction (monophonique/polyphonique), les longueurs de note, les filtres de plage MIDI, le seuil de luminosité et la vélocité minimum.
 4. Appuyez sur Play sur un synthétiseur (ou « tout jouer ») pour commencer à entendre votre image.
-5. Sauvegardez votre travail dans un fichier de session `.soundmap` (bouton de sauvegarde à côté des contrôles d'image) et rouvrez-le plus tard pour tout retrouver en place.
+5. Sauvegardez votre travail dans un fichier de session `.wysiwyl` (bouton de sauvegarde à côté des contrôles d'image) et rouvrez-le plus tard pour tout retrouver en place.
 
 ## Structure du projet
 
 ```text
-soundmap/
+wysiwyl/
 ├── Cargo.toml
 ├── LICENSE
 ├── README.md

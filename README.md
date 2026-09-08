@@ -1,8 +1,10 @@
-# SoundMap
+# Wysiwyl
+
+*What You See Is What You Listen*
 
 *[Version française](README.fr.md)*
 
-SoundMap is a Tauri desktop application that turns an image into music. Load an image, turn it into a pixel grid, and let one or more synthesizers read that grid to generate real-time MIDI notes — turning colors and brightness into sound.
+Wysiwyl is a Tauri desktop application that turns an image into music. Load an image, turn it into a pixel grid, and let one or more synthesizers read that grid to generate real-time MIDI notes — turning colors and brightness into sound.
 
 ## Main Features
 
@@ -50,7 +52,7 @@ You can create any number of independent synthesizers, each reading the pixel gr
 
 ### Work Sessions
 
-- **Save the whole state** into a single self-contained `.soundmap` file (native save dialog): the original image (embedded as base64 PNG), the image processing settings, the metronome tempo, and every synthesizer with its full configuration (name, color, zones, tempo, mode, note lengths, note ranges, thresholds, velocity, MIDI channel and port, reading direction, loop/back-and-forth).
+- **Save the whole state** into a single self-contained `.wysiwyl` file (native save dialog): the original image (embedded as base64 PNG), the image processing settings, the metronome tempo, and every synthesizer with its full configuration (name, color, zones, tempo, mode, note lengths, note ranges, thresholds, velocity, MIDI channel and port, reading direction, loop/back-and-forth).
 - **Reopen a session** through a native open dialog: the image is re-derived from the original with the stored settings, and all the synthesizers are recreated exactly as they were left. Playback state (playhead positions, sounding notes) is deliberately not restored: everything restarts from the beginning.
 
 ### Global Configuration
@@ -92,12 +94,12 @@ Node.js is **not required**: the frontend uses vanilla HTML, CSS, and JavaScript
 From the project directory:
 
 ```bash
-cd soundmap
+cd wysiwyl
 ```
 
 ## Usage
 
-Run SoundMap in development mode:
+Run Wysiwyl in development mode:
 
 ```bash
 cargo tauri dev
@@ -115,12 +117,12 @@ In the application:
 2. Add one or more synthesizers, choose a MIDI port, a MIDI channel and a color for each, and rename them by double-clicking their title.
 3. Draw zones on the image to restrict what each synthesizer plays, pick a tempo per synth, and open the advanced options to configure the translation mode (monophonic/polyphonic), note lengths, note range filters, brightness threshold, and minimum velocity.
 4. Press Play on a synthesizer (or "play all") to start hearing your image.
-5. Save your work into a `.soundmap` session file (save button next to the image controls) and reopen it later to find everything back in place.
+5. Save your work into a `.wysiwyl` session file (save button next to the image controls) and reopen it later to find everything back in place.
 
 ## Project Structure
 
 ```text
-soundmap/
+wysiwyl/
 ├── Cargo.toml
 ├── LICENSE
 ├── README.md
