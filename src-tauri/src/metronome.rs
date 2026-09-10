@@ -202,7 +202,7 @@ fn process_polyphonic(
 /// directions, column by column for the vertical ones. An empty zone list
 /// yields an empty sequence (nothing selected); zones are clipped to the
 /// image bounds.
-fn build_pixel_sequence(
+pub(crate) fn build_pixel_sequence(
     zones: &[PixelZone],
     width: usize,
     height: usize,
@@ -270,33 +270,35 @@ fn step_synth_once(
     // Flat sequence of pixels covered by the synth's zones, in the synth's
     // reading direction. The cursor is an index into this sequence; zones
     // partially outside the image are clipped, and an empty zone list
-    // (nothing selected) leaves the synth stalled.
+    // (nothing selected) leaves a paused synth stalled.
     let sequence = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction);
     let seq_len = sequence.len();
-    if seq_len == 0 {
-        return None;
-    }
 
     // Deferred end of a non-looping sequence: end_pending means the last
     // pixel was played on the previous tick and its note has now rung for
-    // a full step period — stop the synth.
-    if synth.end_pending && !synth.loop_enabled && synth.playing {
-        synth.playing = false;
-        synth.cursor = 0;
-        synth.tempo_accumulator = 0.0;
-        // Turn off the current mono note if it is still sounding
-        if synth.note_is_on {
-            midi.note_off(synth.midi_port, synth.channel, synth.note);
-            synth.note_is_on = false;
-        }
-        // Turn off any currently sounding polyphonic voices
-        for voice in synth.poly_voices.iter_mut() {
-            if voice.note_is_on {
-                midi.note_off(synth.midi_port, synth.channel, voice.note);
-                voice.note_is_on = false;
+    // a full step period — stop the synth. A playing synth whose zones
+    // were emptied (or fully clipped away) mid-playback stops the same
+    // way: without this the tick would silently stall, leaving the
+    // sounding note on forever and the UI in its playing state.
+    if seq_len == 0 || (synth.end_pending && !synth.loop_enabled) {
+        if synth.playing {
+            synth.playing = false;
+            synth.cursor = 0;
+            synth.tempo_accumulator = 0.0;
+            // Turn off the current mono note if it is still sounding
+            if synth.note_is_on {
+                midi.note_off(synth.midi_port, synth.channel, synth.note);
+                synth.note_is_on = false;
             }
+            // Turn off any currently sounding polyphonic voices
+            for voice in synth.poly_voices.iter_mut() {
+                if voice.note_is_on {
+                    midi.note_off(synth.midi_port, synth.channel, voice.note);
+                    voice.note_is_on = false;
+                }
+            }
+            let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
         }
-        let _ = app.emit("synth-stopped", serde_json::json!({ "id": synth.id }));
         return None;
     }
 

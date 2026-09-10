@@ -1,7 +1,8 @@
 use tauri::State;
 use crate::config::ConfigState;
 use crate::error::{err, AppError};
-use crate::state::{NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, MidiState};
+use crate::metronome::build_pixel_sequence;
+use crate::state::{NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, ImageState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
 // (unchanged, assumed to remain above or below in this file)
@@ -441,13 +442,40 @@ pub fn set_synth_zones(
     id: u32,
     zones: Vec<PixelZone>,
     state: State<SynthState>,
+    image_state: State<ImageState>,
 ) -> Result<(), AppError> {
+    // Lock in the metronome's order (image, then synths) to avoid an
+    // AB-BA deadlock with the tick loop
+    let image = image_state.processed.lock().unwrap();
     let mut synths = state.synths.lock().unwrap();
-    match synths.get_mut(&id) {
-        Some(synth) => {
-            synth.zones = zones;
-            Ok(())
+    let synth = match synths.get_mut(&id) {
+        Some(s) => s,
+        None => return Err(synth_not_found(id)),
+    };
+
+    // Keep the playhead on the same pixel across zone edits (instead of
+    // restarting at the beginning): the flat sequence index has no meaning
+    // in the new sequence, but the pixel it points to usually still exists
+    // — find it back in the new sequence. When it cannot be found (zones
+    // emptied, grid reshaped), the reading restarts at 0.
+    let mut cursor = 0;
+    if let Some(img) = image.as_ref() {
+        let width = img.width() as usize;
+        let height = img.height() as usize;
+        let old_seq = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction);
+        if !old_seq.is_empty() {
+            let pixel = old_seq[synth.cursor % old_seq.len()];
+            let new_seq = build_pixel_sequence(&zones, width, height, synth.reading_direction);
+            if let Some(pos) = new_seq.iter().position(|&p| p == pixel) {
+                cursor = pos;
+            }
         }
-        None => Err(synth_not_found(id)),
     }
+
+    synth.zones = zones;
+    synth.cursor = cursor;
+    // A stale end_pending from the old sequence would stop a playing
+    // synth on its next tick
+    synth.end_pending = false;
+    Ok(())
 }

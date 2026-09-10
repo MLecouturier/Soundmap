@@ -338,17 +338,62 @@ function clearOverlay() {
 let zonePickState = null; // { id, btn } while the drawing mode is armed
 let zoneDrag = null;      // { id, start, cur } while dragging
 
+// Do two grid rectangles overlap (even partially)?
+function rectsOverlap(a, b) {
+    return a.x < b.x + b.w &&
+           a.y < b.y + b.h &&
+           a.x + a.w > b.x &&
+           a.y + a.h > b.y;
+}
+
 // Does the rectangle overlap (even partially) one of the synth's zones?
 // Such a drag removes pixels instead of creating an overlapping zone.
 function rectOverlapsZones(id, rect) {
     const hi = synthHighlights.get(id);
     if (!hi) return false;
-    return hi.zones.some(z =>
-        rect.x < z.x + z.w &&
-        rect.y < z.y + z.h &&
-        rect.x + rect.w > z.x &&
-        rect.y + rect.h > z.y
-    );
+    return hi.zones.some(z => rectsOverlap(rect, z));
+}
+
+// Normalized grid rect of the zone drag in progress, or null
+function zoneDragRect() {
+    if (!zoneDrag) return null;
+    const { start, cur } = zoneDrag;
+    return {
+        x: Math.min(start.col, cur.col),
+        y: Math.min(start.row, cur.row),
+        w: Math.abs(cur.col - start.col) + 1,
+        h: Math.abs(cur.row - start.row) + 1,
+    };
+}
+
+// The zone of this synth containing the played pixel, if any
+function zoneAtPixel(id, pixel) {
+    if (pixel == null) return null;
+    const hi = synthHighlights.get(id);
+    if (!hi) return null;
+    const col = pixel % gridW;
+    const row = Math.floor(pixel / gridW);
+    return hi.zones.find(z =>
+        col >= z.x && col < z.x + z.w &&
+        row >= z.y && row < z.y + z.h
+    ) || null;
+}
+
+// While a synth is playing, the zone under its playhead is locked against
+// erasure: an erasing drag that touches it is cancelled, so the pixels
+// being played are never removed under the cursor. Returns true when the
+// drag has just been cancelled.
+function cancelEraseDragOnLockedZone(id, playheadPixel) {
+    if (!zoneDrag || zoneDrag.id !== id) return false;
+    const rect = zoneDragRect();
+    if (!rect || !rectOverlapsZones(id, rect)) return false;
+    const locked = zoneAtPixel(id, playheadPixel);
+    if (locked && rectsOverlap(rect, locked)) {
+        zoneDrag = null;
+        redrawAllHighlights();
+        return true;
+    }
+    return false;
 }
 
 function cellFromClientPoint(clientX, clientY) {
@@ -369,6 +414,16 @@ function startZonePicking(id, btn) {
     zonePickState = { id, btn };
     btn.classList.add('active');
     pixelOverlay.classList.add('picking');
+    // Editing blind is confusing: arming the picking mode reveals this
+    // synth's zones (they may be hidden during playback). The eye button
+    // reflects it; the user can hide them again at any time.
+    const hi = synthHighlights.get(id);
+    if (hi && !hi.visible) {
+        hi.visible = true;
+        hi._wasVisible = true; // keep the zones visible after a stop too
+        syncEyeButton(btn.closest('.synth-block'), true);
+        redrawAllHighlights();
+    }
 }
 
 function cancelZonePicking() {
@@ -426,6 +481,9 @@ pixelOverlay.addEventListener('mousemove', (e) => {
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
     zoneDrag.cur = cell;
+    // Cancel an erasing drag as soon as it grows over the zone under the
+    // playhead (checked again on every playback tick)
+    if (cancelEraseDragOnLockedZone(zoneDrag.id, synthCursors.get(zoneDrag.id))) return;
     redrawAllHighlights();
     drawZonePreview();
 });
@@ -441,14 +499,12 @@ window.addEventListener('mouseup', (e) => {
     }
     if (!zoneDrag) return;
     const { id, start, cur } = zoneDrag;
-    const rect = {
-        x: Math.min(start.col, cur.col),
-        y: Math.min(start.row, cur.row),
-        w: Math.abs(cur.col - start.col) + 1,
-        h: Math.abs(cur.row - start.row) + 1,
-    };
+    const rect = zoneDragRect();
+    // Cancel an erasing drag touching the locked zone (the one under the
+    // playhead) instead of committing it
+    const cancelled = cancelEraseDragOnLockedZone(id, synthCursors.get(id));
     zoneDrag = null;
-    if (start.col !== cur.col || start.row !== cur.row) {
+    if (!cancelled && rect && (start.col !== cur.col || start.row !== cur.row)) {
         // A rectangle overlapping an existing zone (even partially) only
         // removes pixels; it never creates an overlapping zone
         if (rectOverlapsZones(id, rect)) removeSynthZoneRect(id, rect);
@@ -770,16 +826,47 @@ function currentGridWidth() {
   return sliderToCells(Number(gridSlider.value), origWidth);
 }
 
+// ---------- Posterize log scale ----------
+// Position 0 = off; positions 1..SLIDER_STEPS map exponentially from 255
+// levels (left) down to 2 (right): the slider is coarser near 255, where
+// extra levels are barely distinguishable, and very precise around the
+// minimum (each level takes many steps, where posterization is musically
+// strongest).
+const POSTERIZE_MIN_LEVELS = 2;
+const POSTERIZE_MAX_LEVELS = 255;
+
+function sliderToPosterizeLevels(v) {
+  if (v <= 0) return null; // off
+  const lmin = Math.log(POSTERIZE_MIN_LEVELS);
+  const lmax = Math.log(POSTERIZE_MAX_LEVELS);
+  const t = (v - 1) / (SLIDER_STEPS - 1); // 0 at the first notch, 1 at the far right
+  const levels = Math.round(Math.exp(lmax - (lmax - lmin) * t));
+  return Math.min(POSTERIZE_MAX_LEVELS, Math.max(POSTERIZE_MIN_LEVELS, levels));
+}
+
+function posterizeLevelsToSlider(levels) {
+  if (levels == null || levels <= 1) return 0; // off
+  const lmin = Math.log(POSTERIZE_MIN_LEVELS);
+  const lmax = Math.log(POSTERIZE_MAX_LEVELS);
+  let v = Math.round(((lmax - Math.log(levels)) / (lmax - lmin)) * (SLIDER_STEPS - 1)) + 1;
+  v = Math.min(SLIDER_STEPS, Math.max(1, v));
+  // The analytic position may round to a neighbor: nudge it until the
+  // forward mapping gives back exactly `levels` (near 255, one slider step
+  // can skip a level — then the closest reachable one is used)
+  while (v < SLIDER_STEPS && sliderToPosterizeLevels(v) > levels) v++;
+  while (v > 1 && sliderToPosterizeLevels(v - 1) < levels) v--;
+  return v;
+}
+
 // ---------- Settings ----------
 function buildParams() {
-  const levels = Number(posterize.value);
   return {
     grid_width:       currentGridWidth(),
     grid_height:      null,              // always deduced from the ratio
     contrast:         Number(contrast.value),
     brightness:       Number(brightness.value),
     saturation:       Number(saturation.value),
-    posterize_levels: levels > 1 ? levels : null,
+    posterize_levels: sliderToPosterizeLevels(Number(posterize.value)),
   };
 }
 
@@ -835,8 +922,8 @@ function syncLabels() {
   brightnessValue.textContent = Number(brightness.value).toFixed(0);
   saturationValue.textContent = Number(saturation.value).toFixed(0);
 
-  const p = Number(posterize.value);
-  posterizeValue.textContent = p > 1 ? t('controls.posterizeLevels', { count: p }) : t('controls.posterizeOff');
+  const p = sliderToPosterizeLevels(Number(posterize.value));
+  posterizeValue.textContent = p ? t('controls.posterizeLevels', { count: p }) : t('controls.posterizeOff');
 }
 
 // ---------- Refresh ----------
@@ -1279,7 +1366,7 @@ resetBtn.addEventListener('click', () => {
   contrast.value    = 0;
   brightness.value  = 0;
   saturation.value  = 0;
-  posterize.value   = 1;
+  posterize.value   = 0;
 
   syncLabels();
   refresh();
@@ -1292,14 +1379,13 @@ const loadSessionBtn = document.querySelector('#load-session-btn');
 // Collects the frontend-owned state (metronome tempo, image sliders, synth
 // colors in display order); the backend owns the rest (image, synths).
 saveSessionBtn.addEventListener('click', async () => {
-    const levels = Number(posterize.value);
     const ui = {
         bpm: clampBpm(Number(bpmInput.value)),
         grid_slider: Number(gridSlider.value),
         contrast: Number(contrast.value),
         brightness: Number(brightness.value),
         saturation: Number(saturation.value),
-        posterize_levels: levels > 1 ? levels : null,
+        posterize_levels: sliderToPosterizeLevels(Number(posterize.value)),
         synth_colors: Array.from(synthListBody.querySelectorAll('.synth-block')).map(el => ({
             id: Number(el.dataset.synthId),
             color: synthColors.get(Number(el.dataset.synthId)),
@@ -1349,7 +1435,7 @@ loadSessionBtn.addEventListener('click', async () => {
     contrast.value = session.image_settings.contrast;
     brightness.value = session.image_settings.brightness;
     saturation.value = session.image_settings.saturation;
-    posterize.value = session.image_settings.posterize_levels ?? 1;
+    posterize.value = posterizeLevelsToSlider(session.image_settings.posterize_levels);
     showOriginalBtn.classList.remove('active');
     viewerEmpty.classList.add('hidden');
     syncLabels();
@@ -1473,7 +1559,11 @@ async function stopMetronomeIfIdle() {
         const sid = Number(el.dataset.synthId);
         synthCursors.delete(sid);
         const hi = synthHighlights.get(sid);
-        if (hi && hi._wasVisible) { hi.visible = true; hi._wasVisible = false; }
+        if (hi && hi._wasVisible) {
+            hi.visible = true;
+            hi._wasVisible = false;
+            syncEyeButton(el, true);
+        }
     });
     redrawAllHighlights();
 }
@@ -2053,9 +2143,12 @@ function createSynthElement(id, cfg = null) {
     // Eye button
     el.querySelector('.synth-eye-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
-        const hi = synthHighlights.get(id); 
+        const hi = synthHighlights.get(id);
         hi.visible = !hi.visible;
         btn.classList.toggle('active', hi.visible);
+        // During playback this becomes the state kept after stop: the
+        // user's last choice wins over the pre-playback snapshot
+        hi._wasVisible = hi.visible;
         if (hi.visible) drawRangeHighlight(id);
         else            clearRangeHighlight(id);
     });
@@ -2196,22 +2289,14 @@ function syncPlayAllButton() {
 }
 
 // Locks/unlocks the controls specific to a synth while it is playing
-// (MIDI channel, mono/poly mode, and the pixel range). Everything else
-// (hue shift, R/G/B toggles, velocity, loop, highlight...)
+// (MIDI channel, mono/poly mode, and the step forward). Everything else
+// (hue shift, R/G/B toggles, velocity, loop, highlight, zone selection...)
 // remains editable on the fly while the synth is playing.
 function setSynthControlsLocked(el, locked) {
     el.querySelector('.synth-channel').disabled = locked;
     el.querySelector('.synth-midi-port').disabled = locked;
     el.querySelectorAll('.synth-mode-btn').forEach(btn => { btn.disabled = locked; });
-    el.querySelector('.synth-add-zone-btn').disabled = locked;
-    el.querySelector('.synth-clear-zones-btn').disabled = locked;
     el.querySelector('.synth-step-forward').disabled = locked;
-
-    // If this synth was mid-selection when it started playing, cancel it.
-    const id = Number(el.dataset.synthId);
-    if (locked && zonePickState && zonePickState.id === id) {
-        cancelZonePicking();
-    }
 }
 
 async function startSynthPlayback(id, el) {
@@ -2220,7 +2305,7 @@ async function startSynthPlayback(id, el) {
     await invoke('start_synth', { id });
     setPlayButtonState(btn, true);
     // Hide the highlight during playback
-    hideHighlightForPlay(id);
+    hideHighlightForPlay(id, el);
     // Lock this synth's controls while it is playing
     setSynthControlsLocked(el, true);
     updateImageControlsLockState();
@@ -2238,12 +2323,23 @@ async function stopSynthPlayback(id, el) {
     updateImageControlsLockState();
 }
 
-function hideHighlightForPlay(id) {
+// Keeps the eye button's active state in sync with the actual highlight
+// visibility, wherever that state is changed programmatically
+function syncEyeButton(el, visible) {
+    const btn = el?.querySelector('.synth-eye-btn');
+    if (btn) btn.classList.toggle('active', visible);
+}
+
+function hideHighlightForPlay(id, el) {
     const hi = synthHighlights.get(id);
     if (!hi) return;
+    // Don't hide the zones of a synth whose picking mode is armed: the
+    // user is editing its zone selection and needs to see it
+    if (zonePickState && zonePickState.id === id) return;
     hi._wasVisible = hi.visible; // remember the state
     if (hi.visible) {
         hi.visible = false;
+        syncEyeButton(el, false);
         redrawAllHighlights();
     }
 }
@@ -2254,6 +2350,7 @@ function restoreHighlightAfterStop(id, el) {
     if (hi._wasVisible) {
         hi.visible = true;
         hi._wasVisible = false;
+        syncEyeButton(el, true);
         redrawAllHighlights();
     }
     // Clear this synth's cursor from the canvas
@@ -2411,6 +2508,9 @@ window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     const pixelInfoEl = el.querySelector('.synth-pixel-info');
     pixelInfoEl.textContent = t('synth.pixelInfo', { cursor, rgb: rgbStr, tsl: tslStr, noteInfo, velocity: velocity ?? '-' });
     pixelInfoEl.dataset.hasTick = '1';
+    // Abort an erasing drag when the playhead has entered the zone being
+    // edited: let the cursor play, the locked zone stays untouched
+    cancelEraseDragOnLockedZone(id, cursor);
     drawSynthPixel(id, cursor, muted);
 });
 
