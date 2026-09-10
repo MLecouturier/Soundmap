@@ -75,6 +75,7 @@ pub fn run() {
             synth::set_synth_loop,
             synth::set_synth_back_n_forth,
             synth::set_synth_reading_direction,
+            synth::set_synth_sorted_reading,
             synth::set_synth_zones,
             synth::set_synth_mode,
             synth::set_synth_hue_shift,

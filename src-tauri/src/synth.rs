@@ -1,7 +1,7 @@
 use tauri::State;
 use crate::config::ConfigState;
 use crate::error::{err, AppError};
-use crate::metronome::build_pixel_sequence;
+use crate::metronome::remapped_cursor;
 use crate::state::{NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, ImageState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
@@ -460,22 +460,62 @@ pub fn set_synth_zones(
     // emptied, grid reshaped), the reading restarts at 0.
     let mut cursor = 0;
     if let Some(img) = image.as_ref() {
-        let width = img.width() as usize;
-        let height = img.height() as usize;
-        let old_seq = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction);
-        if !old_seq.is_empty() {
-            let pixel = old_seq[synth.cursor % old_seq.len()];
-            let new_seq = build_pixel_sequence(&zones, width, height, synth.reading_direction);
-            if let Some(pos) = new_seq.iter().position(|&p| p == pixel) {
-                cursor = pos;
-            }
-        }
+        cursor = remapped_cursor(
+            synth,
+            &synth.zones,
+            &zones,
+            synth.sorted_reading,
+            synth.sorted_reading,
+            img.width() as usize,
+            img.height() as usize,
+        );
     }
 
     synth.zones = zones;
     synth.cursor = cursor;
     // A stale end_pending from the old sequence would stop a playing
     // synth on its next tick
+    synth.end_pending = false;
+    Ok(())
+}
+
+/// Toggles the sorted reading of the pixel sequence: when enabled, the
+/// selected pixels are ordered by their absolute position in the image
+/// (in the reading direction) instead of being read zone by zone. The
+/// playhead stays on the pixel it is playing.
+#[tauri::command]
+pub fn set_synth_sorted_reading(
+    id: u32,
+    enabled: bool,
+    state: State<SynthState>,
+    image_state: State<ImageState>,
+) -> Result<(), AppError> {
+    // Lock in the metronome's order (image, then synths) to avoid an
+    // AB-BA deadlock with the tick loop
+    let image = image_state.processed.lock().unwrap();
+    let mut synths = state.synths.lock().unwrap();
+    let synth = match synths.get_mut(&id) {
+        Some(s) => s,
+        None => return Err(synth_not_found(id)),
+    };
+
+    // The sequence order changes: remap the playhead onto the same pixel
+    // so the reading continues where it is
+    let mut cursor = 0;
+    if let Some(img) = image.as_ref() {
+        cursor = remapped_cursor(
+            synth,
+            &synth.zones,
+            &synth.zones,
+            synth.sorted_reading,
+            enabled,
+            img.width() as usize,
+            img.height() as usize,
+        );
+    }
+
+    synth.sorted_reading = enabled;
+    synth.cursor = cursor;
     synth.end_pending = false;
     Ok(())
 }

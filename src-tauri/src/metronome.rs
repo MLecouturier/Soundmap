@@ -198,15 +198,20 @@ fn process_polyphonic(
 }
 
 /// Builds the flat, ordered list of pixel indices covered by the synth's
-/// zones, following the reading direction: line by line for the horizontal
-/// directions, column by column for the vertical ones. An empty zone list
-/// yields an empty sequence (nothing selected); zones are clipped to the
-/// image bounds.
+/// zones. By default each zone is read in full, one after the other in
+/// drawing order, following the reading direction: line by line for the
+/// horizontal directions, column by column for the vertical ones. With
+/// `sorted` the pixels of all zones are merged and ordered by their
+/// absolute position in the image (in the reading direction) — one
+/// continuous sweep instead of per-zone blocks. An empty zone list yields
+/// an empty sequence (nothing selected); zones are clipped to the image
+/// bounds.
 pub(crate) fn build_pixel_sequence(
     zones: &[PixelZone],
     width: usize,
     height: usize,
     direction: ReadingDirection,
+    sorted: bool,
 ) -> Vec<usize> {
     let mut sequence = Vec::new();
     for zone in zones {
@@ -246,7 +251,60 @@ pub(crate) fn build_pixel_sequence(
             }
         }
     }
+
+    // Sorted reading: order the pixels of every zone by their absolute
+    // position in the image, following the reading direction. The pixel
+    // index is y * width + x, so the (row, column) and (column, row)
+    // lexicographic orders (with the appropriate direction reversed) give
+    // the four sweeps directly.
+    if sorted {
+        match direction {
+            ReadingDirection::LeftToRight => sequence.sort_unstable(),
+            ReadingDirection::RightToLeft => sequence
+                .sort_unstable_by_key(|&p| (p / width, std::cmp::Reverse(p % width))),
+            ReadingDirection::TopToBottom => {
+                sequence.sort_unstable_by_key(|&p| (p % width, p / width))
+            }
+            ReadingDirection::BottomToTop => sequence
+                .sort_unstable_by_key(|&p| (p % width, std::cmp::Reverse(p / width))),
+        }
+    }
     sequence
+}
+
+/// Computes the sequence index of the pixel currently under the synth's
+/// playhead, once its sequence has changed (zones edited, sorted reading
+/// toggled): keeps the playhead on the same pixel instead of restarting
+/// at the beginning. Returns 0 when the pixel is no longer selected (or
+/// the old sequence was empty).
+pub(crate) fn remapped_cursor(
+    synth: &Synth,
+    old_zones: &[PixelZone],
+    new_zones: &[PixelZone],
+    old_sorted: bool,
+    new_sorted: bool,
+    width: usize,
+    height: usize,
+) -> usize {
+    let old_seq = build_pixel_sequence(
+        old_zones,
+        width,
+        height,
+        synth.reading_direction,
+        old_sorted,
+    );
+    if old_seq.is_empty() {
+        return 0;
+    }
+    let pixel = old_seq[synth.cursor % old_seq.len()];
+    let new_seq = build_pixel_sequence(
+        new_zones,
+        width,
+        height,
+        synth.reading_direction,
+        new_sorted,
+    );
+    new_seq.iter().position(|&p| p == pixel).unwrap_or(0)
 }
 
 /// Plays the pixel at the synth's current playhead position, then advances
@@ -268,10 +326,11 @@ fn step_synth_once(
     let height = image.height() as usize;
 
     // Flat sequence of pixels covered by the synth's zones, in the synth's
-    // reading direction. The cursor is an index into this sequence; zones
+    // reading direction (sorted or per-zone blocks depending on
+    // sorted_reading). The cursor is an index into this sequence; zones
     // partially outside the image are clipped, and an empty zone list
     // (nothing selected) leaves a paused synth stalled.
-    let sequence = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction);
+    let sequence = build_pixel_sequence(&synth.zones, width, height, synth.reading_direction, synth.sorted_reading);
     let seq_len = sequence.len();
 
     // Deferred end of a non-looping sequence: end_pending means the last
@@ -737,5 +796,50 @@ mod tests {
         let toggles = [true, false, false];
         assert_eq!(rescale_into_range(-1.0, &BOUNDS, &toggles), 21);
         assert_eq!(rescale_into_range(2.0, &BOUNDS, &toggles), 47);
+    }
+
+    #[test]
+    fn sorted_reading_merges_zones_by_absolute_position() {
+        // Zone B (bottom row) drawn first, zone A (top row) second
+        let zones = [
+            PixelZone { x: 1, y: 1, w: 3, h: 1 }, // row 1, cols 1–3
+            PixelZone { x: 2, y: 0, w: 2, h: 1 }, // row 0, cols 2–3
+        ];
+        let (width, height) = (8usize, 2usize);
+
+        // Zone-by-zone: B entirely, then A
+        let per_zone = build_pixel_sequence(&zones, width, height, ReadingDirection::LeftToRight, false);
+        assert_eq!(per_zone, vec![9, 10, 11, 2, 3]);
+
+        // Sorted: one left→right sweep, row 0 first
+        let sorted = build_pixel_sequence(&zones, width, height, ReadingDirection::LeftToRight, true);
+        assert_eq!(sorted, vec![2, 3, 9, 10, 11]);
+
+        // Right→left: rows ascending, columns descending
+        let sorted_rtl = build_pixel_sequence(&zones, width, height, ReadingDirection::RightToLeft, true);
+        assert_eq!(sorted_rtl, vec![3, 2, 11, 10, 9]);
+
+        // Top→bottom: each column ascending, within a column top→bottom
+        let sorted_ttb = build_pixel_sequence(&zones, width, height, ReadingDirection::TopToBottom, true);
+        assert_eq!(sorted_ttb, vec![9, 2, 10, 3, 11]);
+    }
+
+    #[test]
+    fn remapped_cursor_keeps_the_playhead_pixel_across_sort_toggle() {
+        // Two zones, one pixel each; playing the first zone's pixel
+        let zones = [PixelZone { x: 5, y: 0, w: 1, h: 1 }, PixelZone { x: 1, y: 0, w: 1, h: 1 }];
+        let synth = Synth::new(1); // cursor 0
+        let (width, height) = (8usize, 1usize);
+
+        // Playhead on pixel 5 (index 0 of the per-zone sequence)
+        // Toggling sorted on: pixel 5 becomes index 1 of the new sequence
+        let cursor = remapped_cursor(&synth, &zones, &zones, false, true, width, height);
+        assert_eq!(cursor, 1);
+
+        // Toggling back off: the playhead returns to index 0
+        let mut synth = synth;
+        synth.cursor = 1;
+        let cursor = remapped_cursor(&synth, &zones, &zones, true, false, width, height);
+        assert_eq!(cursor, 0);
     }
 }

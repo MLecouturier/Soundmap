@@ -262,6 +262,7 @@ mod tests {
         synth.loop_enabled = false;
         synth.back_and_forth = true;
         synth.reading_direction = ReadingDirection::BottomToTop;
+        synth.sorted_reading = true;
         synth.brightness_min = 12;
         synth.brightness_max = 100;
         synth.velocity_min = 40;
@@ -297,6 +298,7 @@ mod tests {
         assert_eq!(s.loop_enabled, synth.loop_enabled);
         assert_eq!(s.back_and_forth, synth.back_and_forth);
         assert_eq!(s.reading_direction, synth.reading_direction);
+        assert_eq!(s.sorted_reading, synth.sorted_reading);
         assert_eq!(s.brightness_min, synth.brightness_min);
         assert_eq!(s.brightness_max, synth.brightness_max);
         assert_eq!(s.velocity_min, synth.velocity_min);

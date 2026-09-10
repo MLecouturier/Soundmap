@@ -91,6 +91,8 @@ pub struct Synth {
     pub back_and_forth: bool, // bounce back and forth between the sequence
                               // bounds (mutually exclusive with the loop)
     pub reading_direction: ReadingDirection, // order in which the sequence is built
+    pub sorted_reading: bool,   // read the pixels by their absolute position in
+                                // the image instead of zone by zone
     pub play_forward: bool,   // current travel direction through the sequence
                               // (flipped by the back-and-forth mode)
     pub end_pending: bool,    // end of a non-looping sequence reached: stop on the next tick
@@ -138,6 +140,7 @@ impl Synth {
             loop_enabled: true,   // loop enabled by default
             back_and_forth: false,
             reading_direction: ReadingDirection::LeftToRight,
+            sorted_reading: false,
             play_forward: true,
             end_pending: false,
             tempo_ratio: 1.0,

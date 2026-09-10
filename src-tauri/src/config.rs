@@ -86,6 +86,7 @@ pub struct SynthTemplate {
     pub loop_enabled: bool,
     pub back_and_forth: bool,
     pub reading_direction: ReadingDirection,
+    pub sorted_reading: bool,
     pub brightness_min: u8,
     pub brightness_max: u8,
     pub velocity_min: u8,
@@ -115,6 +116,7 @@ impl SynthTemplate {
             loop_enabled: synth.loop_enabled,
             back_and_forth: synth.back_and_forth,
             reading_direction: synth.reading_direction,
+            sorted_reading: synth.sorted_reading,
             brightness_min: synth.brightness_min,
             brightness_max: synth.brightness_max,
             velocity_min: synth.velocity_min,
@@ -138,6 +140,7 @@ impl SynthTemplate {
         synth.loop_enabled = self.loop_enabled && !self.back_and_forth;
         synth.back_and_forth = self.back_and_forth;
         synth.reading_direction = self.reading_direction;
+        synth.sorted_reading = self.sorted_reading;
         synth.brightness_min = self.brightness_min;
         synth.brightness_max = self.brightness_max;
         synth.velocity_min = self.velocity_min;

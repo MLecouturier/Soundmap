@@ -498,15 +498,17 @@ window.addEventListener('mouseup', (e) => {
         return;
     }
     if (!zoneDrag) return;
-    const { id, start, cur } = zoneDrag;
+    const { id } = zoneDrag;
     const rect = zoneDragRect();
     // Cancel an erasing drag touching the locked zone (the one under the
     // playhead) instead of committing it
     const cancelled = cancelEraseDragOnLockedZone(id, synthCursors.get(id));
     zoneDrag = null;
-    if (!cancelled && rect && (start.col !== cur.col || start.row !== cur.row)) {
+    if (!cancelled && rect) {
         // A rectangle overlapping an existing zone (even partially) only
-        // removes pixels; it never creates an overlapping zone
+        // removes pixels; it never creates an overlapping zone. A single
+        // pixel works too: a click on a free pixel selects it, a click on
+        // a selected pixel deselects it.
         if (rectOverlapsZones(id, rect)) removeSynthZoneRect(id, rect);
         else                             addSynthZone(id, rect);
     }
@@ -1623,6 +1625,8 @@ function applySynthConfig(el, cfg) {
     const dirBtn = el.querySelector('.synth-reading-direction-btn');
     dirBtn.dataset.direction = cfg.reading_direction || 'leftToRight';
     updateReadingDirectionBtn(dirBtn);
+    // Sorted reading
+    el.querySelector('.synth-sort-btn').classList.toggle('active', !!cfg.sorted_reading);
     // Brightness threshold
     el.querySelector('.brightness-start').value = cfg.brightness_min;
     el.querySelector('.brightness-end').value = cfg.brightness_max;
@@ -1727,6 +1731,7 @@ function createSynthElement(id, cfg = null) {
                         <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
                     </button>
                     <div class="flex-filler"></div>
+                    
                     <button class="synth-eye-btn icon-btn active" data-i18n-title="synth.toggleHighlight"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
                 </div>
             </div>
@@ -1747,6 +1752,7 @@ function createSynthElement(id, cfg = null) {
                     <button class="synth-reading-direction-btn icon-btn" data-direction="leftToRight" data-i18n-title="synth.readingDirection.leftToRight">
                         <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
                     </button>
+                    <button class="synth-sort-btn icon-btn" data-i18n-title="synth.toggleSort"><span class="material-symbols-outlined" aria-hidden="true">sort</span></button>
                     <div class="flex-filler"></div>
                     <button class="synth-loop-btn icon-btn active" data-i18n-title="synth.toggleLoop">
                         <span class="material-symbols-outlined" aria-hidden="true">laps</span>
@@ -2041,6 +2047,16 @@ function createSynthElement(id, cfg = null) {
             .catch(err => console.error('Error in set_synth_reading_direction:', err));
     });
     updateReadingDirectionBtn(directionBtn);
+
+    // ---- Sorted reading: the pixels follow their absolute position in
+    // the image instead of being read zone by zone ----
+    const sortBtn = el.querySelector('.synth-sort-btn');
+    sortBtn.addEventListener('click', () => {
+        const enabled = !sortBtn.classList.contains('active');
+        sortBtn.classList.toggle('active', enabled);
+        invoke('set_synth_sorted_reading', { id, enabled })
+            .catch(err => console.error('Error in set_synth_sorted_reading:', err));
+    });
 
     // ---- Compact mode: reduce the card to the playback controls ----
     // Everything is driven by the .compact class on the synth block (see
