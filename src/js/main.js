@@ -2391,6 +2391,7 @@ window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     if (!el) return;
 
     const rgbStr = `rgb(${r ?? '-'}, ${g ?? '-'}, ${b ?? '-'})`;
+    const tslStr = rgbToTslStr(r, g, b);
     let noteInfo;
 
     if (mode === 'polyphonic' && Array.isArray(voices)) {
@@ -2408,10 +2409,36 @@ window.__TAURI__.event.listen('synth-pixel-tick', (event) => {
     }
 
     const pixelInfoEl = el.querySelector('.synth-pixel-info');
-    pixelInfoEl.textContent = t('synth.pixelInfo', { cursor, rgb: rgbStr, noteInfo, velocity: velocity ?? '-' });
+    pixelInfoEl.textContent = t('synth.pixelInfo', { cursor, rgb: rgbStr, tsl: tslStr, noteInfo, velocity: velocity ?? '-' });
     pixelInfoEl.dataset.hasTick = '1';
     drawSynthPixel(id, cursor, muted);
 });
+
+// Converts RGB (0–255) to HSL: hue in degrees 0–360, saturation and
+// lightness in percent 0–100.
+function rgbToHsl(r, g, b) {
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d === 0) return [0, 0, Math.round(l * 100)];
+    const s = d / (1 - Math.abs(2 * l - 1));
+    let h;
+    if (max === rn) h = ((gn - bn) / d) % 6;
+    else if (max === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+    return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
+}
+
+// Formats the TSL (teinte, saturation, luminosité) values of a pixel for the info line
+function rgbToTslStr(r, g, b) {
+    if (r == null || g == null || b == null) return '-';
+    const [h, s, l] = rgbToHsl(r, g, b);
+    return `${h}°, ${s}%, ${l}%`;
+}
 
 // Formats a MIDI note as "C4 (60)" for the pixel info line
 function midiNoteToName(midi) {

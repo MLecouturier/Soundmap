@@ -98,8 +98,10 @@ fn process_monophonic(
     let hue = pixel_hue(r, g, b);
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
     let raw_note = hue_to_midi_note(shifted_hue);
-    // Fold the hue-derived note into the enabled MIDI range filters
-    let effective_note = fold_note_into_range(raw_note, note_range_bounds, &synth.mono_note_range);
+    // Rescale the hue proportionally across the enabled MIDI range filters:
+    // the pitch rises gradually from the low to the high bound of the
+    // allowed range as the hue increases.
+    let effective_note = rescale_into_range(shifted_hue / 360.0, note_range_bounds, &synth.mono_note_range);
 
     let in_range = brightness_level >= synth.brightness_min
         && brightness_level <= synth.brightness_max;
@@ -155,8 +157,10 @@ fn process_polyphonic(
     for i in 0..3 {
         let enabled = synth.channel_enabled[i];
         let raw_note = channel_to_midi_note(channel_values[i]);
-        // Fold the channel-derived note into this voice's enabled range filters
-        let effective_note = fold_note_into_range(raw_note, note_range_bounds, &synth.voice_note_ranges[i]);
+        // Rescale the channel value proportionally across this voice's
+        // enabled range filters: the pitch rises gradually from the low to
+        // the high bound of the allowed range as the channel value increases.
+        let effective_note = rescale_into_range(channel_values[i] as f32 / 255.0, note_range_bounds, &synth.voice_note_ranges[i]);
         let voice = &mut synth.poly_voices[i];
 
         let in_range = enabled && global_in_range;
@@ -432,37 +436,47 @@ fn active_note_ranges(bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> Vec<(u8, u
         .collect()
 }
 
-/// Folds a note into the allowed sub-ranges by octaves (a note outside the
-/// allowed range is transposed up or down by whole octaves until it lands
-/// in one of them, preserving its pitch class). With no sub-range enabled
-/// the full MIDI range (0–127) is allowed and the note is unchanged.
-fn fold_note_into_range(note: u8, bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> u8 {
-    let allowed = active_note_ranges(bounds, toggles);
+/// Rescales a normalized value (0.0–1.0) proportionally across the enabled
+/// note-range sub-ranges: the pitch rises gradually and continuously from
+/// the low bound of the first enabled sub-range to the high bound of the
+/// last one as the value increases. With several disjoint sub-ranges
+/// enabled, the sweep walks through each of them in order, skipping the
+/// gaps. With no sub-range enabled, the full MIDI range (0–127) is used.
+fn rescale_into_range(normalized: f32, bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> u8 {
+    let mut allowed = active_note_ranges(bounds, toggles);
     if allowed.is_empty() {
-        return note;
-    }
-    if allowed.iter().any(|&(lo, hi)| note >= lo && note <= hi) {
-        return note;
+        return (normalized.clamp(0.0, 1.0) * 127.0).round() as u8;
     }
 
-    // The default sub-ranges each span more than one octave (27, 24 and 37
-    // semitones), so a valid fold always exists; user-defined bounds
-    // narrower than an octave may have none, in which case the note is
-    // left unchanged. Try both directions by increasing octave distance,
-    // folding down first.
-    for octave in 1..=10i32 {
-        for &sign in &[-1i32, 1] {
-            let candidate = note as i32 + sign * 12 * octave;
-            if (0..=127).contains(&candidate)
-                && allowed
-                    .iter()
-                    .any(|&(lo, hi)| candidate >= lo as i32 && candidate <= hi as i32)
-            {
-                return candidate as u8;
+    // Sort the sub-ranges and merge the overlapping/adjacent ones so the
+    // union is walked exactly once, in ascending order.
+    allowed.sort_unstable();
+    let mut merged: Vec<(u8, u8)> = Vec::with_capacity(allowed.len());
+    for &(lo, hi) in &allowed {
+        match merged.last_mut() {
+            Some(last) if lo as i32 <= last.1 as i32 + 1 => {
+                if hi > last.1 {
+                    last.1 = hi;
+                }
             }
+            _ => merged.push((lo, hi)),
         }
     }
-    note
+
+    // Index of the note within the concatenated playable notes (inclusive bounds)
+    let total: i32 = merged
+        .iter()
+        .map(|&(lo, hi)| hi as i32 - lo as i32 + 1)
+        .sum();
+    let mut index = (normalized.clamp(0.0, 1.0) * (total - 1) as f32).round() as i32;
+    for &(lo, hi) in &merged {
+        let span = hi as i32 - lo as i32 + 1;
+        if index < span {
+            return (lo as i32 + index) as u8;
+        }
+        index -= span;
+    }
+    merged[merged.len() - 1].1
 }
 
 pub struct MetronomeState {
@@ -659,4 +673,67 @@ pub fn step_synth(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BOUNDS: [(u8, u8); 3] = [(21, 47), (48, 71), (72, 108)];
+
+    #[test]
+    fn no_range_enabled_uses_full_midi_range() {
+        assert_eq!(rescale_into_range(0.0, &BOUNDS, &[false; 3]), 0);
+        assert_eq!(rescale_into_range(0.5, &BOUNDS, &[false; 3]), 64);
+        assert_eq!(rescale_into_range(1.0, &BOUNDS, &[false; 3]), 127);
+    }
+
+    #[test]
+    fn single_range_rises_gradually_from_low_to_high() {
+        // Medium only [48, 71]: hue 0° -> 48, hue 360° -> 71, no jumps
+        let toggles = [false, true, false];
+        assert_eq!(rescale_into_range(0.0, &BOUNDS, &toggles), 48);
+        assert_eq!(rescale_into_range(1.0, &BOUNDS, &toggles), 71);
+        let notes: Vec<u8> = (0..=100)
+            .map(|i| rescale_into_range(i as f32 / 100.0, &BOUNDS, &toggles))
+            .collect();
+        for w in notes.windows(2) {
+            let step = w[1] as i32 - w[0] as i32;
+            assert!(step == 0 || step == 1, "expected a gradual rise, got {w:?}");
+        }
+    }
+
+    #[test]
+    fn two_ranges_skip_the_gap_and_stay_monotonic() {
+        // Bass [21, 47] + treble [72, 108]: the sweep climbs the bass range
+        // then the treble range, never landing in the 48–71 gap
+        let toggles = [true, false, true];
+        assert_eq!(rescale_into_range(0.0, &BOUNDS, &toggles), 21);
+        assert_eq!(rescale_into_range(1.0, &BOUNDS, &toggles), 108);
+        let notes: Vec<u8> = (0..=200)
+            .map(|i| rescale_into_range(i as f32 / 200.0, &BOUNDS, &toggles))
+            .collect();
+        for w in notes.windows(2) {
+            assert!(w[1] >= w[0], "expected a monotonic rise, got {w:?}");
+            assert!(!(48..=71).contains(&w[1]), "note {w:?} landed in the disabled gap");
+        }
+    }
+
+    #[test]
+    fn overlapping_ranges_are_merged() {
+        // Bass extended up to 60 overlaps the medium range: no note is
+        // double-counted, the sweep stays continuous
+        let bounds = [(21, 60), (48, 71), (72, 108)];
+        let toggles = [true, true, false];
+        assert_eq!(rescale_into_range(0.0, &bounds, &toggles), 21);
+        assert_eq!(rescale_into_range(1.0, &bounds, &toggles), 71);
+        assert_eq!(rescale_into_range(0.5, &bounds, &toggles), 46);
+    }
+
+    #[test]
+    fn clamps_out_of_bounds_values() {
+        let toggles = [true, false, false];
+        assert_eq!(rescale_into_range(-1.0, &BOUNDS, &toggles), 21);
+        assert_eq!(rescale_into_range(2.0, &BOUNDS, &toggles), 47);
+    }
 }
