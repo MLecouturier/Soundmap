@@ -418,13 +418,20 @@ function clearOverlay() {
     synthCursors.clear();
 }
 
-// ---------- Mouse-based rectangular zone selection ----------
-// Only one synth can be in zone-drawing mode at a time. While the mode is
-// active, each rectangle dragged on the image either adds a zone (when it
-// overlaps no existing zone) or removes pixels from the existing zones
-// (when it overlaps one, even partially).
-let zonePickState = null; // { id, btn } while the drawing mode is armed
-let zoneDrag = null;      // { id, start, cur } while dragging
+// ---------- Mouse-based zone selection ----------
+// Only one synth can be in zone-drawing mode at a time. Two modes:
+// - rect:  each rectangle dragged on the image either adds a zone (when
+//          it overlaps no existing zone) or removes pixels from the
+//          existing zones (when it overlaps one, even partially).
+// - lasso: free-hand closed shape. Every pixel inside the traced polygon
+//          (boundary included) toggles: unselected becomes selected,
+//          selected becomes deselected — except the pixels of the zone
+//          under the playhead, which never lose their selection while
+//          the synth is playing. Releasing the button closes the shape
+//          with a straight line back to the start point.
+let zonePickState = null; // { id, btn, mode } while the drawing mode is armed
+let zoneDrag = null;      // { id, start, cur } while dragging a rectangle
+let lassoDrag = null;    // { id, points: [{x, y} image coords], start: {col, row} } while drawing a lasso
 
 // Do two grid rectangles overlap (even partially)?
 function rectsOverlap(a, b) {
@@ -494,12 +501,13 @@ function cellFromClientPoint(clientX, clientY) {
     return { col, row };
 }
 
-function startZonePicking(id, btn) {
-    // Cancel any drawing mode already active on another synth
-    if (zonePickState && zonePickState.id !== id) {
+function startZonePicking(id, btn, mode = 'rect') {
+    // Cancel any drawing mode already active on another synth (or in
+    // another mode on the same one)
+    if (zonePickState && (zonePickState.id !== id || zonePickState.mode !== mode)) {
         cancelZonePicking();
     }
-    zonePickState = { id, btn };
+    zonePickState = { id, btn, mode };
     btn.classList.add('active');
     pixelOverlay.classList.add('picking');
     // Editing blind is confusing: arming the picking mode reveals this
@@ -519,10 +527,10 @@ function cancelZonePicking() {
     zonePickState.btn.classList.remove('active');
     pixelOverlay.classList.remove('picking');
     zonePickState = null;
-    if (zoneDrag) {
-        zoneDrag = null;
-        redrawAllHighlights();
-    }
+    const hadDrag = !!zoneDrag || !!lassoDrag;
+    zoneDrag = null;
+    lassoDrag = null;
+    if (hadDrag) redrawAllHighlights();
 }
 
 window.addEventListener('keydown', (e) => {
@@ -548,7 +556,12 @@ pixelOverlay.addEventListener('mousedown', (e) => {
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
     e.preventDefault(); // prevents image dragging during selection
-    zoneDrag = { id: zonePickState.id, start: cell, cur: cell };
+    if (zonePickState.mode === 'lasso') {
+        const pt = imagePointFromClient(e.clientX, e.clientY);
+        lassoDrag = { id: zonePickState.id, points: [pt], start: cell };
+    } else {
+        zoneDrag = { id: zonePickState.id, start: cell, cur: cell };
+    }
 });
 
 pixelOverlay.addEventListener('mousemove', (e) => {
@@ -565,7 +578,18 @@ pixelOverlay.addEventListener('mousemove', (e) => {
         drawCropOverlay();
         return;
     }
-    if (!zoneDrag) return;
+    if (!zoneDrag && !lassoDrag) return;
+    if (lassoDrag) {
+        const pt = imagePointFromClient(e.clientX, e.clientY);
+        // Ignore duplicate consecutive points (same mousemove batch)
+        const last = lassoDrag.points[lassoDrag.points.length - 1];
+        if (!last || pt.x !== last.x || pt.y !== last.y) {
+            lassoDrag.points.push(pt);
+            redrawAllHighlights();
+            drawLassoPreview();
+        }
+        return;
+    }
     const cell = cellFromClientPoint(e.clientX, e.clientY);
     if (!cell) return;
     zoneDrag.cur = cell;
@@ -585,7 +609,18 @@ window.addEventListener('mouseup', (e) => {
         drawCropOverlay();
         return;
     }
-    if (!zoneDrag) return;
+    if (!zoneDrag && !lassoDrag) return;
+    if (lassoDrag) {
+        const { id, points, start } = lassoDrag;
+        lassoDrag = null;
+        // Close the shape with a straight line back to the start, then
+        // toggle every enclosed pixel (boundary included)
+        if (points.length > 0) {
+            const toggled = lassoTogglePixels(id, points, start);
+            if (toggled) redrawAllHighlights();
+        }
+        return;
+    }
     const { id } = zoneDrag;
     const rect = zoneDragRect();
     // Cancel an erasing drag touching the locked zone (the one under the
@@ -631,6 +666,204 @@ function drawZonePreview() {
     ctx.restore();
 }
 
+// ---------- Lasso (free-hand zone selection) ----------
+
+// Continuous image coordinates (in grid cells, fractional) of a mouse
+// event, so the traced shape isn't quantized to cell corners.
+function imagePointFromClient(clientX, clientY) {
+    const layout = getImageLayout();
+    const rect = pixelOverlay.getBoundingClientRect();
+    return {
+        x: (clientX - rect.left - layout.offsetX) / layout.cellW,
+        y: (clientY - rect.top - layout.offsetY) / layout.cellH,
+    };
+}
+
+// Even-odd point-in-polygon test on the closed shape.
+function pointInPolygon(px, py, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        if ((yi > py) !== (yj > py) &&
+            px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+// Cells whose center the segment (x0,y0)→(x1,y1) passes through, added
+// to `out` as "col,row" keys (Bresenham over cell centers' grid, so the
+// traced boundary counts as enclosed).
+function addSegmentCells(x0, y0, x1, y1, out) {
+    x0 = Math.floor(x0); y0 = Math.floor(y0);
+    x1 = Math.floor(x1); y1 = Math.floor(y1);
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    while (true) {
+        out.add(`${x0},${y0}`);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x0 += sx; }
+        if (e2 <  dx) { err += dx; y0 += sy; }
+    }
+}
+
+// Live preview of the lasso shape: the traced polygon, closed back to
+// its start point, filled with the synth's color.
+function drawLassoPreview() {
+    if (!lassoDrag || lassoDrag.points.length < 1) return;
+    const layout = getImageLayout();
+    if (!layout) return;
+    const { offsetX, offsetY, cellW, cellH } = layout;
+    const ctx = pixelOverlay.getContext('2d');
+    ctx.save();
+    ctx.beginPath();
+    lassoDrag.points.forEach((pt, i) => {
+        const px = offsetX + pt.x * cellW;
+        const py = offsetY + pt.y * cellH;
+        if (i === 0) ctx.moveTo(px, py);
+        else          ctx.lineTo(px, py);
+    });
+    ctx.closePath(); // straight line back to the start point
+    ctx.fillStyle = synthColors.get(lassoDrag.id) || '#ffffff';
+    ctx.globalAlpha = 0.35;
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+}
+
+// Computes every pixel enclosed by the lasso polygon (boundary included,
+// closure line from the release point back to the start) and toggles it:
+// unselected becomes selected, selected becomes deselected. Pixels of
+// the zone under the playhead (while the synth plays) are exempt from
+// deselection. Returns true when the selection changed.
+function lassoTogglePixels(id, points, start) {
+    const hi = synthHighlights.get(id);
+    if (!hi) return false;
+
+    // Closed polygon in continuous coordinates; the closing segment is
+    // the straight line back to the start cell's center.
+    const poly = points.slice();
+    poly.push({ x: start.col + 0.5, y: start.row + 0.5 });
+    // Single point (simple click): degenerate polygon, nothing enclosed —
+    // handled below by the boundary-only path.
+    if (points.length === 1) {
+        poly.push({ x: points[0].x, y: points[0].y + 0.01 });
+    }
+
+    // Bounding box (clamped to the grid): only cells inside can toggle
+    const xs = poly.map(p => p.x);
+    const ys = poly.map(p => p.y);
+    const minCol = Math.max(0, Math.floor(Math.min(...xs)));
+    const maxCol = Math.min(gridW - 1, Math.ceil(Math.max(...xs)));
+    const minRow = Math.max(0, Math.floor(Math.min(...ys)));
+    const maxRow = Math.min(gridH - 1, Math.ceil(Math.max(...ys)));
+
+    // Enclosed cells = polygon interior (cell centers) ∪ boundary cells
+    const enclosed = new Set();
+    for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+            if (pointInPolygon(col + 0.5, row + 0.5, poly)) {
+                enclosed.add(`${col},${row}`);
+            }
+        }
+    }
+    for (let i = 1; i < poly.length; i++) {
+        addSegmentCells(poly[i - 1].x, poly[i - 1].y, poly[i].x, poly[i].y, enclosed);
+    }
+
+    if (enclosed.size === 0) return false;
+
+    // Zone under the playhead: its pixels never lose their selection
+    const locked = zoneAtPixel(id, synthCursors.get(id));
+
+    // Current selection as a cell set
+    const selected = new Set();
+    for (const z of hi.zones) {
+        for (let row = z.y; row < z.y + z.h; row++) {
+            for (let col = z.x; col < z.x + z.w; col++) {
+                selected.add(`${col},${row}`);
+            }
+        }
+    }
+
+    // Toggle each enclosed pixel (XOR), skipping locked pixels that would
+    // be deselected
+    let changed = false;
+    for (const key of enclosed) {
+        const isSelected = selected.has(key);
+        if (isSelected) {
+            const [col, row] = key.split(',').map(Number);
+            const inLocked = locked &&
+                col >= locked.x && col < locked.x + locked.w &&
+                row >= locked.y && row < locked.y + locked.h;
+            if (inLocked) continue; // exempt from deselection
+            selected.delete(key);
+            changed = true;
+        } else {
+            selected.add(key);
+            changed = true;
+        }
+    }
+    if (!changed) return false;
+
+    // Rebuild the selection as merged rectangles
+    hi.zones = lassoCellsToZones(selected);
+    sendSynthZones(id);
+    updateZonesLabel(id);
+    return true;
+}
+
+// Converts a cell set into grid rectangles: contiguous horizontal runs
+// are merged into one rect each, then runs aligned vertically (same x,
+// same width, adjacent rows) merge further. Keeps the zone list compact
+// while the backend only understands rectangles.
+function lassoCellsToZones(cells) {
+    // Row → sorted columns
+    const rows = new Map();
+    for (const key of cells) {
+        const [col, row] = key.split(',').map(Number);
+        if (!rows.has(row)) rows.set(row, []);
+        rows.get(row).push(col);
+    }
+    // Horizontal runs
+    const runs = [];
+    for (const [row, cols] of rows) {
+        cols.sort((a, b) => a - b);
+        let start = cols[0];
+        let prev = cols[0];
+        for (let i = 1; i <= cols.length; i++) {
+            if (cols[i] !== prev + 1) {
+                runs.push({ x: start, y: row, w: prev - start + 1, h: 1 });
+                start = cols[i];
+            }
+            prev = cols[i];
+        }
+    }
+    // Vertical merge: same x and width, consecutive rows
+    runs.sort((a, b) => a.x - b.x || a.w - b.w || a.y - b.y);
+    const zones = [];
+    for (const run of runs) {
+        const top = zones[zones.length - 1];
+        if (top &&
+            top.x === run.x && top.w === run.w && top.y + top.h === run.y) {
+            top.h += run.h;
+        } else {
+            zones.push({ ...run });
+        }
+    }
+    return zones;
+}
+
+// Adds a zone rectangle (or single cell) to a synth's selection
 function addSynthZone(id, zone) {
     const hi = synthHighlights.get(id);
     if (!hi) return;
@@ -754,6 +987,69 @@ function getImageLayout() {
     };
 }
 
+// Refreshes the stored brightness bounds of a synth from its sliders and
+// redraws the highlights: muted-pixel marks depend on the bounds.
+function updateBrightnessBounds(id) {
+    const el = synthListBody.querySelector(`[data-synth-id="${id}"]`);
+    if (!el) return;
+    const bounds = synthBrightnessBounds.get(id);
+    if (!bounds) return;
+    bounds.min = Number(el.querySelector('.brightness-start').value);
+    bounds.max = Number(el.querySelector('.brightness-end').value);
+    redrawAllHighlights();
+}
+
+// Mute rest glyph, drawn on every pixel of a synth's zones whose
+// brightness falls outside the [min, max] threshold. Rendered with the
+// Noto Music font (self-hosted, loaded on demand via unicode-range).
+const MUTE_GLYPH = '𝆝';
+
+// Draws the single outline of a cell set: every cell edge that doesn't
+// touch another selected cell is traced, producing one closed contour
+// per connected component — the irregular shape of the lasso instead of
+// the seams of the internal rectangles. Edge segments are merged into
+// runs (horizontal and vertical) to keep the number of path operations
+// low on large selections.
+function strokeCellOutline(ctx, cellSet, offsetX, offsetY, cellW, cellH) {
+    ctx.beginPath();
+    // Horizontal edges: between (col,row) and its top neighbor
+    for (const key of cellSet) {
+        const [col, row] = key.split(',').map(Number);
+        const x = offsetX + col * cellW;
+        const y = offsetY + row * cellH;
+        if (!cellSet.has(`${col},${row - 1}`)) {
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + cellW, y);
+        }
+        if (!cellSet.has(`${col},${row + 1}`)) {
+            ctx.moveTo(x, y + cellH);
+            ctx.lineTo(x + cellW, y + cellH);
+        }
+        if (!cellSet.has(`${col - 1},${row}`)) {
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + cellH);
+        }
+        if (!cellSet.has(`${col + 1},${row}`)) {
+            ctx.moveTo(x + cellW, y);
+            ctx.lineTo(x + cellW, y + cellH);
+        }
+    }
+    ctx.stroke();
+}
+
+// Builds the set of selected cells of a synth from its zone rectangles.
+function selectedCellSet(hi) {
+    const cells = new Set();
+    for (const z of hi.zones) {
+        for (let row = z.y; row < z.y + z.h; row++) {
+            for (let col = z.x; col < z.x + z.w; col++) {
+                cells.add(`${col},${row}`);
+            }
+        }
+    }
+    return cells;
+}
+
 function drawRangeHighlight(synthId) {
     const hi = synthHighlights.get(synthId);
     if (!hi || !hi.visible) return;
@@ -765,25 +1061,63 @@ function drawRangeHighlight(synthId) {
 
     const ctx = pixelOverlay.getContext('2d');
     ctx.save();
+
+    // Light fill of every zone rect: the image stays readable underneath
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = color;
     for (const z of hi.zones) {
-        const x = offsetX + z.x * cellW;
-        const y = offsetY + z.y * cellH;
-        const w = z.w * cellW;
-        const h = z.h * cellH;
+        ctx.fillRect(
+            offsetX + z.x * cellW,
+            offsetY + z.y * cellH,
+            z.w * cellW,
+            z.h * cellH
+        );
+    }
 
-        // Light fill: the image stays readable underneath
-        ctx.globalAlpha = 0.3;
-        ctx.fillStyle   = color;
-        ctx.fillRect(x, y, w, h);
-
-        // Full-opacity outline, inset so it stays inside the zone:
-        // clearly visible on any image content. The inset shrinks on
-        // tiny zones (sub-pixel cells) to keep the rect positive.
+    // Single outline of the selection's union: one closed contour per
+    // connected component, showing the actual shape (lasso included)
+    // instead of the seams of the internal rectangles.
+    const cells = selectedCellSet(hi);
+    if (cells.size > 0) {
         ctx.globalAlpha = 1;
         ctx.strokeStyle = color;
-        ctx.lineWidth   = 1.5;
-        const inset = Math.min(0.75, w / 2, h / 2);
-        ctx.strokeRect(x + inset, y + inset, w - 2 * inset, h - 2 * inset);
+        ctx.lineWidth = 1.5;
+        strokeCellOutline(ctx, cells, offsetX, offsetY, cellW, cellH);
+    }
+
+    // Mute marks: every zone pixel outside the brightness window gets a
+    // semi-transparent black veil (readable at any cell size), topped with
+    // the rest glyph in the synth's color when cells are large enough for
+    // it to read (below ~9px it would turn into a colored blur).
+    const bounds = synthBrightnessBounds.get(synthId);
+    if (bounds && processedPixels && (bounds.min > 0 || bounds.max < 127)) {
+        const { width: pw, rgba } = processedPixels;
+        const canDrawGlyphs = cellH >= 9 && cellW >= 9;
+        const fontSize = Math.min(cellW, cellH) * 0.9;
+        for (const z of hi.zones) {
+            for (let row = z.y; row < z.y + z.h; row++) {
+                for (let col = z.x; col < z.x + z.w; col++) {
+                    const i = (row * pw + col) * 4;
+                    if (i + 2 >= rgba.length) continue; // torn zone edge
+                    const luma = 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
+                    const level = Math.round(luma / 255 * 127);
+                    if (level >= bounds.min && level <= bounds.max) continue;
+                    const x = offsetX + col * cellW;
+                    const y = offsetY + row * cellH;
+                    ctx.globalAlpha = 0.55;
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(x, y, cellW, cellH);
+                    if (canDrawGlyphs) {
+                        ctx.globalAlpha = 0.9;
+                        ctx.fillStyle = color;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.font = `${fontSize}px "Noto Music"`;
+                        ctx.fillText(MUTE_GLYPH, x + cellW / 2, y + cellH / 2);
+                    }
+                }
+            }
+        }
     }
     ctx.restore();
 }
@@ -897,6 +1231,11 @@ const synthColors = new Map();
 
 // Map id → { visible: bool, start: number, end: number }
 const synthHighlights = new Map();
+
+// Brightness bounds per synth (id → {min, max}), mirroring the backend's
+// threshold so the UI can mark pixels outside the range as muted without
+// asking the backend for each cell.
+const synthBrightnessBounds = new Map();
 
 const SLIDER_STEPS = 1000;
 const MIN_CELLS    = 2;
@@ -1740,6 +2079,10 @@ function applySynthConfig(el, cfg) {
     el.querySelector('.brightness-end').value = cfg.brightness_max;
     el.querySelector('.brightness-start-val').textContent = cfg.brightness_min;
     el.querySelector('.brightness-end-val').textContent = cfg.brightness_max;
+    synthBrightnessBounds.set(Number(el.dataset.synthId), {
+        min: Number(cfg.brightness_min),
+        max: Number(cfg.brightness_max),
+    });
     // Velocity range
     el.querySelector('.velocity-min').value = cfg.velocity_min;
     el.querySelector('.velocity-max').value = cfg.velocity_max;
@@ -1846,11 +2189,14 @@ function createSynthElement(id, cfg = null) {
                     <button class="synth-add-zone-btn icon-btn" data-i18n-title="synth.addZone">
                         <span class="material-symbols-outlined" aria-hidden="true">select</span>
                     </button>
+                    <button class="synth-lasso-add-zone-btn icon-btn" data-i18n-title="synth.addZoneLasso">
+                        <span class="material-symbols-outlined" aria-hidden="true">lasso_select</span>
+                    </button>
                     <button class="synth-select-all-btn icon-btn" data-i18n-title="synth.selectAllZones">
                         <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
                     </button>
                     <button class="synth-clear-zones-btn icon-btn" data-i18n-title="synth.clearZones">
-                        <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">remove_selection</span>
                     </button>
                     <div class="flex-filler"></div>
                     
@@ -1981,12 +2327,17 @@ function createSynthElement(id, cfg = null) {
                 <div class="synth-section">
                     <div class="synth-section-header">
                         <span class="synth-section-title" data-i18n="synth.velocityRange" data-i18n-title="synth.velocityRange"></span>
-                        <em class="synth-section-value"><span class="velocity-min-val">0</span> – <span class="velocity-max-val">127</span></em>
+                        <em class="synth-section-value"><span class="velocity-min-val">0</span> – <span class="velocity-max-val">127</span></em>                        
                     </div>
+                    <div class="synth-section-header">
                     <div class="synth-section-body synth-range-track">
                         <div class="synth-range-fill"></div>
                         <input type="range" class="synth-range-input velocity-min" min="0" max="126" value="0" step="1" />
                         <input type="range" class="synth-range-input velocity-max" min="0" max="127" value="127" step="1" />
+                    </div>
+                    <button class="synth-relative-velocity-range icon-btn active" data-i18n-title="">
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_or_edge</span>
+                    </button>
                     </div>
                 </div>
 
@@ -2291,6 +2642,10 @@ function createSynthElement(id, cfg = null) {
 
     // Initialize the highlight state (visible by default, nothing selected)
     synthHighlights.set(id, { visible: true, zones: [] });
+    synthBrightnessBounds.set(id, {
+        min: Number(cfg?.brightness_min ?? 0),
+        max: Number(cfg?.brightness_max ?? 127),
+    });
     updateZonesLabel(id);
 
     // Eye button
@@ -2313,6 +2668,16 @@ function createSynthElement(id, cfg = null) {
             cancelZonePicking();
         } else {
             startZonePicking(id, btn);
+        }
+    });
+
+    // Lasso: arm/cancel the free-hand selection mode on the image
+    el.querySelector('.synth-lasso-add-zone-btn').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        if (zonePickState && zonePickState.id === id && zonePickState.mode === 'lasso') {
+            cancelZonePicking();
+        } else {
+            startZonePicking(id, btn, 'lasso');
         }
     });
 
@@ -2408,6 +2773,7 @@ function initBrightnessRange(id, el) {
         startVal.textContent = startInput.value;
         updateFill();
         sendRange();
+        updateBrightnessBounds(id);
     });
 
     endInput.addEventListener('input', () => {
@@ -2415,6 +2781,7 @@ function initBrightnessRange(id, el) {
         endVal.textContent = endInput.value;
         updateFill();
         sendRange();
+        updateBrightnessBounds(id);
     });
 
     updateFill();
@@ -2599,6 +2966,7 @@ async function onSynthRemoveClick(id, el) {
     synthColors.delete(id);
     synthCursors.delete(id);
     synthHighlights.delete(id);
+    synthBrightnessBounds.delete(id);
     synthNames.delete(id);
     el.remove();
     redrawAllHighlights();

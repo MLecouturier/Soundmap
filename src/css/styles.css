@@ -801,6 +801,7 @@ select:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  flex-grow: 1;
 }
 .synth-block .synth-body .synth-section .synth-section-body select {
   height: 1.75rem;
@@ -1029,6 +1030,4 @@ select:disabled {
 ::-webkit-scrollbar-thumb {
   background-color: #444;
   border-radius: 0.25rem;
-}
-
-/*# sourceMappingURL=styles.css.map */
+}/*# sourceMappingURL=styles.css.map */
