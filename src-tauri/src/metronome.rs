@@ -441,6 +441,28 @@ fn step_synth_once(
         }
     }
 
+    // Pizzicato: with the sustain disabled, release the notes right
+    // after their articulation — the Note Off is sent immediately after
+    // the Note On, and the instrument's natural decay (its release
+    // phase) shapes the tail of the note instead of it holding for the
+    // full duration. The playback rhythm is unchanged: the note lengths
+    // still drive when the next pixel is played. Clearing note_is_on
+    // also makes every following pixel re-articulate, so a run of
+    // identical pixels becomes a series of plucks rather than one
+    // held note.
+    if !synth.note_sustain {
+        if synth.note_is_on {
+            midi.note_off(synth.midi_port, synth.channel, synth.note);
+            synth.note_is_on = false;
+        }
+        for voice in synth.poly_voices.iter_mut() {
+            if voice.note_is_on {
+                midi.note_off(synth.midi_port, synth.channel, voice.note);
+                voice.note_is_on = false;
+            }
+        }
+    }
+
     let _ = app.emit("synth-pixel-tick", payload);
 
     // Then advance the playhead for the next step, following the current

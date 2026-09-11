@@ -2270,6 +2270,9 @@ function applySynthConfig(el, cfg) {
     });
     el.querySelector('.synth-reverse-note-length').classList.toggle('active', !!cfg.note_length_reversed);
     el.querySelector('.synth-note-length-section').classList.toggle('reversed', !!cfg.note_length_reversed);
+    // Sustain defaults to true when absent (sessions saved before the
+    // pizzicato option existed)
+    el.querySelector('.synth-note-sustain').classList.toggle('active', cfg.note_sustain !== false);
     // Note ranges (mono + one per voice)
     const setRange = (group, toggles) => ['bass', 'medium', 'treble'].forEach((kind, i) => {
         group.querySelector(`.synth-${kind}`).classList.toggle('active', !!(toggles && toggles[i]));
@@ -2812,6 +2815,19 @@ function createSynthElement(id, cfg = null) {
         el.querySelector('.synth-note-length-section').classList.toggle('reversed', reversed);
         invoke('set_synth_note_length_reversed', { id, reversed })
             .catch(err => console.error('Error in set_synth_note_length_reversed:', err));
+    });
+
+    // ---- Note articulation: sustained vs pizzicato ----
+    // Active = each note holds its full length (the Note Off arrives with
+    // the next note). Inactive = pizzicato: the Note Off is sent right
+    // after the Note On and the instrument's natural decay shapes the
+    // tail. The reading rhythm (note lengths) is unchanged.
+    el.querySelector('.synth-note-sustain').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const sustain = !btn.classList.contains('active');
+        btn.classList.toggle('active', sustain);
+        invoke('set_synth_note_sustain', { id, sustain })
+            .catch(err => console.error('Error in set_synth_note_sustain:', err));
     });
 
     // ---- R/G/B channel toggles (polyphonic mode) ----

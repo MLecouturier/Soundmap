@@ -349,6 +349,7 @@ mod tests {
         synth.channel_enabled = [true, false, true];
         synth.note_lengths = vec![NoteLength::Whole, NoteLength::Eighth];
         synth.note_length_reversed = true;
+        synth.note_sustain = false;
         synth.mono_note_range = [true, false, true];
         synth.voice_note_ranges = [[true, false, false], [false, true, false], [false, false, true]];
 
@@ -393,6 +394,7 @@ mod tests {
         assert_eq!(s.channel_enabled, synth.channel_enabled);
         assert_eq!(s.note_lengths, synth.note_lengths);
         assert_eq!(s.note_length_reversed, synth.note_length_reversed);
+        assert_eq!(s.note_sustain, synth.note_sustain);
         assert_eq!(s.mono_note_range, synth.mono_note_range);
         assert_eq!(s.voice_note_ranges, synth.voice_note_ranges);
     }

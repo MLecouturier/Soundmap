@@ -96,6 +96,7 @@ pub struct SynthTemplate {
     pub channel_enabled: [bool; 3],
     pub note_lengths: Vec<NoteLength>,
     pub note_length_reversed: bool,
+    pub note_sustain: bool,
     pub mono_note_range: [bool; 3],
     pub voice_note_ranges: [[bool; 3]; 3],
 }
@@ -128,6 +129,7 @@ impl SynthTemplate {
             channel_enabled: synth.channel_enabled,
             note_lengths: synth.note_lengths.clone(),
             note_length_reversed: synth.note_length_reversed,
+            note_sustain: synth.note_sustain,
             mono_note_range: synth.mono_note_range,
             voice_note_ranges: synth.voice_note_ranges,
         }
@@ -156,6 +158,7 @@ impl SynthTemplate {
             synth.note_lengths = self.note_lengths.clone();
         }
         synth.note_length_reversed = self.note_length_reversed;
+        synth.note_sustain = self.note_sustain;
         synth.mono_note_range = self.mono_note_range;
         synth.voice_note_ranges = self.voice_note_ranges;
         synth

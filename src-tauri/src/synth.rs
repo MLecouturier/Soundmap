@@ -421,6 +421,41 @@ pub fn set_synth_note_length_reversed(
     }
 }
 
+/// Toggles the note articulation: sustained (each note holds its full
+/// length, the Note Off arriving with the next note) or pizzicato (the
+/// Note Off is sent right after the Note On, the instrument's natural
+/// decay shaping the tail). Disabling the sustain immediately releases
+/// any currently sounding note, so a note already holding under the
+/// previous setting doesn't keep ringing until the next step.
+#[tauri::command]
+pub fn set_synth_note_sustain(
+    id: u32,
+    sustain: bool,
+    state: State<SynthState>,
+    midi_state: State<MidiState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            if synth.note_sustain && !sustain {
+                if synth.note_is_on {
+                    midi_state.note_off(synth.midi_port, synth.channel, synth.note);
+                    synth.note_is_on = false;
+                }
+                for voice in synth.poly_voices.iter_mut() {
+                    if voice.note_is_on {
+                        midi_state.note_off(synth.midi_port, synth.channel, voice.note);
+                        voice.note_is_on = false;
+                    }
+                }
+            }
+            synth.note_sustain = sustain;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
 /// Sets the MIDI note range filters: one triplet of toggles (bass, medium,
 /// treble) for the monophonic note, and one per R/G/B voice in polyphonic
 /// mode. All toggles off = full 0–127 range.

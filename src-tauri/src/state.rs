@@ -139,6 +139,11 @@ pub struct Synth {
     // --- Brightness-driven note lengths ---
     pub note_lengths: Vec<NoteLength>, // enabled lengths; empty = all quarter notes
     pub note_length_reversed: bool,    // flip the brightness→length mapping direction
+    pub note_sustain: bool,            // true: notes hold their full length (the Note
+                                       // Off arrives with the next note); false:
+                                       // pizzicato — the Note Off is sent right
+                                       // after the Note On and the instrument's
+                                       // natural decay (release phase) shapes the tail
     pub note_generation: u32,          // bumped on each note articulation, so stale
                                        // delayed Note Offs can cancel themselves
 
@@ -183,6 +188,7 @@ impl Synth {
 
             note_lengths: vec![NoteLength::Quarter],
             note_length_reversed: false,
+            note_sustain: true,
             note_generation: 0,
 
             mono_note_range: [false, false, false],
