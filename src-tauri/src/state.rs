@@ -46,6 +46,25 @@ pub enum ReadingDirection {
     BottomToTop,
 }
 
+/// Sound currently selected on a MIDI channel, as heard on the MIDI input
+/// or sent by the app itself. Banks are optional: we only know them when
+/// a Bank Select has actually been received (a device's power-on bank
+/// can't be queried over MIDI).
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
+pub struct ProgramState {
+    pub bank_msb: Option<u8>, // CC 0
+    pub bank_lsb: Option<u8>, // CC 32
+    pub program: Option<u8>,  // Program Change, 0–127
+}
+
+impl ProgramState {
+    /// True once a Program Change has been learned or sent (banks alone
+    /// don't identify a sound).
+    pub fn is_known(&self) -> bool {
+        self.program.is_some()
+    }
+}
+
 /// State of an individual voice in polyphonic mode (one per R/G/B channel).
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct ChannelVoice {
@@ -106,7 +125,8 @@ pub struct Synth {
     pub note_is_on: bool,      // true if a MIDI note is currently sounding (sustain)
     pub velocity: u8,          // current MIDI velocity, derived from the pixel's brightness (1–127)
     pub velocity_min: u8,      // floor of the velocity range (0–126): brightness is
-                               // mapped between this value and 127 (maximum velocity)
+                               // mapped between this value and velocity_max
+    pub velocity_max: u8,     // ceiling of the velocity range (1–127)
 
     // --- Pixel-to-note translation modes ---
     pub mode: SynthMode,
@@ -151,6 +171,7 @@ impl Synth {
             note_is_on: false,
             velocity: 100,
             velocity_min: 0,
+            velocity_max: 127,
 
             mode: SynthMode::Monophonic,
             hue_shift: 0,
@@ -187,12 +208,22 @@ impl Default for SynthState {
 /// opened lazily, on first use by a synthesizer.
 pub struct MidiState {
     pub connections: Mutex<HashMap<usize, MidiOutputConnection>>,
+    /// Last known program per (output port, channel), learned from the
+    /// MIDI input or set by the app itself. Survives synth removal: it is
+    /// channel state, not synth state.
+    pub known_programs: Mutex<HashMap<(usize, u8), ProgramState>>,
+    /// Open MIDI input connections (one per input port), kept alive for
+    /// the app's lifetime so Program Change / Bank Select messages sent
+    /// by the instruments keep being tracked.
+    pub input_connections: Mutex<Vec<midir::MidiInputConnection<()>>>,
 }
 
 impl Default for MidiState {
     fn default() -> Self {
         Self {
             connections: Mutex::new(HashMap::new()),
+            known_programs: Mutex::new(HashMap::new()),
+            input_connections: Mutex::new(Vec::new()),
         }
     }
 }

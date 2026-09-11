@@ -2,7 +2,7 @@ use tauri::State;
 use crate::config::ConfigState;
 use crate::error::{err, AppError};
 use crate::metronome::remapped_cursor;
-use crate::state::{NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, ImageState, MidiState};
+use crate::state::{NoteLength, PixelZone, ProgramState, ReadingDirection, Synth, SynthMode, SynthState, ImageState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
 // (unchanged, assumed to remain above or below in this file)
@@ -203,16 +203,43 @@ pub fn set_synth_midi_port(
     }
 }
 
+/// Sends the bank (letters A–P in the UI) and program selection of the
+/// synth on its output port and channel, records it as the channel's
+/// known program, and returns the resulting state for the frontend.
+/// Every part is optional: the UI sends the full selection, `None` leaves
+/// that part untouched on the instrument.
 #[tauri::command]
-pub fn set_synth_velocity_min(
+pub fn set_synth_program(
+    id: u32,
+    program: Option<u8>,
+    bank_msb: Option<u8>,
+    bank_lsb: Option<u8>,
+    midi: State<MidiState>,
+    state: State<SynthState>,
+) -> Result<ProgramState, AppError> {
+    let (port, channel) = {
+        let synths = state.synths.lock().unwrap();
+        let synth = synths
+            .get(&id)
+            .ok_or_else(|| synth_not_found(id))?;
+        (synth.midi_port, synth.channel)
+    };
+    Ok(midi.send_program_change(port, channel, program, bank_msb, bank_lsb))
+}
+
+#[tauri::command]
+pub fn set_synth_velocity_range(
     id: u32,
     velocity_min: u8,
+    velocity_max: u8,
     state: State<SynthState>,
 ) -> Result<(), AppError> {
     let mut synths = state.synths.lock().unwrap();
     match synths.get_mut(&id) {
         Some(synth) => {
+            // Keep a usable range: min below 127, max between min and 127
             synth.velocity_min = velocity_min.min(126);
+            synth.velocity_max = velocity_max.clamp(synth.velocity_min, 127);
             Ok(())
         }
         None => Err(synth_not_found(id)),

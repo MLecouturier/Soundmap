@@ -8,7 +8,7 @@ use tauri::{AppHandle, State};
 use crate::config::SynthTemplate;
 use crate::error::{err, AppError};
 use crate::image_processing::encode_to_base64_png;
-use crate::state::{ImageState, MidiState, PixelZone, SynthState};
+use crate::state::{ImageState, MidiState, PixelZone, ProgramState, SynthState};
 
 /// Frontend-owned state passed on save: metronome tempo, image processing
 /// sliders, and the synths' display colors (in list order).
@@ -43,13 +43,17 @@ pub struct SessionImageSettings {
 
 /// A synthesizer as stored in a session file: its identity, display color,
 /// pixel zones (empty = nothing selected since version 2; in version 1 it
-/// implicitly meant the whole image), and settings (flattened SynthTemplate).
+/// implicitly meant the whole image), settings (flattened SynthTemplate),
+/// and the channel's program at save time so loading the session can
+/// reconfigure the instruments to the same sounds.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SessionSynth {
     pub id: u32,
     pub name: Option<String>,
     pub color: String,
     pub zones: Vec<PixelZone>,
+    #[serde(default)]
+    pub program: Option<ProgramState>,
     #[serde(flatten)]
     pub settings: SynthTemplate,
 }
@@ -91,6 +95,7 @@ pub async fn save_session(
     ui: SessionUi,
     image_state: State<'_, ImageState>,
     synth_state: State<'_, SynthState>,
+    midi_state: State<'_, MidiState>,
 ) -> Result<(), AppError> {
     use tauri_plugin_dialog::DialogExt;
 
@@ -121,6 +126,7 @@ pub async fn save_session(
 
     // Synths in display order, as given by the frontend's color list
     let synths_guard = synth_state.synths.lock().unwrap();
+    let known_programs = midi_state.known_programs.lock().unwrap();
     let synths = ui
         .synth_colors
         .iter()
@@ -131,6 +137,12 @@ pub async fn save_session(
                 name: synth.name.clone(),
                 color: entry.color.clone(),
                 zones: synth.zones.clone(),
+                // Snapshot of the channel state, so the session restores the
+                // same sounds even if the synths changed channels since
+                program: known_programs
+                    .get(&(synth.midi_port, synth.channel))
+                    .copied()
+                    .filter(|p| p.is_known()),
                 settings: SynthTemplate::from_synth(synth),
             })
         })
@@ -233,6 +245,35 @@ pub async fn load_session(
         *synth_state.next_id.lock().unwrap() = max_id + 1;
     }
 
+    // Reconfigure the instruments: send each saved program once per
+    // (port, channel) — when several synths share a channel with
+    // conflicting programs, the last one in file order wins. Ports that
+    // no longer exist silently skip the send (the program is still
+    // remembered and displayed).
+    {
+        let mut to_send = std::collections::HashMap::<(usize, u8), ProgramState>::new();
+        for entry in &file.synths {
+            let Some(program) = entry.program else { continue };
+            let (port, channel) = {
+                let synths = synth_state.synths.lock().unwrap();
+                let Some(synth) = synths.get(&entry.id) else { continue };
+                (synth.midi_port, synth.channel)
+            };
+            to_send.insert((port, channel), program);
+        }
+        for (&(port, channel), &program) in &to_send {
+            // Banks travel with the program in one explicit send: the
+            // instrument is reconfigured even if it transmits nothing.
+            midi_state.send_program_change(
+                port,
+                channel,
+                program.program,
+                program.bank_msb,
+                program.bank_lsb,
+            );
+        }
+    }
+
     Ok(Some(LoadedSession {
         version: file.version,
         bpm: file.bpm,
@@ -248,6 +289,39 @@ pub async fn load_session(
 mod tests {
     use super::*;
     use crate::state::{NoteLength, ReadingDirection, SynthMode};
+
+    /// A session saved before velocity_max existed must load with the
+    /// default (127), not fail or fall back to 0.
+    #[test]
+    fn session_without_velocity_max_loads_with_default() {
+        let json = r##"{
+            "id": 1,
+            "name": null,
+            "color": "#3498db",
+            "zones": [{"x": 0, "y": 0, "w": 2, "h": 2}],
+            "velocity_min": 40
+        }"##;
+        let s: SessionSynth = serde_json::from_str(json).unwrap();
+        assert_eq!(s.settings.velocity_min, 40);
+        assert_eq!(s.settings.velocity_max, 127);
+        // Programs didn't exist in that format either
+        assert_eq!(s.program, None);
+    }
+
+    /// A session saved before the program field existed must load with
+    /// program = None (older format compatibility).
+    #[test]
+    fn session_without_program_loads_with_none() {
+        let json = r##"{
+            "id": 1,
+            "name": null,
+            "color": "#3498db",
+            "zones": [],
+            "velocity_min": 0
+        }"##;
+        let s: SessionSynth = serde_json::from_str(json).unwrap();
+        assert_eq!(s.program, None);
+    }
 
     /// Round-trip check: a synth's full parameter set survives a
     /// save → file → load cycle.
@@ -266,6 +340,7 @@ mod tests {
         synth.brightness_min = 12;
         synth.brightness_max = 100;
         synth.velocity_min = 40;
+        synth.velocity_max = 110;
         synth.hue_shift = 180;
         synth.channel_enabled = [true, false, true];
         synth.note_lengths = vec![NoteLength::Whole, NoteLength::Eighth];
@@ -278,6 +353,11 @@ mod tests {
             name: Some("Lead".into()),
             color: "#3498db".into(),
             zones: vec![PixelZone { x: 2, y: 3, w: 5, h: 4 }],
+            program: Some(ProgramState {
+                bank_msb: Some(1),
+                bank_lsb: Some(32),
+                program: Some(41),
+            }),
             settings: SynthTemplate::from_synth(&synth),
         };
 
@@ -290,6 +370,7 @@ mod tests {
         assert_eq!(restored.name, original.name);
         assert_eq!(restored.color, original.color);
         assert_eq!(restored.zones, original.zones);
+        assert_eq!(restored.program, original.program);
         let s = restored.settings.to_synth(7);
         assert_eq!(s.tempo_ratio, synth.tempo_ratio);
         assert_eq!(s.channel, synth.channel);
@@ -302,6 +383,7 @@ mod tests {
         assert_eq!(s.brightness_min, synth.brightness_min);
         assert_eq!(s.brightness_max, synth.brightness_max);
         assert_eq!(s.velocity_min, synth.velocity_min);
+        assert_eq!(s.velocity_max, synth.velocity_max);
         assert_eq!(s.hue_shift, synth.hue_shift);
         assert_eq!(s.channel_enabled, synth.channel_enabled);
         assert_eq!(s.note_lengths, synth.note_lengths);

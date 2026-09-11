@@ -7,6 +7,94 @@ await initI18n();
 // Map id → custom name
 const synthNames = new Map();
 
+// Map "port:channel" → last known program of that MIDI channel, learned
+// from the MIDI input (Program Change / Bank Select sent by the
+// instruments) or set by the app itself. Programs are channel state, not
+// synth state: every synth on a given (port, channel) displays the same.
+const programMap = new Map();
+const programKey = (port, channel) => `${port}:${channel}`;
+
+// Refreshes the program display of every synth currently on the given
+// (port, channel)
+function refreshProgramDisplays(port, channel) {
+    const key = programKey(port, channel);
+    synthListBody.querySelectorAll('.synth-block').forEach(block => {
+        const portSelect = block.querySelector('.synth-midi-port');
+        const channelSelect = block.querySelector('.synth-channel');
+        if (!portSelect || !channelSelect) return;
+        if (programKey(Number(portSelect.value), Number(channelSelect.value)) !== key) return;
+        updateProgramDisplay(block);
+    });
+}
+
+// Renders a synth's program controls (bank select + program number) from
+// programMap, based on the port and channel currently selected in its UI.
+// The bank letters A–P map to Bank Select MSB 0–15 with LSB 0; values
+// learned from the MIDI input that don't fit that scheme show as a
+// dedicated "custom" option (raw msb/lsb).
+function updateProgramDisplay(el) {
+    const bankSelect = el.querySelector('.program-bank');
+    const numberInput = el.querySelector('.program-number');
+    if (!bankSelect || !numberInput) return;
+    const port = Number(el.querySelector('.synth-midi-port').value);
+    const channel = Number(el.querySelector('.synth-channel').value);
+    const st = programMap.get(programKey(port, channel));
+
+    // Program: don't clobber a field being edited
+    if (document.activeElement !== numberInput) {
+        numberInput.value = Number.isInteger(st?.program) ? st.program + 1 : '';
+    }
+
+    // Bank: same skip while the user is on the select
+    if (document.activeElement === bankSelect) return;
+    const custom = bankSelect.querySelector('.program-bank-custom');
+    const msb = st?.bank_msb;
+    const lsb = st?.bank_lsb;
+    if (Number.isInteger(msb) && msb >= 0 && msb <= 15 && lsb === 0) {
+        custom.hidden = true;
+        bankSelect.value = String(msb);
+    } else if (Number.isInteger(msb) || Number.isInteger(lsb)) {
+        // Learned bank outside the A–P scheme (e.g. GS/XG variations)
+        custom.hidden = false;
+        custom.textContent = `${msb ?? '-'}:${lsb ?? '-'}`;
+        bankSelect.value = 'custom';
+    } else {
+        custom.hidden = true;
+        bankSelect.value = '';
+    }
+}
+
+// Sends the synth's current bank + program selection to its output port
+// and channel, and reflects the returned state. Called on every change of
+// either control — an empty program sends the bank alone, and the "–"
+// bank sends no Bank Select at all.
+function sendProgramSelection(id, el) {
+    const bankSelect = el.querySelector('.program-bank');
+    const numberInput = el.querySelector('.program-number');
+    const port = Number(el.querySelector('.synth-midi-port').value);
+    const channel = Number(el.querySelector('.synth-channel').value);
+
+    let bankMsb = null;
+    let bankLsb = null;
+    if (bankSelect.value === 'custom') {
+        // Raw values learned from the MIDI input, kept as displayed
+        const st = programMap.get(programKey(port, channel));
+        bankMsb = Number.isInteger(st?.bank_msb) ? st.bank_msb : null;
+        bankLsb = Number.isInteger(st?.bank_lsb) ? st.bank_lsb : null;
+    } else if (bankSelect.value !== '') {
+        bankMsb = Number(bankSelect.value); // A–P → MSB 0–15
+        bankLsb = 0;
+    }
+    const program = numberInput.value !== '' ? Number(numberInput.value) - 1 : null;
+
+    invoke('set_synth_program', { id, program, bankMsb, bankLsb })
+        .then(st => {
+            programMap.set(programKey(port, channel), st);
+            refreshProgramDisplays(port, channel);
+        })
+        .catch(err => console.error('Error in set_synth_program:', err));
+}
+
 // Display name of a synth: its custom name, or the translated default
 function synthDisplayName(id) {
     return synthNames.get(id) || t('synth.title', { id });
@@ -1451,6 +1539,11 @@ loadSessionBtn.addEventListener('click', async () => {
             // Pre-seed the name and color for createSynthElement to pick up
             synthColors.set(s.id, s.color);
             if (s.name) synthNames.set(s.id, s.name);
+            // The saved programs were just resent by the backend: reflect
+            // them in the display map (keyed by the synth's port/channel)
+            if (s.program && Number.isInteger(s.program.program)) {
+                programMap.set(programKey(s.midi_port, s.channel), s.program);
+            }
             // The synth settings are flattened into the session-synth object
             // (serde flatten), so `s` itself is the config to apply
             synthListBody.appendChild(createSynthElement(s.id, s));
@@ -1595,6 +1688,21 @@ window.__TAURI__.event.listen('metronome-tick', (event) => {
     setTimeout(() => metronomeLed.classList.remove('active'), 100);
 });
 
+// Programs learned from the MIDI input (Program Change / Bank Select
+// turned on the instruments): update the map and every synth concerned.
+window.__TAURI__.event.listen('midi-program', (event) => {
+    const { port, channel, program } = event.payload;
+    programMap.set(programKey(port, channel), program);
+    refreshProgramDisplays(port, channel);
+});
+
+// Hydrate the programs already learned before this page was ready
+invoke('get_known_programs').then(entries => {
+    entries.forEach(({ port, channel, program }) => {
+        programMap.set(programKey(port, channel), program);
+    });
+}).catch(err => console.error('Error in get_known_programs:', err));
+
 // ==========================================
 // Synthesizers
 // ==========================================
@@ -1632,12 +1740,16 @@ function applySynthConfig(el, cfg) {
     el.querySelector('.brightness-end').value = cfg.brightness_max;
     el.querySelector('.brightness-start-val').textContent = cfg.brightness_min;
     el.querySelector('.brightness-end-val').textContent = cfg.brightness_max;
-    // Minimum velocity
-    el.querySelector('.synth-velocity-min').value = cfg.velocity_min;
+    // Velocity range
+    el.querySelector('.velocity-min').value = cfg.velocity_min;
+    el.querySelector('.velocity-max').value = cfg.velocity_max;
     el.querySelector('.velocity-min-val').textContent = cfg.velocity_min;
+    el.querySelector('.velocity-max-val').textContent = cfg.velocity_max;
     // Hue shift (monophonic panel)
-    el.querySelector('.synth-hue-shift').value = cfg.hue_shift;
+    const hueInput = el.querySelector('.synth-hue-shift');
+    hueInput.value = cfg.hue_shift;
     el.querySelector('.hue-shift-val').textContent = `${cfg.hue_shift}°`;
+    anchorHueGradient(hueInput, cfg.hue_shift);
     // R/G/B channel toggles (polyphonic panel)
     el.querySelectorAll('.synth-channel-toggle').forEach(btn => {
         const i = Number(btn.dataset.channel);
@@ -1712,7 +1824,17 @@ function createSynthElement(id, cfg = null) {
                 </button>
             </div>
             <div class="synth-header-row">
-                <span class="synth-title-label" data-i18n-title="synth.renameHint"></span>
+                <div class="synth-title-label" data-i18n-title="synth.renameHint"></div>
+                <div class="synth-section-program-change" data-i18n-title="synth.programEditHint">
+                    <span class="program-label" data-i18n="synth.programLabel"></span>
+                    <select class="program-bank">
+                        <option value="">–</option>
+                        ${Array.from({ length: 16 }, (_, i) =>
+                            `<option value="${i}">${String.fromCharCode(65 + i)}</option>`).join('')}
+                        <option value="custom" class="program-bank-custom" hidden></option>
+                    </select>
+                    <input type="number" class="program-number" min="1" max="128" step="1" placeholder="–" />
+                </div>
             </div>
         </div>
         <div class="synth-body">
@@ -1799,7 +1921,7 @@ function createSynthElement(id, cfg = null) {
                             <em class="synth-section-value hue-shift-val">0°</em>
                         </div>
                         <div class="synth-section-body">
-                            <input type="range" class="slider synth-hue-shift" min="0" max="360" value="0" step="1" />
+                            <input type="range" class="slider synth-hue-shift gradient-hue" min="0" max="360" value="0" step="1" />
                         </div>
                     </div>
                 </div>
@@ -1844,14 +1966,13 @@ function createSynthElement(id, cfg = null) {
                         <button class="note-length-btn noto-music icon-btn" data-length="whole" data-i18n-title="synth.noteLengthWhole">𝅝</button>
                     </div>
                 </div>
-                <div class="synth-section-separator gradient-wb"></div>
                 <div class="synth-section">
                     <div class="synth-section-header">
                         <span class="synth-section-title" data-i18n="synth.brightnessThreshold" data-i18n-title="synth.brightnessThreshold"></span>
                         <em class="synth-section-value"><span class="brightness-start-val">0</span> – <span class="brightness-end-val">127</span></em>
                     </div>
                     <div class="synth-section-body synth-range-track">
-                        <div class="synth-range-fill"></div>
+                        <div class="synth-range-fill gradient-wb"></div>
                         <input type="range" class="synth-range-input brightness-start" min="0" max="127" value="0" step="1" />
                         <input type="range" class="synth-range-input brightness-end" min="0" max="127" value="127" step="1" />
                     </div>
@@ -1859,11 +1980,13 @@ function createSynthElement(id, cfg = null) {
 
                 <div class="synth-section">
                     <div class="synth-section-header">
-                        <span class="synth-section-title" data-i18n="synth.velocityMin" data-i18n-title="synth.velocityMin"></span>
-                        <em class="synth-section-value velocity-min-val">0</em>
+                        <span class="synth-section-title" data-i18n="synth.velocityRange" data-i18n-title="synth.velocityRange"></span>
+                        <em class="synth-section-value"><span class="velocity-min-val">0</span> – <span class="velocity-max-val">127</span></em>
                     </div>
-                    <div class="synth-section-body">
-                        <input type="range" class="slider synth-velocity-min" min="0" max="126" value="0" step="1" />
+                    <div class="synth-section-body synth-range-track">
+                        <div class="synth-range-fill"></div>
+                        <input type="range" class="synth-range-input velocity-min" min="0" max="126" value="0" step="1" />
+                        <input type="range" class="synth-range-input velocity-max" min="0" max="127" value="127" step="1" />
                     </div>
                 </div>
 
@@ -1949,6 +2072,14 @@ function createSynthElement(id, cfg = null) {
         invoke('step_synth', { id })
             .catch(err => console.error('Error in step_synth:', err));
     });
+
+    // ---- Program: bank (A–P) + program (1–128) sent to the instrument ----
+    // Both controls are always visible; each change sends the current
+    // selection (see sendProgramSelection). The display also reflects
+    // programs learned from the MIDI input.
+    updateProgramDisplay(el);
+    el.querySelector('.program-bank').addEventListener('change', () => sendProgramSelection(id, el));
+    el.querySelector('.program-number').addEventListener('change', () => sendProgramSelection(id, el));
     el.querySelector('.synth-rewind').addEventListener('click', () => {
         invoke('reset_synth_cursor', { id })
             .catch(err => console.error('Error in reset_synth_cursor:', err));
@@ -1985,6 +2116,7 @@ function createSynthElement(id, cfg = null) {
     el.querySelector('.synth-channel').addEventListener('change', (e) => {
         invoke('set_synth_channel', { id, channel: Number(e.target.value) })
             .catch(err => console.error('Error in set_synth_channel:', err));
+        updateProgramDisplay(el);
     });
 
     // MIDI output port: one connection per port is opened lazily by the
@@ -2003,10 +2135,14 @@ function createSynthElement(id, cfg = null) {
             invoke('set_synth_midi_port', { id, port: 0 })
                 .catch(err => console.error('Error in set_synth_midi_port:', err));
         }
+        // The program display depends on the port: refresh it now that
+        // the select has its final value.
+        updateProgramDisplay(el);
     }).catch(err => console.error('Error in list_midi_ports:', err));
     midiPortSelect.addEventListener('change', (e) => {
         invoke('set_synth_midi_port', { id, port: Number(e.target.value) })
             .catch(err => console.error('Error in set_synth_midi_port:', err));
+        updateProgramDisplay(el);
     });
 
     // Tempo relative to the main metronome (e.g. 0.5 = one pixel every two ticks)
@@ -2094,6 +2230,7 @@ function createSynthElement(id, cfg = null) {
     hueShiftInput.addEventListener('input', () => {
         const hueShift = Number(hueShiftInput.value);
         hueShiftVal.textContent = `${hueShift}°`;
+        anchorHueGradient(hueShiftInput, hueShift);
         invoke('set_synth_hue_shift', { id, hueShift })
             .catch(err => console.error('Error in set_synth_hue_shift:', err));
     });
@@ -2169,17 +2306,6 @@ function createSynthElement(id, cfg = null) {
         else            clearRangeHighlight(id);
     });
 
-    // Minimum velocity slider: floor of the velocity range (brightness is
-    // mapped between this value and 127)
-    const velocityMinInput = el.querySelector('.synth-velocity-min');
-    const velocityMinVal   = el.querySelector('.velocity-min-val');
-    velocityMinInput.addEventListener('input', () => {
-        const velocityMin = Number(velocityMinInput.value);
-        velocityMinVal.textContent = velocityMin;
-        invoke('set_synth_velocity_min', { id, velocityMin })
-            .catch(err => console.error('Error in set_synth_velocity_min:', err));
-    });
-
     // Zone drawing: arm/cancel the rectangle-drawing mode on the image
     el.querySelector('.synth-add-zone-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
@@ -2213,6 +2339,7 @@ function createSynthElement(id, cfg = null) {
     });
 
     initBrightnessRange(id, el);
+    initVelocityRange(id, el);
 
     return el;
 }
@@ -2240,6 +2367,13 @@ function updateAllSynthZones() {
     redrawAllHighlights();
 }
 
+// Anchors the hue-shift slider's gradient on its thumb: the gradient is
+// rotated by (360 - shift) so the red (0°) always sits at the handle's
+// position and the other hues follow in circle order.
+function anchorHueGradient(input, hueShift) {
+    input.style.setProperty('--hue-rot', `${(360 - Number(hueShift) % 360) % 360}deg`);
+}
+
 function initBrightnessRange(id, el) {
     const startInput = el.querySelector('.brightness-start');
     const endInput   = el.querySelector('.brightness-end');
@@ -2251,8 +2385,10 @@ function initBrightnessRange(id, el) {
         const max = 127;
         const s = Number(startInput.value) / max * 100;
         const e = Number(endInput.value)   / max * 100;
-        fill.style.left  = `${s}%`;
-        fill.style.width = `${e - s}%`;
+        // The gradient spans the whole track; --s/--e clip it to the
+        // selection, keeping colors anchored to absolute luminosity values.
+        fill.style.setProperty('--s', `${s}%`);
+        fill.style.setProperty('--e', `${e}%`);
 
         const atEnd = Number(startInput.value) >= Number(endInput.value);
         startInput.style.zIndex = atEnd ? '3' : '2';
@@ -2277,6 +2413,50 @@ function initBrightnessRange(id, el) {
     endInput.addEventListener('input', () => {
         if (Number(endInput.value) < Number(startInput.value)) endInput.value = startInput.value;
         endVal.textContent = endInput.value;
+        updateFill();
+        sendRange();
+    });
+
+    updateFill();
+}
+
+function initVelocityRange(id, el) {
+    const minInput = el.querySelector('.velocity-min');
+    const maxInput = el.querySelector('.velocity-max');
+    const minVal   = el.querySelector('.velocity-min-val');
+    const maxVal   = el.querySelector('.velocity-max-val');
+    const fill     = minInput.closest('.synth-range-track').querySelector('.synth-range-fill');
+
+    function updateFill() {
+        const max = 127;
+        const s = Number(minInput.value) / max * 100;
+        const e = Number(maxInput.value) / max * 100;
+        fill.style.left  = `${s}%`;
+        fill.style.width = `${e - s}%`;
+
+        const atEnd = Number(minInput.value) >= Number(maxInput.value);
+        minInput.style.zIndex = atEnd ? '3' : '2';
+        maxInput.style.zIndex = atEnd ? '1' : '2';
+    }
+
+    function sendRange() {
+        invoke('set_synth_velocity_range', {
+            id,
+            velocityMin: Number(minInput.value),
+            velocityMax: Number(maxInput.value),
+        }).catch(err => console.error('Error in set_synth_velocity_range:', err));
+    }
+
+    minInput.addEventListener('input', () => {
+        if (Number(minInput.value) > Number(maxInput.value)) minInput.value = maxInput.value;
+        minVal.textContent = minInput.value;
+        updateFill();
+        sendRange();
+    });
+
+    maxInput.addEventListener('input', () => {
+        if (Number(maxInput.value) < Number(minInput.value)) maxInput.value = minInput.value;
+        maxVal.textContent = maxInput.value;
         updateFill();
         sendRange();
     });

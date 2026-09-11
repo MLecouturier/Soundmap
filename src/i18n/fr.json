@@ -109,7 +109,9 @@
     "selectAllZones": "Tout sélectionner (image entière)",
     "clearZones": "Tout désélectionner",
     "brightnessThreshold": "Seuil de luminosité",
-    "velocityMin": "Vélocité minimum",
+    "velocityRange": "Plage de vélocité",
+    "programLabel": "Pgm",
+    "programEditHint": "Banque (A–P) et program (1–128) du canal MIDI de ce synthé : chaque changement est envoyé immédiatement à l'instrument (Bank Select puis Program Change). « – » n'envoie pas de Bank Select. Les valeurs sont aussi apprises depuis l'entrée MIDI quand l'instrument transmet ses changements, et sauvegardées dans la session.",
     "pixelInfoEmpty": "Pixel : -",
     "pixelInfo": "Pixel {cursor} — {rgb} — TSL {tsl}\n{noteInfo} — Vel {velocity}",
     "noteLabel": "Note {note}",
@@ -174,7 +176,8 @@
     "synth.noteRangeTreble": "Restreint les notes à la plage des aigus. La hauteur monte graduellement de la borne basse à la borne haute de la plage à mesure que la teinte (ou la valeur du canal) augmente.",
     "synth.hueShift": "Décale la teinte des pixels avant la conversion en note : chaque degré fait tourner le cercle des couleurs, donc la même image produit d'autres notes. Pratique pour explorer des variations d'une même zone de lecture.",
     "synth.brightnessThreshold": "Fenêtre de luminosité dans laquelle un pixel est audible : en dessous de la borne basse ou au-dessus de la borne haute, le pixel reste muet. Les deux curseurs ajustent les bornes.",
-    "synth.velocityMin": "Vélocité (force) minimale des notes. La force réelle de chaque note dépend de la saturation du pixel, mais ne descend jamais sous cette valeur."
+    "synth.velocityRange": "Fenêtre de vélocité (force) des notes. La force réelle de chaque note dépend de la saturation du pixel, recalée entre la borne basse et la borne haute. Les deux curseurs ajustent les bornes.",
+    "synth.programEditHint": "Banque et program du canal MIDI de ce synthé. Sélectionner une banque (A–P = Bank Select MSB 0–15) et un program (1–128) les envoie immédiatement : l'instrument est reconfiguré même s'il ne transmet rien lui-même. Les valeurs sont aussi apprises depuis l'entrée MIDI, sauvegardées dans la session et renvoyées aux instruments au chargement."
   },
   "errors": {
     "generic": "Une erreur est survenue : {details}",

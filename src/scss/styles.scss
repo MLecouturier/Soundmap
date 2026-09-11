@@ -37,9 +37,27 @@ $color-red: #c00000;
 $color-green: #00cd00;
 $color-blue: #2121c8;
 
+$gradient-hue: linear-gradient(to right, #F00, #FF0, #0F0, #0FF, #00F, #F0F, #F00);
+$gradient-wb: linear-gradient(to right, black, white);
+
+// Hue-shift slider gradient: red stays anchored on the thumb. The JS sets
+// --hue-rot to (360 - shift) so the hue at the thumb's position is always 0°
+// and the other hues follow in circle order.
+@mixin hue-rotating-gradient {
+    background: linear-gradient(to right,
+        hsl(calc(var(--hue-rot, 0deg))           100% 50%),
+        hsl(calc(var(--hue-rot, 0deg) + 60deg)   100% 50%),
+        hsl(calc(var(--hue-rot, 0deg) + 120deg)  100% 50%),
+        hsl(calc(var(--hue-rot, 0deg) + 180deg)  100% 50%),
+        hsl(calc(var(--hue-rot, 0deg) + 240deg)  100% 50%),
+        hsl(calc(var(--hue-rot, 0deg) + 300deg)  100% 50%),
+        hsl(calc(var(--hue-rot, 0deg) + 360deg)  100% 50%));
+}
+
 $sidebar-width: 24rem;
 
 $border-radius-base: .25rem;
+$border-radius-round: 1rem;
 $transition-fast: 0.2s ease;
 
 // ==========================================================================
@@ -323,6 +341,13 @@ input[type="range"].synth-range-input {
     &::-moz-range-thumb         { @include slider-thumb; border: .125rem solid $color-bg-dark; }
     &::-webkit-slider-runnable-track { @include slider-track; }
     &::-moz-range-track         { @include slider-track; }
+
+    &.gradient-hue {
+        @include hue-rotating-gradient;
+
+        &::-webkit-slider-runnable-track { @include hue-rotating-gradient; }
+        &::-moz-range-track { @include hue-rotating-gradient; }
+    }
 }
 
 // ==========================================================================
@@ -743,6 +768,58 @@ $metronome-led-transition: 0.05s ease;
         border: 1px solid $color-text-muted;
     }
 
+    // Program change of the synth's MIDI channel: bank select (A–P) and
+    // program number (1–128), both sent to the instrument on change
+    .synth-section-program-change {
+        display: inline-flex;
+        align-items: center;
+        gap: .375rem;
+        margin-left: .5rem;
+        font-size: .78rem;
+        white-space: nowrap;
+
+        .program-label {
+            color: $color-text-muted;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            font-size: .7rem;
+        }
+
+        .program-bank {
+            padding: 0 .25rem;
+            font-size: .78rem;
+            background-color: $color-bg-medium;
+            color: $color-text-primary;
+            border: 1px solid $color-border;
+            border-radius: $border-radius-base;
+            cursor: pointer;
+
+            &:hover { border-color: $color-accent; }
+        }
+
+        .program-number {
+            width: 3.5em;
+            padding: 0 .25rem;
+            font-size: .78rem;
+            background-color: $color-bg-medium;
+            color: $color-text-primary;
+            border: 1px solid $color-border;
+            border-radius: $border-radius-base;
+            outline: none;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+
+            &:hover { border-color: $color-accent; }
+            &:focus { border-color: $color-accent; }
+
+            // Keep the increment spinners visible (they send on click)
+            &::-webkit-inner-spin-button,
+            &::-webkit-outer-spin-button {
+                opacity: 1;
+            }
+        }
+    }
+
     // Clickable color band on the left edge
     .synth-color-band {
         position: absolute;
@@ -814,10 +891,11 @@ $metronome-led-transition: 0.05s ease;
             background-color: $color-bg-light;
             color: $color-text-primary;
             border: 1px solid $color-accent;
-            border-radius: $border-radius-base;
+            border-radius: $border-radius-round;
             padding: 2px .375rem;
             font-size: 0.9rem;
-            width: 8rem;
+            text-align: center;
+            width: 100%;
             outline: none;
         }
 
@@ -1078,11 +1156,15 @@ $metronome-led-transition: 0.05s ease;
     }
 
     .synth-section-separator {
-        height: 1px;
+        height: 2px;
         background: $color-accent;
 
         &.gradient-wb {
-            background: linear-gradient(to left, white, black);
+            background: $gradient-wb;
+        }
+
+        &.gradient-hue {
+            background: $gradient-hue;
         }
     }
 
@@ -1114,6 +1196,17 @@ $metronome-led-transition: 0.05s ease;
             background-color: $color-accent;
             border-radius: .125rem;
             pointer-events: none;
+
+            // Brightness threshold variant: the black→white gradient spans
+            // the whole track and is clipped to the selection, so its colors
+            // stay anchored to absolute luminosity values — moving a handle
+            // erodes the gradient instead of squashing it.
+            &.gradient-wb {
+                left: 0;
+                width: 100%;
+                background: $gradient-wb;
+                clip-path: inset(0 calc(100% - var(--e, 100%)) 0 var(--s, 0%));
+            }
         }
 
         // The two overlapping inputs — the thumb style comes from the global mixin

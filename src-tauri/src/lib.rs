@@ -26,6 +26,7 @@ pub fn run() {
         .setup(|app| {
             let midi_state = app.state::<MidiState>();
             midi::auto_connect(&midi_state);
+            midi::start_midi_input_listeners(app.handle(), &midi_state);
 
             // Load the persisted configuration and apply it
             let loaded = config::load_config(app.handle());
@@ -52,6 +53,8 @@ pub fn run() {
             image_processing::apply_image_transform,
             image_processing::apply_image_adjustments,
             midi::list_midi_ports,
+            midi::get_known_programs,
+            synth::set_synth_program,
             session::save_session,
             session::load_session,
             metronome::start_metronome,
@@ -71,7 +74,7 @@ pub fn run() {
             synth::set_synth_name,
             synth::set_synth_tempo,
             synth::set_synth_brightness_range,
-            synth::set_synth_velocity_min,
+            synth::set_synth_velocity_range,
             synth::set_synth_loop,
             synth::set_synth_back_n_forth,
             synth::set_synth_reading_direction,

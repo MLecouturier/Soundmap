@@ -70,14 +70,14 @@ fn pixel_saturation(r: u8, g: u8, b: u8) -> f32 {
 }
 
 /// Maps a saturation value (0–255) to a MIDI velocity between
-/// `velocity_min` and 127 (the more saturated the pixel, the stronger
-/// the velocity: achromatic areas are played delicately, vivid colors
-/// with more intensity). `velocity_min` therefore defines the floor of
-/// the velocity range, not a silence threshold.
-fn saturation_to_velocity(saturation: f32, velocity_min: u8) -> u8 {
+/// `velocity_min` and `velocity_max` (the more saturated the pixel, the
+/// stronger the velocity: achromatic areas are played delicately, vivid
+/// colors with more intensity). The bounds therefore define the velocity
+/// range, not a silence threshold.
+fn saturation_to_velocity(saturation: f32, velocity_min: u8, velocity_max: u8) -> u8 {
     let min = velocity_min.min(126) as f32;
-    let range = 127.0 - min;
-    let v = (min + (saturation / 255.0) * range).round() as u8;
+    let max = (velocity_max.clamp(velocity_min.min(126), 127)) as f32;
+    let v = (min + (saturation / 255.0) * (max - min)).round() as u8;
     v.clamp(1, 127) // 0 would be equivalent to a Note Off in MIDI
 }
 
@@ -374,7 +374,7 @@ fn step_synth_once(
     let luma = pixel_luma(r, g, b);
     let brightness_level = luma_to_level(luma);
     let saturation = pixel_saturation(r, g, b);
-    let velocity = saturation_to_velocity(saturation, synth.velocity_min);
+        let velocity = saturation_to_velocity(saturation, synth.velocity_min, synth.velocity_max);
     synth.velocity = velocity;
 
     // Note lengths: when enabled, the pixel's brightness picks a duration

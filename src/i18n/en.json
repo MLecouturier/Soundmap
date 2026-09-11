@@ -109,7 +109,9 @@
     "selectAllZones": "Select all (whole image)",
     "clearZones": "Deselect all",
     "brightnessThreshold": "Brightness threshold",
-    "velocityMin": "Minimum velocity",
+    "velocityRange": "Velocity range",
+    "programLabel": "Pgm",
+    "programEditHint": "Bank (A–P) and program (1–128) of this synth's MIDI channel: every change is sent to the instrument immediately (Bank Select then Program Change). “–” sends no Bank Select. Values are also learned from the MIDI input when the instrument transmits its changes, and saved in the session.",
     "pixelInfoEmpty": "Pixel: -",
     "pixelInfo": "Pixel {cursor} — {rgb} — HSL {tsl}\n{noteInfo} — Vel {velocity}",
     "noteLabel": "Note {note}",
@@ -174,7 +176,8 @@
     "synth.noteRangeTreble": "Restricts notes to the treble range. The pitch rises gradually from the low to the high bound of the range as the hue (or the channel value) increases.",
     "synth.hueShift": "Shifts the hue of pixels before the note conversion: each degree rotates the color circle, so the same image yields different notes. Handy to explore variations of the same reading zone.",
     "synth.brightnessThreshold": "Brightness window within which a pixel is audible: below the low bound or above the high bound, the pixel stays silent. The two sliders adjust the bounds.",
-    "synth.velocityMin": "Minimum note velocity (force). The actual force of each note depends on the pixel's saturation, but never drops below this value."
+    "synth.velocityRange": "Note velocity (force) window. The actual force of each note depends on the pixel's saturation, rescaled between the low and the high bound. The two sliders adjust the bounds.",
+    "synth.programEditHint": "Bank and program of this synth's MIDI channel. Selecting a bank (A–P = Bank Select MSB 0–15) and a program (1–128) sends them immediately: the instrument is reconfigured even if it transmits nothing itself. Values are also learned from the MIDI input, saved in the session, and resent to the instruments when it loads."
   },
   "errors": {
     "generic": "An error occurred: {details}",

@@ -90,6 +90,7 @@ pub struct SynthTemplate {
     pub brightness_min: u8,
     pub brightness_max: u8,
     pub velocity_min: u8,
+    pub velocity_max: u8,
     pub hue_shift: u16,
     pub channel_enabled: [bool; 3],
     pub note_lengths: Vec<NoteLength>,
@@ -120,6 +121,7 @@ impl SynthTemplate {
             brightness_min: synth.brightness_min,
             brightness_max: synth.brightness_max,
             velocity_min: synth.velocity_min,
+            velocity_max: synth.velocity_max,
             hue_shift: synth.hue_shift,
             channel_enabled: synth.channel_enabled,
             note_lengths: synth.note_lengths.clone(),
@@ -144,6 +146,7 @@ impl SynthTemplate {
         synth.brightness_min = self.brightness_min;
         synth.brightness_max = self.brightness_max;
         synth.velocity_min = self.velocity_min;
+        synth.velocity_max = self.velocity_max;
         synth.hue_shift = self.hue_shift;
         synth.channel_enabled = self.channel_enabled;
         if !self.note_lengths.is_empty() {
