@@ -227,6 +227,25 @@ pub fn set_synth_program(
     Ok(midi.send_program_change(port, channel, program, bank_msb, bank_lsb))
 }
 
+/// Toggles the velocity mapping mode: relative (rescaled onto the
+/// [min, max] range) or clamp (native 1–127 mapping, values outside the
+/// range brought to the nearest bound).
+#[tauri::command]
+pub fn set_synth_velocity_relative(
+    id: u32,
+    enabled: bool,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.velocity_relative = enabled;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
 #[tauri::command]
 pub fn set_synth_velocity_range(
     id: u32,

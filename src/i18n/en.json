@@ -111,8 +111,11 @@
     "clearZones": "Deselect all",
     "brightnessThreshold": "Brightness threshold",
     "velocityRange": "Velocity range",
+    "velocityRelative": "Velocity mode: relative / clamp",
     "programLabel": "Pgm",
     "programEditHint": "Bank (A–P) and program (1–128) of this synth's MIDI channel: every change is sent to the instrument immediately (Bank Select then Program Change). “–” sends no Bank Select. Values are also learned from the MIDI input when the instrument transmits its changes, and saved in the session.",
+    "programBankManual": "Bank (letter A–P, empty = none)",
+    "programManual": "Program (1–128, empty = none)",
     "pixelInfoEmpty": "Pixel: -",
     "pixelInfo": "Pixel {cursor} — {rgb} — HSL {tsl}\n{noteInfo} — Vel {velocity}",
     "noteLabel": "Note {note}",
@@ -179,6 +182,7 @@
     "synth.hueShift": "Shifts the hue of pixels before the note conversion: each degree rotates the color circle, so the same image yields different notes. Handy to explore variations of the same reading zone.",
     "synth.brightnessThreshold": "Brightness window within which a pixel is audible: below the low bound or above the high bound, the pixel stays silent. Muted pixels in this synth's zones are veiled in black, with the 𝆝 symbol in its color when cells are large enough. The two sliders adjust the bounds.",
     "synth.velocityRange": "Note velocity (force) window. The actual force of each note depends on the pixel's saturation, rescaled between the low and the high bound. The two sliders adjust the bounds.",
+    "synth.velocityRelative": "Toggles the velocity mode. Active (relative): the pixel's saturation is rescaled onto the whole min–max range, so the entire range is always used. Inactive (clamp): the velocity is computed on the native 1–127 range, then brought to the nearest bound when outside the window — weak saturations floor at min, strong ones ceiling at max, with no compression in between.",
     "synth.programEditHint": "Bank and program of this synth's MIDI channel. Selecting a bank (A–P = Bank Select MSB 0–15) and a program (1–128) sends them immediately: the instrument is reconfigured even if it transmits nothing itself. Values are also learned from the MIDI input, saved in the session, and resent to the instruments when it loads."
   },
   "errors": {

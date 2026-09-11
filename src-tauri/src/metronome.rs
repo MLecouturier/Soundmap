@@ -74,11 +74,31 @@ fn pixel_saturation(r: u8, g: u8, b: u8) -> f32 {
 /// stronger the velocity: achromatic areas are played delicately, vivid
 /// colors with more intensity). The bounds therefore define the velocity
 /// range, not a silence threshold.
-fn saturation_to_velocity(saturation: f32, velocity_min: u8, velocity_max: u8) -> u8 {
-    let min = velocity_min.min(126) as f32;
-    let max = (velocity_max.clamp(velocity_min.min(126), 127)) as f32;
-    let v = (min + (saturation / 255.0) * (max - min)).round() as u8;
-    v.clamp(1, 127) // 0 would be equivalent to a Note Off in MIDI
+///
+/// Two mappings share these bounds:
+/// - relative (velocity_relative = true): the saturation is rescaled
+///   onto [min, max], so the whole range is used whatever the image;
+/// - clamp (velocity_relative = false): the velocity is computed on the
+///   native full range 1–127, then values outside [min, max] are brought
+///   to the nearest bound (a floor/ceiling filter, no compression).
+fn saturation_to_velocity(
+    saturation: f32,
+    velocity_min: u8,
+    velocity_max: u8,
+    velocity_relative: bool,
+) -> u8 {
+    let lo = velocity_min.min(126);
+    let hi = velocity_max.clamp(lo, 127);
+    let v = if velocity_relative {
+        // Rescale: saturation 0 → min, 255 → max
+        let min = lo as f32;
+        let max = hi as f32;
+        min + (saturation / 255.0) * (max - min)
+    } else {
+        // Native full range, clamped afterwards
+        1.0 + (saturation / 255.0) * 126.0
+    };
+    v.round().clamp(lo.max(1) as f32, hi as f32) as u8
 }
 
 /// Processes a pixel in monophonic mode: the hue (shifted by hue_shift)
@@ -374,7 +394,12 @@ fn step_synth_once(
     let luma = pixel_luma(r, g, b);
     let brightness_level = luma_to_level(luma);
     let saturation = pixel_saturation(r, g, b);
-        let velocity = saturation_to_velocity(saturation, synth.velocity_min, synth.velocity_max);
+        let velocity = saturation_to_velocity(
+            saturation,
+            synth.velocity_min,
+            synth.velocity_max,
+            synth.velocity_relative,
+        );
     synth.velocity = velocity;
 
     // Note lengths: when enabled, the pixel's brightness picks a duration
@@ -741,6 +766,30 @@ mod tests {
     use super::*;
 
     const BOUNDS: [(u8, u8); 3] = [(21, 47), (48, 71), (72, 108)];
+
+    #[test]
+    fn relative_mapping_rescales_saturation_onto_the_bounds() {
+        // min=40, max=90: the saturation range is compressed onto [40, 90]
+        assert_eq!(saturation_to_velocity(0.0, 40, 90, true), 40);
+        assert_eq!(saturation_to_velocity(255.0, 40, 90, true), 90);
+        // Half saturation → halfway between the bounds
+        assert_eq!(saturation_to_velocity(127.5, 40, 90, true), 65);
+        // A nearly-gray pixel still lands inside the range
+        assert_eq!(saturation_to_velocity(25.5, 40, 90, true), 45);
+    }
+
+    #[test]
+    fn clamp_mapping_uses_the_full_range_then_clamps() {
+        // min=40, max=90: native 1–127 mapping, values outside clamped
+        // Weak saturation → below 40 → clamped to 40
+        assert_eq!(saturation_to_velocity(0.0, 40, 90, false), 40);
+        assert_eq!(saturation_to_velocity(25.5, 40, 90, false), 40); // ~14 → 40
+        // In range → untouched
+        assert_eq!(saturation_to_velocity(127.5, 40, 90, false), 64); // ~64
+        // Strong saturation → above 90 → clamped to 90
+        assert_eq!(saturation_to_velocity(255.0, 40, 90, false), 90);
+        assert_eq!(saturation_to_velocity(229.5, 40, 90, false), 90); // ~114 → 90
+    }
 
     #[test]
     fn no_range_enabled_uses_full_midi_range() {

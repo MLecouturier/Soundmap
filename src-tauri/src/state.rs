@@ -127,6 +127,8 @@ pub struct Synth {
     pub velocity_min: u8,      // floor of the velocity range (0–126): brightness is
                                // mapped between this value and velocity_max
     pub velocity_max: u8,     // ceiling of the velocity range (1–127)
+    pub velocity_relative: bool, // true: saturation rescaled onto [min, max];
+                                 // false: native 1–127 mapping, clamped to [min, max]
 
     // --- Pixel-to-note translation modes ---
     pub mode: SynthMode,
@@ -172,6 +174,7 @@ impl Synth {
             velocity: 100,
             velocity_min: 0,
             velocity_max: 127,
+            velocity_relative: true,
 
             mode: SynthMode::Monophonic,
             hue_shift: 0,

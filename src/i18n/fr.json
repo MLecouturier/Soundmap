@@ -111,8 +111,11 @@
     "clearZones": "Tout désélectionner",
     "brightnessThreshold": "Seuil de luminosité",
     "velocityRange": "Plage de vélocité",
+    "velocityRelative": "Mode de vélocité : relatif / clamp",
     "programLabel": "Pgm",
     "programEditHint": "Banque (A–P) et program (1–128) du canal MIDI de ce synthé : chaque changement est envoyé immédiatement à l'instrument (Bank Select puis Program Change). « – » n'envoie pas de Bank Select. Les valeurs sont aussi apprises depuis l'entrée MIDI quand l'instrument transmet ses changements, et sauvegardées dans la session.",
+    "programBankManual": "Banque (lettre A–P, vide = aucune)",
+    "programManual": "Program (1–128, vide = aucun)",
     "pixelInfoEmpty": "Pixel : -",
     "pixelInfo": "Pixel {cursor} — {rgb} — TSL {tsl}\n{noteInfo} — Vel {velocity}",
     "noteLabel": "Note {note}",
@@ -179,6 +182,7 @@
     "synth.hueShift": "Décale la teinte des pixels avant la conversion en note : chaque degré fait tourner le cercle des couleurs, donc la même image produit d'autres notes. Pratique pour explorer des variations d'une même zone de lecture.",
     "synth.brightnessThreshold": "Fenêtre de luminosité dans laquelle un pixel est audible : en dessous de la borne basse ou au-dessus de la borne haute, le pixel reste muet. Les pixels muets des zones de ce synthé sont voilés de noir, avec le symbole 𝆝 dans sa couleur quand les cellules sont assez grandes. Les deux curseurs ajustent les bornes.",
     "synth.velocityRange": "Fenêtre de vélocité (force) des notes. La force réelle de chaque note dépend de la saturation du pixel, recalée entre la borne basse et la borne haute. Les deux curseurs ajustent les bornes.",
+    "synth.velocityRelative": "Bascule le mode de vélocité. Actif (relatif) : la saturation du pixel est recalée sur toute la plage min–max, la plage entière est donc toujours utilisée. Inactif (clamp) : la vélocité est calculée sur la plage native 1–127 puis ramenée à la borne la plus proche si elle sort de la plage — les saturations faibles plaquent à min, les fortes à max, sans compression intermédiaire.",
     "synth.programEditHint": "Banque et program du canal MIDI de ce synthé. Sélectionner une banque (A–P = Bank Select MSB 0–15) et un program (1–128) les envoie immédiatement : l'instrument est reconfiguré même s'il ne transmet rien lui-même. Les valeurs sont aussi apprises depuis l'entrée MIDI, sauvegardées dans la session et renvoyées aux instruments au chargement."
   },
   "errors": {
