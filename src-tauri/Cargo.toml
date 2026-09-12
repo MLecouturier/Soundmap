@@ -1,6 +1,6 @@
 [package]
 name = "wysiwyl"
-version = "1.7.0"
+version = "1.8.0"
 description = "Pixels to Synth App"
 authors = ["MLecout"]
 edition = "2021"

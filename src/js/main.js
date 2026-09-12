@@ -1471,6 +1471,25 @@ function currentGridWidth() {
   return sliderToCells(Number(gridSlider.value), origWidth);
 }
 
+// Inverse of sliderToCells: the slider position that maps to the given
+// column count. The logarithmic mapping rounds cells at every step, so
+// the analytic position is walked until it lands exactly on the count —
+// or on the nearest reachable one at the top of the range, where one
+// slider step spans several columns.
+function cellsToSlider(cells, maxCells) {
+  if (!maxCells || maxCells < MIN_CELLS) return SLIDER_STEPS;
+  const lmin = Math.log(MIN_CELLS);
+  const lmax = Math.log(maxCells);
+  let v = Math.round(((Math.log(cells) - lmin) / (lmax - lmin)) * SLIDER_STEPS);
+  v = Math.min(SLIDER_STEPS, Math.max(0, v));
+  if (sliderToCells(v, maxCells) < cells) {
+    while (v < SLIDER_STEPS && sliderToCells(v, maxCells) < cells) v++;
+  } else {
+    while (v > 0 && sliderToCells(v, maxCells) > cells) v--;
+  }
+  return v;
+}
+
 // ---------- Posterize log scale ----------
 // Position 0 = off; positions 1..SLIDER_STEPS map exponentially from 255
 // levels (left) down to 2 (right): the slider is coarser near 255, where
@@ -2125,6 +2144,57 @@ loadSessionBtn.addEventListener('click', async () => {
     syncLabels();
     scheduleRefresh();
   });
+});
+
+// ---------- Manual column entry: double-click the placeholder ----------
+// The column count normally follows the logarithmic slider; a
+// double-click on the displayed count opens an inline input to type an
+// exact number instead. Values outside 2..origWidth are refused (the
+// input closes without changing anything), as is any entry while the
+// controls are locked during playback.
+gridValue.addEventListener('dblclick', () => {
+  if (!hasImage || gridSlider.disabled || document.querySelector('#grid-width-input')) return;
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.id = 'grid-width-input';
+  input.className = 'grid-width-input';
+  input.min = MIN_CELLS;
+  input.max = origWidth;
+  input.step = 1;
+  input.value = currentGridWidth();
+
+  gridValue.classList.add('hidden');
+  gridValue.after(input);
+  input.focus();
+  input.select();
+
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    input.remove();
+    gridValue.classList.remove('hidden');
+  };
+  const commit = () => {
+    if (closed) return;
+    const cells = Math.round(Number(input.value));
+    if (Number.isFinite(cells) && cells >= MIN_CELLS && cells <= origWidth) {
+      gridSlider.value = cellsToSlider(cells, origWidth);
+      syncLabels();
+      scheduleRefresh();
+    }
+    close();
+  };
+
+  input.addEventListener('keydown', (e) => {
+    // Enter commits, Escape cancels; stopPropagation prevents global
+    // handlers (zone picking, help mode) from firing as well
+    e.stopPropagation();
+    if (e.key === 'Enter') commit();
+    else if (e.key === 'Escape') close();
+  });
+  input.addEventListener('blur', commit);
 });
 
 showOriginalBtn.addEventListener('click', () => {

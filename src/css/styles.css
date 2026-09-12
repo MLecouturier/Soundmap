@@ -548,6 +548,17 @@ select:disabled {
   color: #888;
   font-variant-numeric: tabular-nums;
 }
+#controls label span .grid-width-input {
+  background-color: #262626;
+  color: #e0e0e0;
+  border: 1px solid #3a7bd5;
+  border-radius: 0.25rem;
+  padding: 1px 0.25rem;
+  font-size: 0.8rem;
+  width: 3.75rem;
+  outline: none;
+  text-align: right;
+}
 #controls .info {
   font-size: 0.78rem;
   color: #888;
@@ -1135,4 +1146,6 @@ select:disabled {
 ::-webkit-scrollbar-thumb {
   background-color: #444;
   border-radius: 0.25rem;
-}/*# sourceMappingURL=styles.css.map */
+}
+
+/*# sourceMappingURL=styles.css.map */

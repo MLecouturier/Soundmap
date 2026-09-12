@@ -148,7 +148,7 @@
     "controls.transform": "Ouvre le panneau de transformation de l'image : rotation fine (-45° à +45°) et perspective verticale/horizontale. Appliquez pour valider, annulez pour revenir en arrière.",
     "controls.transformGrid": "Affiche ou masque la grille de lecture superposée à l'image.",
     "controls.showOriginal": "Affiche l'image d'origine, sans les réglages, le temps de comparer. Relâchez pour revenir à l'image traitée.",
-    "controls.columns": "Nombre de colonnes de la grille de lecture. Chaque colonne est jouée à son tour ; plus la grille est fine, plus la séquence est longue et détaillée. Modifier ce réglage redécoupe les zones existantes.",
+    "controls.columns": "Nombre de colonnes de la grille de lecture. Chaque colonne est jouée à son tour ; plus la grille est fine, plus la séquence est longue et détaillée. Modifier ce réglage redécoupe les zones existantes. Double-cliquez sur le nombre affiché pour saisir une valeur exacte (refusée si elle dépasse la largeur de l'image originale).",
     "controls.contrast": "Renforce ou atténue l'écart entre zones sombres et claires. Un contraste élevé rend la séquence plus tranchée : des notes nettes entourées de silences.",
     "controls.brightness": "Éclaircit ou assombrit l'image entière. Les pixels trop sombres restent muets (sous le seuil de luminosité du synthé) : ce réglage détermine donc lesquels jouent.",
     "controls.saturation": "Augmente ou réduit l'intensité des couleurs. La saturation d'un pixel détermine aussi la vélocité (la force) de la note jouée.",

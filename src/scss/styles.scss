@@ -666,6 +666,19 @@ select:disabled {
                 color: $color-text-muted;
                 font-variant-numeric: tabular-nums;
             }
+
+            // Inline entry opened by double-clicking the column count
+            .grid-width-input {
+                background-color: $color-bg-light;
+                color: $color-text-primary;
+                border: 1px solid $color-accent;
+                border-radius: $border-radius-base;
+                padding: 1px .25rem;
+                font-size: 0.8rem;
+                width: 3.75rem;
+                outline: none;
+                text-align: right;
+            }
         }
     }
 
