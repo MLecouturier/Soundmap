@@ -2325,9 +2325,9 @@ function applySynthConfig(el, cfg) {
     });
     el.querySelector('.synth-reverse-note-length').classList.toggle('active', !!cfg.note_length_reversed);
     el.querySelector('.synth-note-length-section').classList.toggle('reversed', !!cfg.note_length_reversed);
-    // Sustain defaults to true when absent (sessions saved before the
-    // pizzicato option existed)
-    el.querySelector('.synth-note-sustain').classList.toggle('active', cfg.note_sustain !== false);
+    // Sustain: false by default (pizzicato) — also the backend's default
+    // for sessions saved before the option existed
+    el.querySelector('.synth-note-sustain').classList.toggle('active', !!cfg.note_sustain);
     // Note ranges (mono + one per voice)
     const setRange = (group, toggles) => ['bass', 'medium', 'treble'].forEach((kind, i) => {
         group.querySelector(`.synth-${kind}`).classList.toggle('active', !!(toggles && toggles[i]));
@@ -2536,7 +2536,7 @@ function createSynthElement(id, cfg = null) {
                         <button class="synth-reverse-note-length icon-btn" data-i18n-title="synth.reverseNoteLength">
                             <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
                         </button>
-                        <button class="synth-note-sustain icon-btn active" data-i18n-title="synth.noteSustain">
+                        <button class="synth-note-sustain icon-btn" data-i18n-title="synth.noteSustain">
                             <span class="material-symbols-outlined" aria-hidden="true">line_start</span>
                         </button>
                     </div>
@@ -2563,17 +2563,16 @@ function createSynthElement(id, cfg = null) {
                 <div class="synth-section">
                     <div class="synth-section-header">
                         <span class="synth-section-title" data-i18n="synth.velocityRange" data-i18n-title="synth.velocityRange"></span>
-                        <em class="synth-section-value"><span class="velocity-min-val">0</span> – <span class="velocity-max-val">127</span></em>                        
-                    </div>
-                    <div class="synth-section-header">
-                        <div class="synth-section-body synth-range-track">
-                            <div class="synth-range-fill"></div>
-                            <input type="range" class="synth-range-input velocity-min" min="0" max="126" value="0" step="1" />
-                            <input type="range" class="synth-range-input velocity-max" min="0" max="127" value="127" step="1" />
-                        </div>
+                        <em class="synth-section-value"><span class="velocity-min-val">0</span> – <span class="velocity-max-val">127</span></em>   
+                        <div class="flex-filler"></div> 
                         <button class="synth-relative-velocity-range icon-btn active" data-i18n-title="synth.velocityRelative">
                             <span class="material-symbols-outlined" aria-hidden="true">arrow_or_edge</span>
-                        </button>
+                        </button>                    
+                    </div>
+                    <div class="synth-section-body synth-range-track">
+                        <div class="synth-range-fill"></div>
+                        <input type="range" class="synth-range-input velocity-min" min="0" max="126" value="0" step="1" />
+                        <input type="range" class="synth-range-input velocity-max" min="0" max="127" value="127" step="1" />
                     </div>
                 </div>
 
@@ -2971,10 +2970,12 @@ function createSynthElement(id, cfg = null) {
         else            clearRangeHighlight(id);
     });
 
-    // Zone drawing: arm/cancel the rectangle-drawing mode on the image
+    // Zone drawing: arm/cancel the rectangle-drawing mode on the image.
+    // Clicking while the lasso is armed switches to the rectangle mode
+    // right away instead of merely disarming the lasso.
     el.querySelector('.synth-add-zone-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
-        if (zonePickState && zonePickState.id === id) {
+        if (zonePickState && zonePickState.id === id && zonePickState.mode === 'rect') {
             cancelZonePicking();
         } else {
             startZonePicking(id, btn);

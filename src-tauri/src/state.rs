@@ -216,7 +216,7 @@ impl Synth {
 
             note_lengths: vec![NoteLength::Quarter],
             note_length_reversed: false,
-            note_sustain: true,
+            note_sustain: false,
             note_generation: 0,
 
             mono_note_range: [false, false, false],
