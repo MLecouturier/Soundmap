@@ -46,6 +46,30 @@ pub enum ReadingDirection {
     BottomToTop,
 }
 
+/// Musical scale the derived notes are quantized to: each raw note is
+/// snapped to the nearest degree of the scale that stays within the
+/// enabled note ranges. Chromatic (the default) means no quantization
+/// at all — every semitone is allowed, i.e. the historical behavior.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum Scale {
+    #[default]
+    Chromatic,
+    Major,
+    NaturalMinor,
+    HarmonicMinor,
+    MelodicMinor,
+    MajorPentatonic,
+    MinorPentatonic,
+    Blues,
+    Dorian,
+    Phrygian,
+    Lydian,
+    Mixolydian,
+    Locrian,
+    WholeTone,
+}
+
 /// Sound currently selected on a MIDI channel, as heard on the MIDI input
 /// or sent by the app itself. Banks are optional: we only know them when
 /// a Bank Select has actually been received (a device's power-on bank
@@ -149,8 +173,12 @@ pub struct Synth {
 
     // --- MIDI note range filters ---
     pub mono_note_range: [bool; 3],       // bass, medium, treble enabled for the
-                                          // monophonic note (all off = full 0–127)
+                                           // monophonic note (all off = full 0–127)
     pub voice_note_ranges: [[bool; 3]; 3], // same, per R/G/B voice, polyphonic mode
+
+    // --- Scale quantization ---
+    pub scale: Scale,   // scale the derived notes are snapped to (Chromatic = none)
+    pub scale_root: u8, // scale tonic as a pitch class 0–11 (0 = C)
 }
 
 impl Synth {
@@ -193,6 +221,9 @@ impl Synth {
 
             mono_note_range: [false, false, false],
             voice_note_ranges: [[false, false, false]; 3],
+
+            scale: Scale::Chromatic,
+            scale_root: 0,
         }
     }
 }

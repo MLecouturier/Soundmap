@@ -8,7 +8,7 @@ use image::{DynamicImage, GenericImageView};
 use crate::error::{err, AppError};
 use crate::config::ConfigState;
 use crate::state::{
-    ImageState, NoteLength, PixelZone, ReadingDirection, Synth, SynthMode, SynthState, MidiState,
+    ImageState, NoteLength, PixelZone, ReadingDirection, Scale, Synth, SynthMode, SynthState, MidiState,
 };
 
 /// Computes the perceived brightness of an RGBA pixel (Rec.601 formula), 0.0–255.0.
@@ -118,10 +118,11 @@ fn process_monophonic(
     let hue = pixel_hue(r, g, b);
     let shifted_hue = (hue + synth.hue_shift as f32) % 360.0;
     let raw_note = hue_to_midi_note(shifted_hue);
-    // Rescale the hue proportionally across the enabled MIDI range filters:
-    // the pitch rises gradually from the low to the high bound of the
-    // allowed range as the hue increases.
-    let effective_note = rescale_into_range(shifted_hue / 360.0, note_range_bounds, &synth.mono_note_range);
+    // Rescale the hue proportionally across the enabled MIDI range filters,
+    // then quantize to the synth's scale: the pitch rises gradually from
+    // the low to the high bound of the allowed range as the hue increases,
+    // landing only on scale degrees.
+    let effective_note = effective_note_for(synth, shifted_hue / 360.0, note_range_bounds, &synth.mono_note_range);
 
     let in_range = brightness_level >= synth.brightness_min
         && brightness_level <= synth.brightness_max;
@@ -178,9 +179,11 @@ fn process_polyphonic(
         let enabled = synth.channel_enabled[i];
         let raw_note = channel_to_midi_note(channel_values[i]);
         // Rescale the channel value proportionally across this voice's
-        // enabled range filters: the pitch rises gradually from the low to
-        // the high bound of the allowed range as the channel value increases.
-        let effective_note = rescale_into_range(channel_values[i] as f32 / 255.0, note_range_bounds, &synth.voice_note_ranges[i]);
+        // enabled range filters, then quantize to the synth's scale: the
+        // pitch rises gradually from the low to the high bound of the
+        // allowed range as the channel value increases, landing only on
+        // scale degrees.
+        let effective_note = effective_note_for(synth, channel_values[i] as f32 / 255.0, note_range_bounds, &synth.voice_note_ranges[i]);
         let voice = &mut synth.poly_voices[i];
 
         let in_range = enabled && global_in_range;
@@ -544,20 +547,11 @@ fn active_note_ranges(bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> Vec<(u8, u
         .collect()
 }
 
-/// Rescales a normalized value (0.0–1.0) proportionally across the enabled
-/// note-range sub-ranges: the pitch rises gradually and continuously from
-/// the low bound of the first enabled sub-range to the high bound of the
-/// last one as the value increases. With several disjoint sub-ranges
-/// enabled, the sweep walks through each of them in order, skipping the
-/// gaps. With no sub-range enabled, the full MIDI range (0–127) is used.
-fn rescale_into_range(normalized: f32, bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> u8 {
+/// Sorts the enabled sub-ranges and merges the overlapping/adjacent ones
+/// so their union is walked exactly once, in ascending order. An empty
+/// result means no sub-range is enabled (the full 0–127 range is used).
+fn merged_note_ranges(bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> Vec<(u8, u8)> {
     let mut allowed = active_note_ranges(bounds, toggles);
-    if allowed.is_empty() {
-        return (normalized.clamp(0.0, 1.0) * 127.0).round() as u8;
-    }
-
-    // Sort the sub-ranges and merge the overlapping/adjacent ones so the
-    // union is walked exactly once, in ascending order.
     allowed.sort_unstable();
     let mut merged: Vec<(u8, u8)> = Vec::with_capacity(allowed.len());
     for &(lo, hi) in &allowed {
@@ -569,6 +563,20 @@ fn rescale_into_range(normalized: f32, bounds: &[(u8, u8); 3], toggles: &[bool; 
             }
             _ => merged.push((lo, hi)),
         }
+    }
+    merged
+}
+
+/// Rescales a normalized value (0.0–1.0) proportionally across the enabled
+/// note-range sub-ranges: the pitch rises gradually and continuously from
+/// the low bound of the first enabled sub-range to the high bound of the
+/// last one as the value increases. With several disjoint sub-ranges
+/// enabled, the sweep walks through each of them in order, skipping the
+/// gaps. With no sub-range enabled, the full MIDI range (0–127) is used.
+fn rescale_into_range(normalized: f32, bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> u8 {
+    let merged = merged_note_ranges(bounds, toggles);
+    if merged.is_empty() {
+        return (normalized.clamp(0.0, 1.0) * 127.0).round() as u8;
     }
 
     // Index of the note within the concatenated playable notes (inclusive bounds)
@@ -585,6 +593,88 @@ fn rescale_into_range(normalized: f32, bounds: &[(u8, u8); 3], toggles: &[bool; 
         index -= span;
     }
     merged[merged.len() - 1].1
+}
+
+/// Semitone offsets from the tonic of each scale, within one octave.
+fn scale_intervals(scale: Scale) -> &'static [u8] {
+    match scale {
+        Scale::Chromatic => &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        Scale::Major => &[0, 2, 4, 5, 7, 9, 11],
+        Scale::NaturalMinor => &[0, 2, 3, 5, 7, 8, 10],
+        Scale::HarmonicMinor => &[0, 2, 3, 5, 7, 8, 11],
+        Scale::MelodicMinor => &[0, 2, 3, 5, 7, 9, 11],
+        Scale::MajorPentatonic => &[0, 2, 4, 7, 9],
+        Scale::MinorPentatonic => &[0, 3, 5, 7, 10],
+        Scale::Blues => &[0, 3, 5, 6, 7, 10],
+        Scale::Dorian => &[0, 2, 3, 5, 7, 9, 10],
+        Scale::Phrygian => &[0, 1, 3, 5, 7, 8, 10],
+        Scale::Lydian => &[0, 2, 4, 6, 7, 9, 11],
+        Scale::Mixolydian => &[0, 2, 4, 5, 7, 9, 10],
+        Scale::Locrian => &[0, 1, 3, 5, 6, 8, 10],
+        Scale::WholeTone => &[0, 2, 4, 6, 8, 10],
+    }
+}
+
+/// All pitches (0–127) a synth may land on: those within its merged
+/// enabled note-range sub-ranges (the full 0–127 range when none is
+/// enabled) that also belong to its scale, relative to its tonic.
+/// The result is sorted ascending; it can be empty when the ranges are
+/// too narrow to contain any degree of the scale.
+fn allowed_pitches(synth: &Synth, bounds: &[(u8, u8); 3], toggles: &[bool; 3]) -> Vec<u8> {
+    let intervals = scale_intervals(synth.scale);
+    let ranges = merged_note_ranges(bounds, toggles);
+    let ranges = if ranges.is_empty() { vec![(0u8, 127u8)] } else { ranges };
+    let mut out = Vec::new();
+    for &(lo, hi) in &ranges {
+        for note in lo..=hi {
+            let rel = (note as i16 - synth.scale_root as i16).rem_euclid(12) as u8;
+            if intervals.contains(&rel) {
+                out.push(note);
+            }
+        }
+    }
+    out
+}
+
+/// Snaps a note to the nearest pitch of the allowed set (the nearest
+/// scale degree within the enabled ranges). Ties go to the lower pitch.
+/// A note already in the set is returned unchanged; an empty set returns
+/// the note as-is (a range too narrow for the scale falls back to the
+/// unquantized pitch rather than going silent).
+fn snap_to_allowed(note: u8, allowed: &[u8]) -> u8 {
+    match allowed.binary_search(&note) {
+        Ok(_) => note,
+        Err(idx) => {
+            let lower = if idx > 0 { Some(allowed[idx - 1]) } else { None };
+            let upper = allowed.get(idx).copied();
+            match (lower, upper) {
+                (Some(lo), Some(hi)) => {
+                    if note - lo <= hi - note { lo } else { hi }
+                }
+                (Some(lo), None) => lo,
+                (None, Some(hi)) => hi,
+                (None, None) => note,
+            }
+        }
+    }
+}
+
+/// Full pixel-to-pitch translation for one voice: rescales the normalized
+/// hue/channel value across the enabled note-range sub-ranges, then
+/// quantizes the result to the synth's scale (no-op when Chromatic —
+/// the historical behavior, every semitone allowed).
+fn effective_note_for(
+    synth: &Synth,
+    normalized: f32,
+    bounds: &[(u8, u8); 3],
+    toggles: &[bool; 3],
+) -> u8 {
+    let note = rescale_into_range(normalized, bounds, toggles);
+    if synth.scale == Scale::Chromatic {
+        note
+    } else {
+        snap_to_allowed(note, &allowed_pitches(synth, bounds, toggles))
+    }
 }
 
 pub struct MetronomeState {
@@ -867,6 +957,93 @@ mod tests {
         let toggles = [true, false, false];
         assert_eq!(rescale_into_range(-1.0, &BOUNDS, &toggles), 21);
         assert_eq!(rescale_into_range(2.0, &BOUNDS, &toggles), 47);
+    }
+
+    /// A synth configured for a scale (used by the quantization tests).
+    fn scaled_synth(scale: Scale, root: u8) -> Synth {
+        let mut synth = Synth::new(1);
+        synth.scale = scale;
+        synth.scale_root = root;
+        synth
+    }
+
+    #[test]
+    fn snaps_to_the_nearest_degree_of_the_scale() {
+        // C major, no range filter: every note lands on a scale tone
+        let synth = scaled_synth(Scale::Major, 0);
+        let allowed = allowed_pitches(&synth, &BOUNDS, &[false; 3]);
+        // C#4 (61) is equidistant between C4 (60) and D4 (62): tie → lower
+        assert_eq!(snap_to_allowed(61, &allowed), 60);
+        // F#4 (66): equidistant between F4 (65) and G4 (67) → lower
+        assert_eq!(snap_to_allowed(66, &allowed), 65);
+        // A4 (69) is a scale tone: unchanged
+        assert_eq!(snap_to_allowed(69, &allowed), 69);
+        // Below the lowest degree and above the highest: clamped to the
+        // nearest allowed pitch
+        assert_eq!(snap_to_allowed(0, &allowed), 0);
+        assert_eq!(snap_to_allowed(127, &allowed), 127);
+    }
+
+    #[test]
+    fn scale_respects_the_root_and_the_enabled_ranges() {
+        // A minor pentatonic, bass range [21, 47] only: allowed pitches
+        // are the A-minor-pentatonic tones within [21, 47]
+        let synth = scaled_synth(Scale::MinorPentatonic, 9); // A
+        let allowed = allowed_pitches(&synth, &BOUNDS, &[true, false, false]);
+        assert!(!allowed.is_empty());
+        for &n in &allowed {
+            // In the bass range…
+            assert!((21..=47).contains(&n));
+            // …and a minor pentatonic degree from A
+            let rel = (n as i16 - 9).rem_euclid(12);
+            assert!([0, 3, 5, 7, 10].contains(&rel));
+        }
+        // Snap stays inside the range: D4 (62) can't reach the scale tones
+        // above it (all disabled ranges), so it lands on the highest
+        // allowed pitch below it — 45 (A2), B not being in the scale
+        assert_eq!(snap_to_allowed(62, &allowed), 45);
+    }
+
+    #[test]
+    fn narrow_range_without_any_degree_falls_back_to_the_raw_note() {
+        // Medium range manually narrowed to [61, 61] (a single C#4):
+        // no C-major degree in it, the snap must leave the note alone
+        let bounds = [(21, 47), (61, 61), (72, 108)];
+        let synth = scaled_synth(Scale::Major, 0);
+        let allowed = allowed_pitches(&synth, &bounds, &[false, true, false]);
+        assert!(allowed.is_empty());
+        assert_eq!(snap_to_allowed(61, &allowed), 61);
+    }
+
+    #[test]
+    fn quantized_sweep_rises_monotonically() {
+        // Full hue sweep quantized to C major pentatonic: the pitch never
+        // decreases as the hue rises (snapping to a sorted set is monotonic)
+        let synth = scaled_synth(Scale::MajorPentatonic, 0);
+        let notes: Vec<u8> = (0..=200)
+            .map(|i| effective_note_for(&synth, i as f32 / 200.0, &BOUNDS, &[false; 3]))
+            .collect();
+        for w in notes.windows(2) {
+            assert!(w[1] >= w[0], "expected a monotonic rise, got {w:?}");
+        }
+        // Every landed note is a degree of the scale
+        for &n in &notes {
+            assert!([0, 2, 4, 7, 9].contains(&(n % 12)));
+        }
+    }
+
+    #[test]
+    fn chromatic_scale_leaves_the_rescaled_note_untouched() {
+        // The default must reproduce the historical behavior exactly
+        let synth = scaled_synth(Scale::Chromatic, 0);
+        let toggles = [false, true, false];
+        for i in 0..=100 {
+            let normalized = i as f32 / 100.0;
+            assert_eq!(
+                effective_note_for(&synth, normalized, &BOUNDS, &toggles),
+                rescale_into_range(normalized, &BOUNDS, &toggles),
+            );
+        }
     }
 
     #[test]

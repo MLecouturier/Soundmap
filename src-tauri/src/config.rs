@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::error::{err, AppError};
 use crate::metronome::MetronomeState;
-use crate::state::{NoteLength, ReadingDirection, Synth, SynthMode};
+use crate::state::{NoteLength, ReadingDirection, Scale, Synth, SynthMode};
 
 /// Default bounds of the three note-range filters, in MIDI note numbers.
 pub const DEFAULT_NOTE_RANGE_BOUNDS: [(u8, u8); 3] = [(21, 47), (48, 71), (72, 108)];
@@ -16,6 +16,26 @@ fn default_synth_colors() -> Vec<String> {
      "#1abc9c", "#3498db", "#9b59b6", "#e91e63",
      "#ff5722", "#00bcd4", "#8bc34a", "#ffffff"]
         .iter().map(|s| s.to_string()).collect()
+}
+
+/// All scales, in canonical order — the default `enabled_scales`.
+fn default_enabled_scales() -> Vec<Scale> {
+    vec![
+        Scale::Chromatic,
+        Scale::Major,
+        Scale::NaturalMinor,
+        Scale::HarmonicMinor,
+        Scale::MelodicMinor,
+        Scale::MajorPentatonic,
+        Scale::MinorPentatonic,
+        Scale::Blues,
+        Scale::Dorian,
+        Scale::Phrygian,
+        Scale::Lydian,
+        Scale::Mixolydian,
+        Scale::Locrian,
+        Scale::WholeTone,
+    ]
 }
 
 fn is_valid_hex_color(s: &str) -> bool {
@@ -45,6 +65,11 @@ pub struct AppConfig {
     /// entries are dropped on load; an empty list falls back to the default
     /// palette.
     pub synth_colors: Vec<String>,
+    /// Scales offered in the per-synth scale selects. Hand-edited entries
+    /// are deduplicated on load and Chromatic is always enabled (it is the
+    /// "no quantization" default, a synth can never lose access to it).
+    /// The selects show the enabled scales in their canonical order.
+    pub enabled_scales: Vec<Scale>,
 }
 
 impl Default for AppConfig {
@@ -55,6 +80,7 @@ impl Default for AppConfig {
             default_synth: SynthTemplate::default(),
             note_range_bounds: DEFAULT_NOTE_RANGE_BOUNDS,
             synth_colors: default_synth_colors(),
+            enabled_scales: default_enabled_scales(),
         }
     }
 }
@@ -72,6 +98,18 @@ impl AppConfig {
         if self.synth_colors.is_empty() {
             self.synth_colors = default_synth_colors();
         }
+        // Scale enablement: deduplicate, and always keep Chromatic (the
+        // "no quantification" default)
+        let mut seen: Vec<Scale> = Vec::new();
+        for scale in self.enabled_scales.drain(..) {
+            if !seen.contains(&scale) {
+                seen.push(scale);
+            }
+        }
+        if !seen.contains(&Scale::Chromatic) {
+            seen.insert(0, Scale::Chromatic);
+        }
+        self.enabled_scales = seen;
     }
 }
 
@@ -99,6 +137,8 @@ pub struct SynthTemplate {
     pub note_sustain: bool,
     pub mono_note_range: [bool; 3],
     pub voice_note_ranges: [[bool; 3]; 3],
+    pub scale: Scale,
+    pub scale_root: u8,
 }
 
 impl Default for SynthTemplate {
@@ -132,6 +172,8 @@ impl SynthTemplate {
             note_sustain: synth.note_sustain,
             mono_note_range: synth.mono_note_range,
             voice_note_ranges: synth.voice_note_ranges,
+            scale: synth.scale,
+            scale_root: synth.scale_root,
         }
     }
 
@@ -161,6 +203,8 @@ impl SynthTemplate {
         synth.note_sustain = self.note_sustain;
         synth.mono_note_range = self.mono_note_range;
         synth.voice_note_ranges = self.voice_note_ranges;
+        synth.scale = self.scale;
+        synth.scale_root = self.scale_root.min(11);
         synth
     }
 }
@@ -358,5 +402,39 @@ mod tests {
         config.synth_colors = vec![];
         config.sanitize();
         assert_eq!(config.synth_colors, default_synth_colors());
+    }
+
+    #[test]
+    fn sanitize_dedupes_enabled_scales_and_forces_chromatic() {
+        // Duplicates collapse, and Chromatic is forced in even when the
+        // hand-edited file drops it
+        let mut config = AppConfig {
+            enabled_scales: vec![Scale::Major, Scale::Major, Scale::Blues],
+            ..AppConfig::default()
+        };
+        config.sanitize();
+        assert_eq!(config.enabled_scales, vec![Scale::Chromatic, Scale::Major, Scale::Blues]);
+
+        // Chromatic already present: kept once, order preserved
+        let mut config = AppConfig {
+            enabled_scales: vec![Scale::Chromatic, Scale::Blues, Scale::Chromatic],
+            ..AppConfig::default()
+        };
+        config.sanitize();
+        assert_eq!(config.enabled_scales, vec![Scale::Chromatic, Scale::Blues]);
+    }
+
+    #[test]
+    fn config_without_enabled_scales_loads_them_all() {
+        // A file written before the field existed: every scale is enabled
+        let json = r##"{
+            "max_image_size": 2048,
+            "default_bpm": 120,
+            "default_synth": {},
+            "note_range_bounds": [[21, 47], [48, 71], [72, 108]],
+            "synth_colors": ["#3498db"]
+        }"##;
+        let config: AppConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.enabled_scales, default_enabled_scales());
     }
 }

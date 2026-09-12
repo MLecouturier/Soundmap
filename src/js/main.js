@@ -343,6 +343,15 @@ invoke('get_config').then(config => {
             return [Math.max(0, Math.min(127, l)), Math.max(0, Math.min(127, h))];
         });
     }
+    // Enabled scales: unknown values are dropped, chromatic is always
+    // kept. Synth cards created before the config arrived are refreshed.
+    if (Array.isArray(config.enabled_scales)) {
+        ENABLED_SCALES = new Set(
+            config.enabled_scales.filter(s => SCALE_OPTIONS.some(o => o.value === s))
+        );
+    }
+    ENABLED_SCALES.add('chromatic');
+    document.querySelectorAll('.synth-block').forEach(el => refreshScaleSelects(el));
 }).catch(err => console.error('Error in get_config:', err));
 
 document.querySelector('#open-config-btn').addEventListener('click', () => {
@@ -1368,6 +1377,52 @@ let NOTE_RANGE_BOUNDS = [[21, 47], [48, 71], [72, 108]];
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+// Scales offered for note quantization: values match the backend's Scale
+// enum (serde camelCase). Chromatic = no quantization (default).
+const SCALE_OPTIONS = [
+    { value: 'chromatic',        key: 'synth.scaleChromatic' },
+    { value: 'major',            key: 'synth.scaleMajor' },
+    { value: 'naturalMinor',     key: 'synth.scaleNaturalMinor' },
+    { value: 'harmonicMinor',    key: 'synth.scaleHarmonicMinor' },
+    { value: 'melodicMinor',     key: 'synth.scaleMelodicMinor' },
+    { value: 'majorPentatonic',  key: 'synth.scaleMajorPentatonic' },
+    { value: 'minorPentatonic',  key: 'synth.scaleMinorPentatonic' },
+    { value: 'blues',            key: 'synth.scaleBlues' },
+    { value: 'dorian',           key: 'synth.scaleDorian' },
+    { value: 'phrygian',         key: 'synth.scalePhrygian' },
+    { value: 'lydian',           key: 'synth.scaleLydian' },
+    { value: 'mixolydian',       key: 'synth.scaleMixolydian' },
+    { value: 'locrian',          key: 'synth.scaleLocrian' },
+    { value: 'wholeTone',        key: 'synth.scaleWholeTone' },
+];
+
+// Scales enabled in the global config (config.json, applied at the next
+// start): the per-synth scale selects only offer these. Chromatic is
+// always enabled — it is the "no quantification" default.
+let ENABLED_SCALES = new Set(SCALE_OPTIONS.map(o => o.value));
+
+// Options markup for a scale select: the enabled scales, plus a ghost
+// option for `activeScale` when it is globally disabled — a synth using
+// it keeps its value, the config never corrupts a synth's state.
+function scaleOptionsHtml(activeScale) {
+    const shown = SCALE_OPTIONS.filter(o => ENABLED_SCALES.has(o.value));
+    if (activeScale && !ENABLED_SCALES.has(activeScale)) {
+        const ghost = SCALE_OPTIONS.find(o => o.value === activeScale);
+        if (ghost) shown.push(ghost);
+    }
+    return shown.map(o => `<option value="${o.value}">${t(o.key)}</option>`).join('');
+}
+
+// Rebuilds a synth card's scale selects from the enabled-scales config,
+// keeping each select's current value (ghost option included)
+function refreshScaleSelects(el) {
+    el.querySelectorAll('.synth-scale').forEach(sel => {
+        const current = sel.value || 'chromatic';
+        sel.innerHTML = scaleOptionsHtml(current);
+        sel.value = current;
+    });
+}
+
 function midiNoteName(n) {
     return NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1);
 }
@@ -2281,6 +2336,17 @@ function applySynthConfig(el, cfg) {
     el.querySelectorAll('.synth-mode-panel-poly .synth-note-range').forEach((group, i) => {
         setRange(group, cfg.voice_note_ranges && cfg.voice_note_ranges[i]);
     });
+    // Scale quantization (shared by both panels; defaults for sessions
+    // saved before the option existed). The select is rebuilt with the
+    // restored scale as the active one: if it is globally disabled the
+    // ghost option keeps it selectable instead of corrupting the value.
+    const scale = cfg.scale || 'chromatic';
+    const scaleRoot = Number.isInteger(cfg.scale_root) ? cfg.scale_root : 0;
+    el.querySelectorAll('.synth-scale').forEach(sel => {
+        sel.innerHTML = scaleOptionsHtml(scale);
+        sel.value = scale;
+    });
+    el.querySelectorAll('.synth-scale-root').forEach(sel => { sel.value = String(scaleRoot); });
 }
 
 // One bass/medium/treble filter group: used four times per card
@@ -2422,6 +2488,8 @@ function createSynthElement(id, cfg = null) {
                         </div>
                         <div class="synth-section-body">
                             ${noteRangeGroup()}
+                            <select class="synth-scale" data-i18n-title="synth.scale"></select>
+                            <select class="synth-scale-root" data-i18n-title="synth.scaleRoot"></select>
                         </div>
                     </div>
                     <div class="synth-section">
@@ -2439,6 +2507,8 @@ function createSynthElement(id, cfg = null) {
                     <div class="synth-section">
                         <div class="synth-section-header">
                             <span class="synth-section-title" data-i18n="synth.channelsPanelLabel"></span>
+                            <select class="synth-scale" data-i18n-title="synth.scale"></select>
+                            <select class="synth-scale-root" data-i18n-title="synth.scaleRoot"></select>
                         </div>
                         <div class="synth-section-body">
                             <div class="synth-channel-toggles">
@@ -2792,6 +2862,36 @@ function createSynthElement(id, cfg = null) {
             sendSynthNoteRanges(id, el);
         });
     });
+
+    // ---- Scale quantization: gamme + tonique ----
+    // One setting for the whole synth, mirrored in the mono and poly
+    // panels: changing either select syncs the other. Every derived
+    // note is snapped to the nearest degree of the chosen scale that
+    // stays within the enabled note ranges.
+    const scaleSelects = el.querySelectorAll('.synth-scale');
+    const scaleRootSelects = el.querySelectorAll('.synth-scale-root');
+    scaleSelects.forEach(sel => {
+        sel.innerHTML = scaleOptionsHtml(null);
+    });
+    scaleRootSelects.forEach(sel => {
+        sel.innerHTML = NOTE_NAMES
+            .map((name, i) => `<option value="${i}">${name}</option>`)
+            .join('');
+    });
+    const sendSynthScale = () => {
+        const scale = scaleSelects[0].value;
+        const root = Number(scaleRootSelects[0].value);
+        invoke('set_synth_scale', { id, scale, root })
+            .catch(err => console.error('Error in set_synth_scale:', err));
+    };
+    scaleSelects.forEach(sel => sel.addEventListener('change', () => {
+        scaleSelects.forEach(other => { other.value = sel.value; });
+        sendSynthScale();
+    }));
+    scaleRootSelects.forEach(sel => sel.addEventListener('change', () => {
+        scaleRootSelects.forEach(other => { other.value = sel.value; });
+        sendSynthScale();
+    }));
 
     // ---- Note lengths: brightness → duration mapping ----
     // At least one length must stay enabled: clicking the last remaining

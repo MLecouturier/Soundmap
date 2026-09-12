@@ -2,7 +2,7 @@ use tauri::State;
 use crate::config::ConfigState;
 use crate::error::{err, AppError};
 use crate::metronome::remapped_cursor;
-use crate::state::{NoteLength, PixelZone, ProgramState, ReadingDirection, Synth, SynthMode, SynthState, ImageState, MidiState};
+use crate::state::{NoteLength, PixelZone, ProgramState, ReadingDirection, Scale, Synth, SynthMode, SynthState, ImageState, MidiState};
 
 // --- Existing SynthConfig / SynthEngine (pure pixel-processing logic) ---
 // (unchanged, assumed to remain above or below in this file)
@@ -471,6 +471,27 @@ pub fn set_synth_note_ranges(
         Some(synth) => {
             synth.mono_note_range = mono;
             synth.voice_note_ranges = voices;
+            Ok(())
+        }
+        None => Err(synth_not_found(id)),
+    }
+}
+
+/// Sets the scale the synth's notes are quantized to, and its tonic
+/// (a pitch class 0–11, 0 = C). The scale is shared by the monophonic
+/// note and every polyphonic voice. Chromatic disables quantization.
+#[tauri::command]
+pub fn set_synth_scale(
+    id: u32,
+    scale: Scale,
+    root: u8,
+    state: State<SynthState>,
+) -> Result<(), AppError> {
+    let mut synths = state.synths.lock().unwrap();
+    match synths.get_mut(&id) {
+        Some(synth) => {
+            synth.scale = scale;
+            synth.scale_root = root.min(11);
             Ok(())
         }
         None => Err(synth_not_found(id)),

@@ -288,7 +288,7 @@ pub async fn load_session(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{NoteLength, ReadingDirection, SynthMode};
+    use crate::state::{NoteLength, ReadingDirection, Scale, SynthMode};
 
     /// A session saved before velocity_max existed must load with the
     /// default (127), not fail or fall back to 0.
@@ -352,6 +352,8 @@ mod tests {
         synth.note_sustain = false;
         synth.mono_note_range = [true, false, true];
         synth.voice_note_ranges = [[true, false, false], [false, true, false], [false, false, true]];
+        synth.scale = Scale::Blues;
+        synth.scale_root = 9;
 
         let original = SessionSynth {
             id: 7,
@@ -397,5 +399,7 @@ mod tests {
         assert_eq!(s.note_sustain, synth.note_sustain);
         assert_eq!(s.mono_note_range, synth.mono_note_range);
         assert_eq!(s.voice_note_ranges, synth.voice_note_ranges);
+        assert_eq!(s.scale, synth.scale);
+        assert_eq!(s.scale_root, synth.scale_root);
     }
 }
